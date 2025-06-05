@@ -111,7 +111,6 @@ export default function CatalogPage() {
         <ul className={`${styles.navLinksScrollable}`}>
           <li><Link href="/#home" className="hover:underline">Home</Link></li>
           <li><Link href="/#catalogue" className="hover:underline">Catalog</Link></li>
-          <li><Link href="/#testimonials" className="hover:underline">Testimonials</Link></li>
           <li><Link href="/#contact" className="hover:underline">Contact</Link></li>
         </ul>
       </nav>
