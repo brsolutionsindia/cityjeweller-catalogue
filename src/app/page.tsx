@@ -47,6 +47,14 @@ export default function Home() {
     { label: 'Others', image: '/others.png', link: '/catalog?type=OT' }
   ];
 
+  const silverItems = [
+    { label: 'Silver Rings', image: '/silver-rings.png', link: '/catalog?type=SRG' },
+    { label: 'Silver Kada', image: '/silver-kada.png', link: '/catalog?type=SOT' },
+    { label: 'Silver Nazariye', image: '/silver-nazariye.png', link: '/catalog?type=SBR' },
+    { label: 'Silver Pendants', image: '/silver-pendants.png', link: '/catalog?type=SPD' }
+  ];
+
+
   return (
     <main style={{ backgroundColor: '#fff', padding: '1rem' }}>
       {/* Navbar */}
@@ -104,6 +112,31 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+
+{/* Silver Grid */}
+<section id="silver" className={`${productStyles.catalogSection} ${productStyles.silverSection}`}>
+  <h2 className={productStyles.sectionHeading}>Silver Store</h2>
+
+  <div className={productStyles.catalogContainer}>
+    <div className={productStyles.catalogSlider}>
+      <div className={productStyles.horizontalScroll}>
+        {silverItems.map(item => (
+          <div className={productStyles.productCardHorizontal} key={item.label}>
+            <Link href={item.link}>
+              <Image src={item.image} alt={item.label} width={160} height={160} className={productStyles.productImg} />
+              <h4 className={productStyles.productLabel}>{item.label}</h4>
+            </Link>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+
 
       {/* Footer */}
       <footer className={footerStyles.footer} id="contact">

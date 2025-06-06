@@ -122,3 +122,10 @@
   border-bottom: 2px solid #cc8c23;
   display: inline-block;
 }
+
+
+.silverSection {
+  background-color: #fafafa;
+  padding: 2rem 1rem;
+  border-radius: 16px;
+}

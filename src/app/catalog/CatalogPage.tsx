@@ -73,16 +73,19 @@ export default function CatalogPage() {
         const imgData = imgSnap.val();
         if (skuData) {
           const allItems = Object.entries(skuData) as [string, SkuData][];
-	  const filteredItems = allItems.filter(([key, value]) => {
-	    const remarks = (value?.remarks || '').toLowerCase();
+const filteredItems = allItems.filter(([key, value]) => {
+  const remarks = (value?.remarks || '').toLowerCase();
+  const containsSilver = remarks.includes('sil');
 
-	    const containsSilver = remarks.includes('sil');
+  if (!typeFilter) return true;
 
-	    // First, check if typeFilter matches
-	    const matchesType = !typeFilter || key.includes(typeFilter);
-
-	    // Only include if it matches the type and does NOT contain 'sil'
-	    return matchesType && !containsSilver;
+  // If it's a silver-prefixed category like SRG
+  if (typeFilter.startsWith('S')) {
+    const goldType = typeFilter.substring(1); // SRG → RG
+    return key.includes(goldType) && containsSilver;
+  } else {
+    return key.includes(typeFilter) && !containsSilver;
+  }
 });
 
 
