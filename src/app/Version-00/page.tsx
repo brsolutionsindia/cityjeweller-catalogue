@@ -62,45 +62,48 @@ export default function Home() {
       </nav>
 
       {/* Banner */}
-<section className={bannerStyles.offerBanner}>
-  <div className={`${bannerStyles.offerContent} ${isMobile ? bannerStyles.mobileContent : ''}`}>
-    <span className={bannerStyles.goldLabel}>({rateDate})22kt Rate:</span>
-    <span className={bannerStyles.goldRateText}>₹{goldRate}</span>
-    <span className={bannerStyles.unitText}>/10gm</span>
-    <a
-      href="https://api.whatsapp.com/send?phone=919023130944&text=Hello%2C%20I%20am%20interested%20in%20learning%20more%20about%20your%20Digital%20Gold%20services.%20Please%20share%20the%20details."
-      target="_blank"
-      rel="noopener noreferrer"
-      className={bannerStyles.bookGoldBtn}
-    >
-      Book Digital Gold
-    </a>
-  </div>
-</section>
+      {isMobile ? (
+        <div className={bannerStyles.horizontalScroll}>
+          <div className={bannerStyles.productCardHorizontal}>
+            <span className={bannerStyles.goldLabel}>({rateDate?.slice(0, 5)})22kt Gold Rate:</span>
+            <span className={bannerStyles.goldRateText}>₹{goldRate}</span>
+            <span className={bannerStyles.unitText}>/10gm</span>
+            <a href="https://api.whatsapp.com/send?phone=919023130944&text=Hello%2C%20I%20am%20interested%20in%20learning%20more%20about%20your%20Digital%20Gold%20services.%20Please%20share%20the%20details." target="_blank" rel="noopener noreferrer" className={bannerStyles.bookGoldBtn}>Book</a>
+          </div>
+        </div>
+      ) : (
+        <section className={bannerStyles.offerBanner}>
+          <div className={bannerStyles.offerContent}>
+            <span className={bannerStyles.goldLabel}>({rateDate})22kt Rate:</span>
+            <span className={bannerStyles.goldRateText}>₹{goldRate}</span>
+            <span className={bannerStyles.unitText}>/10gm</span>
+            <a href="https://api.whatsapp.com/send?phone=919023130944&text=Hello%2C%20I%20am%20interested%20in%20learning%20more%20about%20your%20Digital%20Gold%20services.%20Please%20share%20the%20details." target="_blank" rel="noopener noreferrer" className={bannerStyles.bookGoldBtn}>Book Digital Gold</a>
+          </div>
+        </section>
+      )}
 
       {/* Hero */}
       <section className={heroStyles.hero}>
         <Image src="/hero-banner.png" alt="Jewellery Banner" width={1200} height={400} className={heroStyles.heroImage} />
       </section>
 
-
       {/* Product Grid */}
       <section id="catalogue" className={productStyles.catalogSection}>
-<h2 className={productStyles.sectionHeading}>Gold & Diamond</h2>
-
         <div className={productStyles.catalogContainer}>
+          <div className={productStyles.catalogBanner}>
+            <Image src="/products-banner.png" alt="Product Banner" width={500} height={350} className={productStyles.bannerImage} />
+          </div>
           <div className={productStyles.catalogSlider}>
             <div className={productStyles.horizontalScroll}>
-  {productItems.map(item => (
-    <div className={productStyles.productCardHorizontal} key={item.label}>
-      <Link href={item.link}>
-        <Image src={item.image} alt={item.label} width={160} height={160} className={productStyles.productImg} />
-        <h4 className={productStyles.productLabel}>{item.label}</h4>
-      </Link>
-    </div>
-  ))}
-</div>
-
+              {productItems.map((item, index) => (
+                <div key={index} className={productStyles.productCardHorizontal}>
+                  <Link href={item.link}>
+                    <Image src={item.image} alt={item.label} width={160} height={160} className={productStyles.productImg} />
+                  </Link>
+                  <h3 className={productStyles.productLabel}>{item.label}</h3>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
