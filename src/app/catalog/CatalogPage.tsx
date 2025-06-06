@@ -12,6 +12,7 @@ import Link from 'next/link';
 export default function CatalogPage() {
   type SkuData = {
     grTotalPrice?: number;
+    remarks?: string;
   };
 
   const [products, setProducts] = useState<{ id: string; price: number | string; image: string }[]>([]);
@@ -27,6 +28,13 @@ export default function CatalogPage() {
     ER: 'Earrings Collection',
     RG: 'Rings Collection',
     NK: 'Necklace Collection',
+    PD: 'Pendants Collection',
+    MG: 'Mangalsutra Collection',
+    BG: 'Bangles Collection',
+    BR: 'Bracelets Collection',
+    CH: 'Chains Collection',
+    NP: 'Nose Pins Collection',
+    OT: 'Miscellaneous Collection',
   };
 
   const heading = typeFilter && typeMap[typeFilter] ? typeMap[typeFilter] : 'All Collection';
@@ -65,10 +73,18 @@ export default function CatalogPage() {
         const imgData = imgSnap.val();
         if (skuData) {
           const allItems = Object.entries(skuData) as [string, SkuData][];
-          const filteredItems = allItems.filter(([key]) => {
-            if (!typeFilter) return true;
-            return key.includes(typeFilter);
-          });
+	  const filteredItems = allItems.filter(([key, value]) => {
+	    const remarks = (value?.remarks || '').toLowerCase();
+
+	    const containsSilver = remarks.includes('sil');
+
+	    // First, check if typeFilter matches
+	    const matchesType = !typeFilter || key.includes(typeFilter);
+
+	    // Only include if it matches the type and does NOT contain 'sil'
+	    return matchesType && !containsSilver;
+});
+
 
           const items = await Promise.all(
             filteredItems.map(async ([key, value]) => {
@@ -115,11 +131,8 @@ export default function CatalogPage() {
         </ul>
       </nav>
 
-{/* Offer Banner */}
-      {/* isMobile is to be ignored here*/}
-      {/* isMobile is to be ignored here*/}
-
-      {isMobile? (
+      {/* Offer Banner */}
+      {isMobile ? (
         <div className={styles.horizontalScroll} style={{ marginTop: '1rem', paddingBottom: '0.5rem', borderRadius: '12px', backgroundColor: '#f3f3f3'}}>
           <div className={styles.productCardHorizontal}>
             <span className={styles.goldLabel}>({rateDate?.slice(0, 5)})22kt Gold Rate:</span>
@@ -138,9 +151,7 @@ export default function CatalogPage() {
       ) : (
         <section className={styles.offerBanner} style={{ borderRadius: '12px', backgroundColor: '#f3f3f3' }}>
           <div className={styles.offerContent}>
-            <span className={styles.goldLabel}>
-            ({rateDate})22kt Rate:
-            </span>
+            <span className={styles.goldLabel}>({rateDate})22kt Rate:</span>
             <span className={styles.goldRateText}>₹{goldRate}</span>
             <span className={styles.unitText}>/10gm</span>
             <a
@@ -155,7 +166,7 @@ export default function CatalogPage() {
         </section>
       )}
 
-{/* Catalog Grid */}
+      {/* Catalog Grid */}
       <section>
         <h1>{heading}</h1>
         <p className={styles.itemCount}>{products.length} item(s)</p>
@@ -189,6 +200,13 @@ export default function CatalogPage() {
                 <li onClick={() => { handleFilterClick('ER'); setMenuOpen(null); }}>Earrings</li>
                 <li onClick={() => { handleFilterClick('RG'); setMenuOpen(null); }}>Rings</li>
                 <li onClick={() => { handleFilterClick('NK'); setMenuOpen(null); }}>Necklaces</li>
+                <li onClick={() => { handleFilterClick('PD'); setMenuOpen(null); }}>Pendants</li>
+                <li onClick={() => { handleFilterClick('MG'); setMenuOpen(null); }}>Mangalsutra</li>
+                <li onClick={() => { handleFilterClick('BG'); setMenuOpen(null); }}>Bangles</li>
+                <li onClick={() => { handleFilterClick('BR'); setMenuOpen(null); }}>Bracelets</li>
+                <li onClick={() => { handleFilterClick('CH'); setMenuOpen(null); }}>Chains</li>
+                <li onClick={() => { handleFilterClick('NP'); setMenuOpen(null); }}>Nose Pins</li>
+                <li onClick={() => { handleFilterClick('OT'); setMenuOpen(null); }}>Others</li>
               </ul>
             )}
             {menuOpen === 'sort' && (
@@ -206,3 +224,4 @@ export default function CatalogPage() {
     </main>
   );
 }
+

@@ -114,7 +114,8 @@
 .heroImage {
   width: 100%;
   height: auto;
-  object-fit: cover;
+  objectFit: 'cover';
+  filter: brightness(0.8)
 }
 
 .heroOverlay {

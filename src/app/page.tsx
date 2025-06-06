@@ -41,8 +41,16 @@ export default function Home() {
   const productItems = [
     { label: 'Earrings', image: '/earrings.png', link: '/catalog?type=ER' },
     { label: 'Rings', image: '/rings.png', link: '/catalog?type=RG' },
-    { label: 'Necklace Sets', image: '/necklace.png', link: '/catalog?type=NK' }
+    { label: 'Necklace Sets', image: '/necklace.png', link: '/catalog?type=NK' },
+    { label: 'Pendants', image: '/pendants.png', link: '/catalog?type=PD' },
+    { label: 'Mangalsutra', image: '/mangalsutra.png', link: '/catalog?type=MG' },
+    { label: 'Bangles', image: '/bangles.png', link: '/catalog?type=BG' },
+    { label: 'Bracelets', image: '/bracelets.png', link: '/catalog?type=BR' },
+    { label: 'Chains', image: '/chains.png', link: '/catalog?type=CH' },
+    { label: 'Nose Pins', image: '/nosepins.png', link: '/catalog?type=NP' },
+    { label: 'Others', image: '/others.png', link: '/catalog?type=OT' }
   ];
+
 
   return (
     <main className={styles.main} id="home" style={{ backgroundColor: '#fff', padding: '1rem' }}>
