@@ -63,7 +63,7 @@ export default function Home() {
 
       {/* Banner */}
 <section className={bannerStyles.offerBanner}>
-  <div className={`${bannerStyles.offerContent} ${isMobile ? bannerStyles.mobileContent : ''}`}>
+  <div className={`${bannerStyles.offerContent} ${isMobile ? bannerStyles.mobileScroll : ''}`}>
     <span className={bannerStyles.goldLabel}>({rateDate})22kt Rate:</span>
     <span className={bannerStyles.goldRateText}>₹{goldRate}</span>
     <span className={bannerStyles.unitText}>/10gm</span>
@@ -108,11 +108,11 @@ export default function Home() {
       {/* Footer */}
       <footer className={footerStyles.footer} id="contact">
         <p>📞 <a href="https://api.whatsapp.com/send?phone=919023130944&text=Hi%2C%20I%20was%20checking%20out%20your%20website%20and%20would%20like%20to%20know%20more%20details." target="_blank" rel="noopener noreferrer">+91-90231-30944</a></p>
-        <div className={footerStyles.socialIcons}>
-          <a href="https://www.facebook.com/cityJewellersIndia/" target="_blank" rel="noopener noreferrer">
-            <img src="/facebook-icon.png" alt="Facebook" width="30" height="30" />
-          </a>
-        </div>
+<div className={footerStyles.socialIcons}>
+  <a href="https://www.facebook.com/cityJewellersIndia/" target="_blank" rel="noopener noreferrer" className={footerStyles.iconCircle}>
+    <img src="/facebook-icon.png" alt="Facebook" />
+  </a>
+</div>
       </footer>
 
       {/* WhatsApp Floating */}
