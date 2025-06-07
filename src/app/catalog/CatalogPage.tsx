@@ -76,29 +76,38 @@ export default function CatalogPage() {
 const filteredItems = allItems.filter(([key, value]) => {
   const remarks = (value?.remarks || '').toLowerCase();
   const containsSilver = remarks.includes('sil');
+  const containsGemstone = remarks.includes('gemstone');
 
   if (!typeFilter) return true;
 
-  // If it's a silver-prefixed category like SRG
-  if (typeFilter.startsWith('S')) {
-    const goldType = typeFilter.substring(1); // SRG → RG
-    return key.includes(goldType) && containsSilver;
-  } else {
-    return key.includes(typeFilter) && !containsSilver;
+  if (typeFilter === 'ST') {
+    // For gemstone strings, show items that mention gemstones
+    return containsGemstone;
   }
+
+  if (typeFilter.startsWith('S')) {
+    const goldType = typeFilter.substring(1); // e.g., SRG → RG
+    return key.includes(goldType) && containsSilver;
+  }
+
+  // For gold & diamond
+  return key.includes(typeFilter) && !containsSilver && !containsGemstone;
 });
 
 
-          const items = await Promise.all(
-            filteredItems.map(async ([key, value]) => {
-              const imageUrl = imgData?.[key]?.Primary || '/product-placeholder.jpg';
-              return {
-                id: key,
-                price: value?.grTotalPrice || 'N/A',
-                image: imageUrl,
-              };
-            })
-          );
+const items = await Promise.all(
+  filteredItems.map(async ([key, value]) => {
+    const imageUrl = imgData?.[key]?.Primary || '/product-placeholder.jpg';
+    const rawPrice = value?.grTotalPrice;
+    const adjustedPrice = typeof rawPrice === 'number' ? +(rawPrice / 1.03).toFixed(0) : 'N/A';
+    
+    return {
+      id: key,
+      price: adjustedPrice,
+      image: imageUrl,
+    };
+  })
+);
 
           items.sort((a, b) => {
             const priceA = typeof a.price === 'number' ? a.price : 0;

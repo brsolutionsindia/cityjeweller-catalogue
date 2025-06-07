@@ -14,7 +14,6 @@ type SkuData = {
   goldPurety: number;
   grTotalPrice: number;
   goldPrice?: string;
-  gstPrice?: string;
 
   labour?: string;
   labourUnit?: string;
@@ -47,7 +46,6 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
   const [skuData, setSkuData] = useState<SkuData | null>(null);
   const [imageUrl, setImageUrl] = useState('/product-placeholder.jpg');
   const [goldRate, setGoldRate] = useState<number>(0);
-  const [gstRate, setGstRate] = useState<number>(3);
 
   const formatINR = (value?: string | number) => {
     const num = Number(value || 0);
@@ -73,7 +71,6 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
           if (rateData) {
             const key = `Gold ${skuSnap.val().goldPurety}kt`;
             setGoldRate(parseFloat(rateData[key] || '0'));
-            setGstRate(parseFloat(rateData.GST || '3'));
           }
         } catch (error) {
           console.error('Error fetching SKU summary or rates:', error);
@@ -146,8 +143,8 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
           <div className="flex items-center justify-center gap-4">
             {/* Price Info */}
             <div>
-              <div className="text-2xl font-bold text-green-700">{formatINR(skuData.grTotalPrice ?? "0")}</div>
-              <div className="text-sm text-gray-500 italic">MRP inclusive of all taxes</div>
+              <div className="text-2xl font-bold text-green-700"> {formatINR(typeof skuData.grTotalPrice === 'number'? +(skuData.grTotalPrice / 1.03).toFixed(0) : 0)} </div>
+              <div className="text-sm text-gray-500 italic">Taxes Extra</div>
             </div>
           </div>
         </div>
@@ -170,8 +167,16 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
               </>
             )}
 
-            <div><strong>Net Weight:</strong> {skuData.net} gm ({skuData.goldPurety}kt) × {formatINR(goldRate ?? "0")}</div>
-            <div className="text-right"> = {formatINR(skuData.goldPrice ?? "0")}</div>
+{skuData.goldPrice && parseFloat(skuData.goldPrice) > 0 && (
+  <>
+    <div>
+      <strong>Net Weight:</strong> {skuData.net} gm ({skuData.goldPurety}kt) × {formatINR(goldRate)}
+    </div>
+    <div className="text-right">
+      = {formatINR(skuData.goldPrice ?? "0")}
+    </div>
+  </>
+)}
 
             {summary.containsD && skuData.stone1 && parseFloat(skuData.stone1) > 0 && (
               <>
@@ -187,7 +192,7 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
               </>
             )}
 
-            {skuData.labour && parseFloat(skuData.labour) > 0 && (
+            {skuData.labourPrice && parseFloat(skuData.labourPrice) > 0 && (
               <>
                 <div><strong>Making Charges:</strong></div>
                 <div className="text-right">= {formatINR(skuData.labourPrice ?? "0")}</div>
@@ -208,12 +213,6 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
               </>
             )}
 
-            {skuData.gstPrice && (
-              <>
-                <div><strong>GST ({gstRate}%):</strong></div>
-                <div className="text-right">= {formatINR(skuData.gstPrice ?? "0")}</div>
-              </>
-            )}
           </div>
         </div>
 
@@ -234,6 +233,8 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
             )}
 
             {/* BIS Logo - Right */}
+{skuData.goldPrice && parseFloat(skuData.goldPrice) > 0 && (
+  <>
             <Image
               src="/bis.png"
               alt="BIS Hallmark"
@@ -241,6 +242,8 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
               height={64}
               className="object-contain"
             />
+  </>
+)}
           </div>
         </div>
 

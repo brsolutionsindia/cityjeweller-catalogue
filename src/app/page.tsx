@@ -54,6 +54,11 @@ export default function Home() {
     { label: 'Silver Pendants', image: '/silver-pendants.png', link: '/catalog?type=SPD' }
   ];
 
+  const gemstoneItems = [
+    { label: 'Loose Gemstones', image: '/gemstone-loose.png', link: '/catalog?type=LG' },
+    { label: 'Strings', image: '/gemstone-strings.png', link: '/catalog?type=ST' }
+  ];
+
 
   return (
     <main style={{ backgroundColor: '#fff', padding: '1rem' }}>
@@ -134,6 +139,26 @@ export default function Home() {
   </div>
 </section>
 
+
+{/* Gemstone Grid */}
+<section id="gemstone" className={productStyles.catalogSection}>
+  <h2 className={productStyles.sectionHeading}>Gemstones Jewellery</h2>
+
+  <div className={productStyles.catalogContainer}>
+    <div className={productStyles.catalogSlider}>
+      <div className={productStyles.horizontalScroll}>
+        {gemstoneItems.map(item => (
+          <div className={productStyles.productCardHorizontal} key={item.label}>
+            <Link href={item.link}>
+              <Image src={item.image} alt={item.label} width={160} height={160} className={productStyles.productImg} />
+              <h4 className={productStyles.productLabel}>{item.label}</h4>
+            </Link>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
 
 
 
