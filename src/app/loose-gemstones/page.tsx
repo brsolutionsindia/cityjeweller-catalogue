@@ -7,30 +7,16 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
-import bannerStyles from "../banner.module.css";
 import footerStyles from "../footer.module.css";
-import heroStyles from "../hero.module.css";
 import navbarStyles from "../navbar.module.css";
 import productStyles from "../product.module.css";
 import "../globals.css";
 
 export default function LooseGemstonesPage() {
-  const [goldRate, setGoldRate] = useState("Loading...");
-  const [rateDate, setRateDate] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    const rateRef = ref(db, "Global SKU/Rates/Gold 22kt");
-    const dateRef = ref(db, "Global SKU/Rates/Date");
-
-    onValue(rateRef, (snapshot) => setGoldRate(snapshot.val()));
-    onValue(dateRef, (snapshot) => setRateDate(snapshot.val()));
-
-    const checkScreenSize = () => setIsMobile(window.innerWidth <= 600);
-    checkScreenSize();
-    window.addEventListener("resize", checkScreenSize);
-    return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
 
   const gemstoneTypes = [
