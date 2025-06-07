@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { ref, get } from 'firebase/database';
 import { db } from '../../firebaseConfig';
+import { useSearchParams } from 'next/navigation';
 
 type Props = {
   skuId: string;
@@ -51,6 +52,9 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
     const num = Number(value || 0);
     return '₹' + num.toLocaleString('en-IN', { maximumFractionDigits: 0 });
   };
+
+    const searchParams = useSearchParams();
+    const ratti = parseFloat(searchParams.get("ratti") || "1");
 
   useEffect(() => {
     if (skuId) {
@@ -143,7 +147,13 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
           <div className="flex items-center justify-center gap-4">
             {/* Price Info */}
             <div>
-              <div className="text-2xl font-bold text-green-700"> {formatINR(typeof skuData.grTotalPrice === 'number'? +(skuData.grTotalPrice / 1.03).toFixed(0) : 0)} </div>
+              <div className="text-2xl font-bold text-green-700">
+  {formatINR(
+    typeof skuData.grTotalPrice === 'number'
+      ? +((skuData.grTotalPrice / 1.03) * ratti).toFixed(0)
+      : 0
+  )}
+</div>
               <div className="text-sm text-gray-500 italic">Taxes Extra</div>
             </div>
           </div>

@@ -25,21 +25,33 @@ export default function CatalogPage() {
   const router = useRouter();
 
   const typeMap: { [key: string]: string } = {
-    ER: 'Earrings Collection',
-    RG: 'Rings Collection',
-    NK: 'Necklace Collection',
-    PD: 'Pendants Collection',
-    MG: 'Mangalsutra Collection',
-    BG: 'Bangles Collection',
-    BR: 'Bracelets Collection',
-    CH: 'Chains Collection',
-    NP: 'Nose Pins Collection',
-    OT: 'Miscellaneous Collection',
-    ST: 'Gemstones Strings Collection',
-    LG: 'Loose Gemstones Collection'
-  };
+  ER: 'Earrings Collection',
+  RG: 'Rings Collection',
+  NK: 'Necklace Collection',
+  PD: 'Pendants Collection',
+  MG: 'Mangalsutra Collection',
+  BG: 'Bangles Collection',
+  BR: 'Bracelets Collection',
+  CH: 'Chains Collection',
+  NP: 'Nose Pins Collection',
+  OT: 'Miscellaneous Collection',
+  ST: 'Gemstones Strings Collection',
+  LG: 'Loose Gemstones Collection'
+};
 
-  const heading = typeFilter && typeMap[typeFilter] ? typeMap[typeFilter] : 'All Collection';
+const ratti = searchParams.get('ratti');
+const heading = (() => {
+  if (typeFilter?.startsWith('LG-')) {
+    const gem = typeFilter.replace('LG-', '');
+    return ratti ? `${ratti} Ratti ${gem}` : `${gem} (Loose Gemstone)`;
+  } else if (typeFilter && typeMap[typeFilter]) {
+    return typeMap[typeFilter];
+  } else {
+    return 'All Collection';
+  }
+})();
+
+
   const [goldRate, setGoldRate] = useState('Loading...');
   const [rateDate, setRateDate] = useState('');
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
@@ -75,6 +87,8 @@ export default function CatalogPage() {
         const imgData = imgSnap.val();
         if (skuData) {
           const allItems = Object.entries(skuData) as [string, SkuData][];
+const rattiParam = parseFloat(searchParams.get('ratti') || '0');
+
 const filteredItems = allItems.filter(([key, value]) => {
   const remarks = (value?.remarks || '').toLowerCase();
   const containsSilver = remarks.includes('sil');
@@ -83,8 +97,14 @@ const filteredItems = allItems.filter(([key, value]) => {
   if (!typeFilter) return true;
 
   if (typeFilter === 'ST') {
-    // For gemstone strings, show items that mention gemstones
+// For gemstone strings, show items that mention gemstones
     return containsGemstone;
+  }
+
+  if (typeFilter.startsWith('LG-')) {
+    const desiredType = typeFilter.replace('LG-', '').toLowerCase();
+    const categoryOther = (value as any)?.jwelleryCategoryOther?.toLowerCase();
+    return categoryOther === desiredType;
   }
 
   if (typeFilter.startsWith('S')) {
@@ -96,13 +116,17 @@ const filteredItems = allItems.filter(([key, value]) => {
   return key.includes(typeFilter) && !containsSilver && !containsGemstone;
 });
 
-
 const items = await Promise.all(
   filteredItems.map(async ([key, value]) => {
     const imageUrl = imgData?.[key]?.Primary || '/product-placeholder.jpg';
-    const rawPrice = value?.grTotalPrice;
-    const adjustedPrice = typeof rawPrice === 'number' ? +(rawPrice / 1.03).toFixed(0) : 'N/A';
-    
+    const basePrice = typeof value?.grTotalPrice === 'number' ? value.grTotalPrice / 1.03 : null;
+
+    const adjustedPrice = basePrice
+      ? typeFilter?.startsWith('LG-') && rattiParam > 0
+        ? Math.round(basePrice * rattiParam)
+        : Math.round(basePrice)
+      : 'N/A';
+
     return {
       id: key,
       price: adjustedPrice,

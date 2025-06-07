@@ -55,7 +55,7 @@ export default function Home() {
   ];
 
   const gemstoneItems = [
-    { label: 'Loose Gemstones', image: '/gemstone-loose.png', link: '/catalog?type=LG' },
+    { label: 'Loose Gemstones', image: '/gemstone-loose.png', link: '/loose-gemstones' },
     { label: 'Strings', image: '/gemstone-strings.png', link: '/catalog?type=ST' }
   ];
 
