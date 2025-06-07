@@ -35,6 +35,8 @@ export default function CatalogPage() {
     CH: 'Chains Collection',
     NP: 'Nose Pins Collection',
     OT: 'Miscellaneous Collection',
+    ST: 'Gemstones Strings Collection',
+    LG: 'Loose Gemstones Collection'
   };
 
   const heading = typeFilter && typeMap[typeFilter] ? typeMap[typeFilter] : 'All Collection';
