@@ -28,16 +28,16 @@ export const metadata: Metadata = {
         alt: "City Jeweller Website Thumbnail",
       },
     ],
+    locale: "en_IN",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "City Jeweller | Tricity's Jewellery Hub",
-    description: "Explore jewellery from multiple top retailers across the Tricity area.",
+    title: "The Jewellery Hub - City Jeweller",
+    description: "Discover curated jewellery collections.",
     images: ["/thumbnail.png"],
   },
 };
-
 
 export default function RootLayout({
   children,
