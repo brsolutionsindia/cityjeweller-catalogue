@@ -153,7 +153,7 @@ const items = await Promise.all(
       window.removeEventListener('resize', checkScreenSize);
       window.removeEventListener('keydown', escHandler);
     };
-  }, [typeFilter, sortOrder]);
+  }, [typeFilter, sortOrder, searchParams]);
 
   return (
     <main className={styles.main} id="home">
