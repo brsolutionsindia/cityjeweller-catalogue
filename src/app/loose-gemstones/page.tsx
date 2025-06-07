@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ref, onValue } from "firebase/database";
-import { db } from '../../firebaseConfig';
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -13,7 +11,6 @@ import productStyles from "../product.module.css";
 import "../globals.css";
 
 export default function LooseGemstonesPage() {
-  const [isMobile, setIsMobile] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -78,7 +75,7 @@ export default function LooseGemstonesPage() {
         <p>📞 <a href="https://api.whatsapp.com/send?phone=919023130944&text=Hi%2C%20I%20want%20to%20know%20more%20about%20Gemstones." target="_blank" rel="noopener noreferrer">+91-90231-30944</a></p>
         <div className={footerStyles.socialIcons}>
           <a href="https://www.facebook.com/cityJewellersIndia/" target="_blank" rel="noopener noreferrer" className={footerStyles.iconCircle}>
-            <img src="/facebook-icon.png" alt="Facebook" />
+            <Image src="/facebook-icon.png" alt="Facebook" width={30} height={30} />
           </a>
         </div>
       </footer>
