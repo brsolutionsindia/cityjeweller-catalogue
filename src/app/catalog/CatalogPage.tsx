@@ -13,6 +13,7 @@ export default function CatalogPage() {
   type SkuData = {
     grTotalPrice?: number;
     remarks?: string;
+    jwelleryCategoryOther?: string; // ✅ Add this line
   };
 
   const [products, setProducts] = useState<{ id: string; price: number | string; image: string }[]>([]);
@@ -63,6 +64,8 @@ const heading = (() => {
   };
 
   useEffect(() => {
+    const rattiParam = parseFloat(searchParams.get('ratti') || '0');
+
     const skuRef = ref(db, 'Global SKU/SKU/');
     const imgRef = ref(db, 'Global SKU/Images/');
     const rateRef = ref(db, 'Global SKU/Rates/Gold 22kt');
@@ -87,7 +90,6 @@ const heading = (() => {
         const imgData = imgSnap.val();
         if (skuData) {
           const allItems = Object.entries(skuData) as [string, SkuData][];
-const rattiParam = parseFloat(searchParams.get('ratti') || '0');
 
 const filteredItems = allItems.filter(([key, value]) => {
   const remarks = (value?.remarks || '').toLowerCase();
@@ -103,7 +105,7 @@ const filteredItems = allItems.filter(([key, value]) => {
 
   if (typeFilter.startsWith('LG-')) {
     const desiredType = typeFilter.replace('LG-', '').toLowerCase();
-    const categoryOther = (value as any)?.jwelleryCategoryOther?.toLowerCase();
+    const categoryOther = value?.jwelleryCategoryOther?.toLowerCase();
     return categoryOther === desiredType;
   }
 
