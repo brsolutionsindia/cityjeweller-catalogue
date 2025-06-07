@@ -300,27 +300,9 @@
   gap: 0.5rem 0.5rem; /* vertical gap (row), horizontal gap (column) */
 }
 
-.catalogCard {
-  transform-origin: top left;
-  width: 100%; /* ensure full width within scaled card */
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-  text-align: center;
-  transition: transform 0.2s ease;
-  color: #333;
-}
-
 .catalogCard:hover {
   transform: translateY(-2px);
   transform: scale(1.2); /* base scale */
-}
-
-.catalogImage {
-  border-radius: 8px;
-  width: 100%;
-  height: auto;
 }
 
 .catalogMain {
@@ -334,6 +316,25 @@
   font-weight: 500;
   color: #222;
 }
+
+.catalogCard {
+  transform-origin: top left;
+  width: 100%; /* ensure full width within scaled card */
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  text-align: center;
+  transition: transform 0.2s ease;
+  color: #333;
+}
+
+.catalogImage {
+  border-radius: 8px;
+  width: 100%;
+  height: auto;
+}
+
 
 .catalogPrice {
   font-weight: bold;
