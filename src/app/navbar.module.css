@@ -150,21 +150,4 @@
     min-width: 90px;
     max-width: 120px;
   }
-
-  .mainFlexWrapper {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .brandSearchWrapper {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .navLinksScrollable {
-    width: 100%;
-    justify-content: flex-start;
-    gap: 1.25rem;
-    padding-left: 0;
-  }
 }
