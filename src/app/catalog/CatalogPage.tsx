@@ -115,7 +115,9 @@ export default function CatalogPage() {
           const items = await Promise.all(
             filteredItems.map(async ([key, value]) => {
               const imageUrl = imgData?.[key]?.Primary || '/product-placeholder.jpg';
-              const basePrice = typeof value?.grTotalPrice === 'number' ? value.grTotalPrice / 1.03 : null;
+              const parsedPrice = parseFloat(value?.grTotalPrice as any);
+		const basePrice = !isNaN(parsedPrice) ? parsedPrice / 1.03 : null;
+
               const adjustedPrice = basePrice
                 ? typeFilter?.startsWith('LG-') && ratti > 0
                   ? Math.round(basePrice * ratti)
