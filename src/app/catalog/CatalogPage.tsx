@@ -7,135 +7,124 @@ import Image from 'next/image';
 import styles from '../page.module.css';
 import { useSearchParams, useRouter } from 'next/navigation';
 import SkuSummaryModal from '../components/SkuSummaryModal';
-import Link from 'next/link';
+import PageLayout from '../components/PageLayout';
+import OfferBar from '../components/OfferBar';
 
 export default function CatalogPage() {
-  type SkuData = {
-    grTotalPrice?: number;
-    remarks?: string;
-    jwelleryCategoryOther?: string; // ✅ Add this line
-  };
-
+  const [goldRate, setGoldRate] = useState('Loading...');
+  const [rateDate, setRateDate] = useState('');
   const [products, setProducts] = useState<{ id: string; price: number | string; image: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [menuOpen, setMenuOpen] = useState<'categories' | 'sort' | 'filter' | null>(null);
+  const [selectedSku, setSelectedSku] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
   const typeFilter = searchParams.get('type');
+  const ratti = parseFloat(searchParams.get('ratti') || '0');
+  const searchParam = (searchParams.get('search') || '').toLowerCase();
   const router = useRouter();
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const typeMap: { [key: string]: string } = {
-  ER: 'Earrings Collection',
-  RG: 'Rings Collection',
-  NK: 'Necklace Collection',
-  PD: 'Pendants Collection',
-  MG: 'Mangalsutra Collection',
-  BG: 'Bangles Collection',
-  BR: 'Bracelets Collection',
-  CH: 'Chains Collection',
-  NP: 'Nose Pins Collection',
-  OT: 'Miscellaneous Collection',
-  ST: 'Gemstones Strings Collection',
-  LG: 'Loose Gemstones Collection'
-};
+    ER: 'Earrings Collection',
+    RG: 'Rings Collection',
+    NK: 'Necklace Collection',
+    PD: 'Pendants Collection',
+    MG: 'Mangalsutra Collection',
+    BG: 'Bangles Collection',
+    BR: 'Bracelets Collection',
+    CH: 'Chains Collection',
+    NP: 'Nose Pins Collection',
+    OT: 'Miscellaneous Collection',
+    ST: 'Gemstones Strings Collection',
+    LG: 'Loose Gemstones Collection'
+  };
 
-const ratti = searchParams.get('ratti');
-const heading = (() => {
-  if (typeFilter?.startsWith('LG-')) {
-    const gem = typeFilter.replace('LG-', '');
-    return ratti ? `${ratti} Ratti ${gem}` : `${gem} (Loose Gemstone)`;
-  } else if (typeFilter && typeMap[typeFilter]) {
-    return typeMap[typeFilter];
-  } else {
-    return 'All Collection';
-  }
-})();
-
-
-  const [goldRate, setGoldRate] = useState('Loading...');
-  const [rateDate, setRateDate] = useState('');
-  const [selectedSku, setSelectedSku] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
+  const heading = (() => {
+    if (searchParam) return `Search Results for "${searchParam}"`;
+    if (typeFilter?.startsWith('LG-')) {
+      const gem = typeFilter.replace('LG-', '');
+      return ratti ? `${ratti} Ratti ${gem}` : `${gem} (Loose Gemstone)`;
+    } else if (typeFilter && typeMap[typeFilter]) {
+      return typeMap[typeFilter];
+    } else {
+      return 'All Collection';
+    }
+  })();
 
   const handleFilterClick = (type: string) => {
     router.push(`/catalog?type=${type}`);
   };
 
   useEffect(() => {
-    const rattiParam = parseFloat(searchParams.get('ratti') || '0');
-
-    const skuRef = ref(db, 'Global SKU/SKU/');
-    const imgRef = ref(db, 'Global SKU/Images/');
     const rateRef = ref(db, 'Global SKU/Rates/Gold 22kt');
     const dateRef = ref(db, 'Global SKU/Rates/Date');
-
     onValue(rateRef, (snapshot) => setGoldRate(snapshot.val()));
     onValue(dateRef, (snapshot) => setRateDate(snapshot.val()));
+  }, []);
 
-    const checkScreenSize = () => {
-      setIsMobile(window.innerWidth <= 600);
-    };
+  useEffect(() => {
+    const skuRef = ref(db, 'Global SKU/SKU/');
+    const imgRef = ref(db, 'Global SKU/Images/');
 
     const escHandler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setMenuOpen(null);
     };
     window.addEventListener('keydown', escHandler);
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
+
     onValue(skuRef, (skuSnap) => {
       const skuData = skuSnap.val();
       onValue(imgRef, async (imgSnap) => {
         const imgData = imgSnap.val();
         if (skuData) {
-          const allItems = Object.entries(skuData) as [string, SkuData][];
+          const allItems = Object.entries(skuData) as [string, {
+            grTotalPrice?: number;
+            remarks?: string;
+            jwelleryCategoryOther?: string;
+          }][];
 
-const filteredItems = allItems.filter(([key, value]) => {
-  const remarks = (value?.remarks || '').toLowerCase();
-  const containsSilver = remarks.includes('sil');
-  const containsGemstone = remarks.includes('gemstone');
+          const filteredItems = allItems.filter(([key, value]) => {
+            const remarks = (value?.remarks || '').toLowerCase();
+            const categoryOther = (value?.jwelleryCategoryOther || '').toLowerCase();
+            const containsSilver = remarks.includes('sil');
+            const containsGemstone = remarks.includes('gemstone');
 
-  if (!typeFilter) return true;
+            if (searchParam) {
+              return (
+                key.toLowerCase().includes(searchParam) ||
+                remarks.includes(searchParam) ||
+                categoryOther.includes(searchParam)
+              );
+            }
 
-  if (typeFilter === 'ST') {
-// For gemstone strings, show items that mention gemstones
-    return containsGemstone;
-  }
+            if (!typeFilter) return true;
+            if (typeFilter === 'ST') return containsGemstone;
+            if (typeFilter.startsWith('LG-')) {
+              const desiredType = typeFilter.replace('LG-', '').toLowerCase();
+              return categoryOther === desiredType;
+            }
+            if (typeFilter.startsWith('S')) {
+              const goldType = typeFilter.substring(1);
+              return key.includes(goldType) && containsSilver;
+            }
 
-  if (typeFilter.startsWith('LG-')) {
-    const desiredType = typeFilter.replace('LG-', '').toLowerCase();
-    const categoryOther = value?.jwelleryCategoryOther?.toLowerCase();
-    return categoryOther === desiredType;
-  }
+            return key.includes(typeFilter) && !containsSilver && !containsGemstone;
+          });
 
-  if (typeFilter.startsWith('S')) {
-    const goldType = typeFilter.substring(1); // e.g., SRG → RG
-    return key.includes(goldType) && containsSilver;
-  }
+          const items = await Promise.all(
+            filteredItems.map(async ([key, value]) => {
+              const imageUrl = imgData?.[key]?.Primary || '/product-placeholder.jpg';
+              const basePrice = typeof value?.grTotalPrice === 'number' ? value.grTotalPrice / 1.03 : null;
+              const adjustedPrice = basePrice
+                ? typeFilter?.startsWith('LG-') && ratti > 0
+                  ? Math.round(basePrice * ratti)
+                  : Math.round(basePrice)
+                : 'N/A';
 
-  // For gold & diamond
-  return key.includes(typeFilter) && !containsSilver && !containsGemstone;
-});
-
-const items = await Promise.all(
-  filteredItems.map(async ([key, value]) => {
-    const imageUrl = imgData?.[key]?.Primary || '/product-placeholder.jpg';
-    const basePrice = typeof value?.grTotalPrice === 'number' ? value.grTotalPrice / 1.03 : null;
-
-    const adjustedPrice = basePrice
-      ? typeFilter?.startsWith('LG-') && rattiParam > 0
-        ? Math.round(basePrice * rattiParam)
-        : Math.round(basePrice)
-      : 'N/A';
-
-    return {
-      id: key,
-      price: adjustedPrice,
-      image: imageUrl,
-    };
-  })
-);
+              return { id: key, price: adjustedPrice, image: imageUrl };
+            })
+          );
 
           items.sort((a, b) => {
             const priceA = typeof a.price === 'number' ? a.price : 0;
@@ -150,63 +139,13 @@ const items = await Promise.all(
     });
 
     return () => {
-      window.removeEventListener('resize', checkScreenSize);
       window.removeEventListener('keydown', escHandler);
     };
-  }, [typeFilter, sortOrder, searchParams]);
+  }, [typeFilter, sortOrder, searchParam]);
 
   return (
-    <main className={styles.main} id="home">
-      <nav 
-      className={`${styles.navbar} flex flex-wrap items-center justify-between gap-4`} 
-      style={{ borderRadius: '12px', padding: '1rem', backgroundColor: '#f9f9f9' }}
-      >
-        <div className={styles.branding}>
-          <Image src="/logo.png" alt="Logo" width={80} height={30} className={styles.logoImg} />
-        </div>
-        <ul className={`${styles.navLinksScrollable}`}>
-          <li><Link href="/#home" className="hover:underline">Home</Link></li>
-          <li><Link href="/#catalogue" className="hover:underline">Catalog</Link></li>
-          <li><Link href="/#contact" className="hover:underline">Contact</Link></li>
-        </ul>
-      </nav>
-
-      {/* Offer Banner */}
-      {isMobile ? (
-        <div className={styles.horizontalScroll} style={{ marginTop: '1rem', paddingBottom: '0.5rem', borderRadius: '12px', backgroundColor: '#f3f3f3'}}>
-          <div className={styles.productCardHorizontal}>
-            <span className={styles.goldLabel}>({rateDate?.slice(0, 5)})22kt Gold Rate:</span>
-            <span className={styles.goldRateText}>₹{goldRate}</span>
-            <span className={styles.unitText}>/10gm</span>
-            <a
-              href="https://api.whatsapp.com/send?phone=919023130944&text=Hello%2C%20I%20am%20interested%20in%20learning%20more%20about%20your%20Digital%20Gold%20services.%20Please%20share%20the%20details."
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.bookGoldBtn}
-            >
-              Book
-            </a>
-          </div>
-        </div>
-      ) : (
-        <section className={styles.offerBanner} style={{ borderRadius: '12px', backgroundColor: '#f3f3f3' }}>
-          <div className={styles.offerContent}>
-            <span className={styles.goldLabel}>({rateDate})22kt Rate:</span>
-            <span className={styles.goldRateText}>₹{goldRate}</span>
-            <span className={styles.unitText}>/10gm</span>
-            <a
-              href="https://api.whatsapp.com/send?phone=919023130944&text=Hello%2C%20I%20am%20interested%20in%20learning%20more%20about%20your%20Digital%20Gold%20services.%20Please%20share%20the%20details."
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.bookGoldBtn}
-            >
-              Book Digital Gold
-            </a>
-          </div>
-        </section>
-      )}
-
-      {/* Catalog Grid */}
+    <PageLayout>
+      <OfferBar goldRate={goldRate} rateDate={rateDate} />
       <section>
         <h1>{heading}</h1>
         <p className={styles.itemCount}>{products.length} item(s)</p>
@@ -236,17 +175,9 @@ const items = await Promise.all(
           <div className={styles.popupMenu} id="footerMenuPopup" ref={menuRef}>
             {menuOpen === 'categories' && (
               <ul>
-                <li onClick={() => { handleFilterClick(''); setMenuOpen(null); }}>All</li>
-                <li onClick={() => { handleFilterClick('ER'); setMenuOpen(null); }}>Earrings</li>
-                <li onClick={() => { handleFilterClick('RG'); setMenuOpen(null); }}>Rings</li>
-                <li onClick={() => { handleFilterClick('NK'); setMenuOpen(null); }}>Necklaces</li>
-                <li onClick={() => { handleFilterClick('PD'); setMenuOpen(null); }}>Pendants</li>
-                <li onClick={() => { handleFilterClick('MG'); setMenuOpen(null); }}>Mangalsutra</li>
-                <li onClick={() => { handleFilterClick('BG'); setMenuOpen(null); }}>Bangles</li>
-                <li onClick={() => { handleFilterClick('BR'); setMenuOpen(null); }}>Bracelets</li>
-                <li onClick={() => { handleFilterClick('CH'); setMenuOpen(null); }}>Chains</li>
-                <li onClick={() => { handleFilterClick('NP'); setMenuOpen(null); }}>Nose Pins</li>
-                <li onClick={() => { handleFilterClick('OT'); setMenuOpen(null); }}>Others</li>
+                {Object.entries(typeMap).map(([code, name]) => (
+                  <li key={code} onClick={() => { handleFilterClick(code); setMenuOpen(null); }}>{name}</li>
+                ))}
               </ul>
             )}
             {menuOpen === 'sort' && (
@@ -255,13 +186,10 @@ const items = await Promise.all(
                 <li onClick={() => { setSortOrder('desc'); setMenuOpen(null); }}>Price: High to Low</li>
               </ul>
             )}
-            {menuOpen === 'filter' && (
-              <div>Under Designing</div>
-            )}
+            {menuOpen === 'filter' && <div>Under Designing</div>}
           </div>
         )}
       </footer>
-    </main>
+    </PageLayout>
   );
 }
-

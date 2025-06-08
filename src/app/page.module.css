@@ -23,18 +23,6 @@
   z-index: 10;
 }
 
-.hamburgerMenu {
-  height: 100%;
-  justify-content: center;
-}
-
-.hamburgerMenu span {
-  width: 20px;
-  height: 2px;
-  background-color: black;
-  border-radius: 1px;
-}
-
 .branding {
   display: flex;
   align-items: center;

@@ -71,11 +71,8 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
 
           const rateRef = ref(db, 'Global SKU/Rates');
           const rateSnap = await get(rateRef);
-          const rateData = rateSnap.val();
-          if (rateData) {
-            const key = `Gold ${skuSnap.val().goldPurety}kt`;
-            setGoldRate(parseFloat(rateData[key] || '0'));
-          }
+	  const goldRatePerGram = parseFloat(skuSnap.val().goldRatePerGram || '0');
+	  setGoldRate(goldRatePerGram);
         } catch (error) {
           console.error('Error fetching SKU summary or rates:', error);
         }

@@ -54,3 +54,47 @@
   font-weight: bold;
   white-space: nowrap;
 }
+
+.hamburgerIcon {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hamburgerLine {
+  width: 20px;
+  height: 2px;
+  background-color: #333;
+  border-radius: 2px;
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: 60px;
+  left: 10px;
+  z-index: 20;
+  background-color: white;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  padding: 1rem;
+  border-radius: 8px;
+  max-height: 80vh;
+  overflow-y: auto;
+  width: 260px;
+}
+
+.menuSection {
+  margin-bottom: 1rem;
+}
+
+.menuSection h4 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.menuSection p {
+  margin: 0.25rem 0;
+  cursor: pointer;
+  color: #0070f3;
+}
