@@ -44,26 +44,28 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Branding */}
-      <div className="flex items-center gap-2">
-        <Image src="/logo.png" alt="Logo" width={80} height={30} className={styles.logoImg} />
-        <form onSubmit={handleSearch}>
-          <input
-            type="text"
-            placeholder="Search..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className={styles.searchInput}
-            style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid #ccc', minWidth: '180px' }}
-          />
-        </form>
-      </div>
+      <div className={styles.mainFlexWrapper}>
+  {/* Branding + Search */}
+  <div className={styles.brandSearchWrapper}>
+    <Image src="/logo.png" alt="Logo" width={80} height={30} className={styles.logoImg} />
+    <form onSubmit={handleSearch} className={styles.searchForm}>
+      <input
+        type="text"
+        placeholder="Search..."
+        value={searchText}
+        onChange={(e) => setSearchText(e.target.value)}
+        className={styles.searchInput}
+      />
+    </form>
+  </div>
 
-      {/* Top Nav */}
-      <ul className={styles.navLinksScrollable}>
-        <li><Link href="/">Home</Link></li>
-        <li><Link href="/#contact">Contact</Link></li>
-      </ul>
+  {/* Top Nav */}
+  <ul className={styles.navLinksScrollable}>
+    <li><Link href="/">Home</Link></li>
+    <li><Link href="/#contact">Contact</Link></li>
+  </ul>
+</div>
+
 
       {/* Dropdown Menu */}
       {menuOpen && (

@@ -99,9 +99,55 @@
   color: #0070f3;
 }
 
+.mainFlexWrapper {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.brandSearchWrapper {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-grow: 1;
+}
+
+.searchForm {
+  flex-grow: 1;
+}
+
+.searchInput {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  min-width: 180px;
+  width: 100%;
+  max-width: 220px;
+}
+
 @media (max-width: 768px) {
   .searchInput {
-    min-width: 90px !important; /* half of 180px */
-    width: 50%;
+    min-width: 90px;
+    max-width: 120px;
+  }
+
+  .mainFlexWrapper {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .brandSearchWrapper {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .navLinksScrollable {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 1.25rem;
+    padding-left: 0;
   }
 }
