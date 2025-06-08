@@ -101,22 +101,23 @@
 
 .mainFlexWrapper {
   display: flex;
-  flex: 1;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
+  flex: 1;
   gap: 1rem;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .brandSearchWrapper {
   display: flex;
   align-items: center;
   gap: 1rem;
-  flex-grow: 1;
+  flex-shrink: 0;
 }
 
 .searchForm {
-  flex-grow: 1;
+  flex-shrink: 0;
 }
 
 .searchInput {
@@ -124,8 +125,24 @@
   border-radius: 6px;
   border: 1px solid #ccc;
   min-width: 180px;
-  width: 100%;
   max-width: 220px;
+}
+
+.navLinksScrollable {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 1rem;
+  font-size: 0.95rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.navLinksScrollable::-webkit-scrollbar {
+  display: none;
 }
 
 @media (max-width: 768px) {
