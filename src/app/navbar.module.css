@@ -98,3 +98,10 @@
   cursor: pointer;
   color: #0070f3;
 }
+
+@media (max-width: 768px) {
+  .searchInput {
+    min-width: 90px !important; /* half of 180px */
+    width: 50%;
+  }
+}
