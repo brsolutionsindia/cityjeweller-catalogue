@@ -10,6 +10,12 @@ import SkuSummaryModal from '../components/SkuSummaryModal';
 import PageLayout from '../components/PageLayout';
 import OfferBar from '../components/OfferBar';
 
+interface RawSkuData {
+  grTotalPrice?: number | string;
+  remarks?: string;
+  jwelleryCategoryOther?: string;
+}
+
 export default function CatalogPage() {
   const [goldRate, setGoldRate] = useState('Loading...');
   const [rateDate, setRateDate] = useState('');
@@ -38,7 +44,7 @@ export default function CatalogPage() {
     NP: 'Nose Pins Collection',
     OT: 'Miscellaneous Collection',
     ST: 'Gemstones Strings Collection',
-    LG: 'Loose Gemstones Collection'
+    LG: 'Loose Gemstones Collection',
   };
 
   const heading = (() => {
@@ -78,15 +84,11 @@ export default function CatalogPage() {
       onValue(imgRef, async (imgSnap) => {
         const imgData = imgSnap.val();
         if (skuData) {
-          const allItems = Object.entries(skuData) as [string, {
-            grTotalPrice?: number;
-            remarks?: string;
-            jwelleryCategoryOther?: string;
-          }][];
+          const allItems = Object.entries(skuData) as [string, RawSkuData][];
 
           const filteredItems = allItems.filter(([key, value]) => {
-            const remarks = (value?.remarks || '').toLowerCase();
-            const categoryOther = (value?.jwelleryCategoryOther || '').toLowerCase();
+            const remarks = (value.remarks || '').toLowerCase();
+            const categoryOther = (value.jwelleryCategoryOther || '').toLowerCase();
             const containsSilver = remarks.includes('sil');
             const containsGemstone = remarks.includes('gemstone');
 
@@ -115,8 +117,11 @@ export default function CatalogPage() {
           const items = await Promise.all(
             filteredItems.map(async ([key, value]) => {
               const imageUrl = imgData?.[key]?.Primary || '/product-placeholder.jpg';
-              const parsedPrice = parseFloat(value?.grTotalPrice as any);
-		const basePrice = !isNaN(parsedPrice) ? parsedPrice / 1.03 : null;
+              const rawPrice = value.grTotalPrice;
+              const parsedPrice = typeof rawPrice === 'string' || typeof rawPrice === 'number'
+                ? parseFloat(String(rawPrice))
+                : NaN;
+              const basePrice = !isNaN(parsedPrice) ? parsedPrice / 1.03 : null;
 
               const adjustedPrice = basePrice
                 ? typeFilter?.startsWith('LG-') && ratti > 0
