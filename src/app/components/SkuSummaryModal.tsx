@@ -69,8 +69,6 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
           const url = imgSnap.val();
           if (url && typeof url === 'string' && url.startsWith('http')) setImageUrl(url);
 
-          const rateRef = ref(db, 'Global SKU/Rates');
-          const rateSnap = await get(rateRef);
 	  const goldRatePerGram = parseFloat(skuSnap.val().goldRatePerGram || '0');
 	  setGoldRate(goldRatePerGram);
         } catch (error) {

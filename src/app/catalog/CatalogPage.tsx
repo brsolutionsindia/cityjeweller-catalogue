@@ -141,7 +141,7 @@ export default function CatalogPage() {
     return () => {
       window.removeEventListener('keydown', escHandler);
     };
-  }, [typeFilter, sortOrder, searchParam]);
+  }, [typeFilter, sortOrder, searchParam, ratti]);
 
   return (
     <PageLayout>
