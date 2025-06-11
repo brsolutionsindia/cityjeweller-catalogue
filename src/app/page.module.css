@@ -572,3 +572,51 @@
     color: #333;
   }
 }
+
+
+
+/* ===============================
+   For CVD Page
+=============================== */
+
+.pageTitle {
+  font-size: 2rem;
+  margin: 1rem;
+  text-align: center;
+}
+
+.filterContainer {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1rem auto;
+}
+
+.enquiryBtn {
+  background-color: #16a34a;
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  margin-top: 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.catalogHeading {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.catalogSubheading {
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: #555;
+  margin-bottom: 0.5rem;
+}
+
+.catalogText {
+  font-size: 0.85rem;
+  margin: 0.2rem 0;
+}

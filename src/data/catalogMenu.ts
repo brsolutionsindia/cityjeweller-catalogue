@@ -22,3 +22,7 @@ export const gemstoneItems = [
   { label: 'Loose Gemstones', image: '/gemstone-loose.png', link: '/loose-gemstones' },
   { label: 'Gemstone Strings', image: '/gemstone-strings.png', link: '/catalog?type=ST' },
 ];
+
+export const cvdItems = [
+  { label: 'Loose CVD', image: '/cvd-loose.png', link: '/cvd' },
+];
