@@ -36,11 +36,11 @@ const isIGICertified = (val: string): boolean => val?.includes('IGI');
 const obfuscateStoneId = (id: string): string => {
   return id.split('').map(char => {
     if (/[A-Z]/.test(char)) {
-      return String.fromCharCode(((char.charCodeAt(0) - 65 + 3) % 26) + 65); // A-Z
+      return String.fromCharCode(((char.charCodeAt(0) - 65 + 3) % 26) + 65);
     } else if (/[a-z]/.test(char)) {
-      return String.fromCharCode(((char.charCodeAt(0) - 97 + 3) % 26) + 97); // a-z
+      return String.fromCharCode(((char.charCodeAt(0) - 97 + 3) % 26) + 97);
     } else if (/[0-9]/.test(char)) {
-      return String.fromCharCode(((parseInt(char) + 3) % 10) + 48); // 0-9
+      return String.fromCharCode(((parseInt(char) + 3) % 10) + 48);
     }
     return char;
   }).join('');
@@ -49,6 +49,7 @@ const obfuscateStoneId = (id: string): string => {
 export default function CvdCatalogPage() {
   const [diamonds, setDiamonds] = useState<Diamond[]>([]);
   const [filtered, setFiltered] = useState<Diamond[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState({
     SizeRange: '',
     Shape: '',
@@ -91,6 +92,7 @@ export default function CvdCatalogPage() {
 
       setDiamonds(parsed);
       setFiltered(parsed);
+      setIsLoading(false);
     });
   }, []);
 
@@ -114,6 +116,12 @@ export default function CvdCatalogPage() {
   return (
     <PageLayout>
       <h1 className={styles.pageTitle}>Lab Grown Diamonds</h1>
+      {!isLoading && (
+        <p className={styles.itemCount}>Showing {filtered.length} items</p>
+      )}
+      {isLoading && (
+        <p className={styles.loadingBlink}>Loading...</p>
+      )}
 
       {/* Filters */}
       <div className={styles.filterContainer}>
