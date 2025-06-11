@@ -64,11 +64,11 @@ export default function CvdCatalogPage() {
     const dataRef = ref(db, 'Global SKU/CVD');
 
     onValue(dataRef, (snapshot) => {
-      const val = snapshot.val();
+      const val = snapshot.val() as Record<string, Partial<Diamond>>;
       if (!val || typeof val !== 'object') return;
 
       const parsed: Diamond[] = Object.values(val)
-        .filter((d): d is Partial<Diamond> => d.Status === 'AVAILABLE' && isIGICertified(d.Certified))
+        .filter((d): d is Partial<Diamond> => d.Status === 'AVAILABLE' && isIGICertified(d.Certified ?? ''))
         .map((d): Diamond => ({
           StoneId: d.StoneId ?? '',
           Size: d.Size ?? '',
@@ -151,7 +151,7 @@ export default function CvdCatalogPage() {
             <p className={styles.catalogText}>Fluorescence: {d.Fluorescence}</p>
             <a
               href={`https://wa.me/919023130944?text=${encodeURIComponent(
-                `Hi, I am interested in CVD Diamond ${d.StoneId}. Please confirm availability.`
+                `Hi, I am interested in CVD Diamond ${obfuscateStoneId(d.StoneId)}. Please confirm availability.`
               )}`}
               target="_blank"
               rel="noopener noreferrer"
