@@ -641,3 +641,8 @@
   margin-bottom: 1rem;
   color: #444;
 }
+
+.sortingContainer {
+  text-align: center;
+  margin: 0.5rem 0 1rem;
+}

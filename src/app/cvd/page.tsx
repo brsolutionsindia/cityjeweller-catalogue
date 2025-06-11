@@ -50,6 +50,7 @@ export default function CvdCatalogPage() {
   const [diamonds, setDiamonds] = useState<Diamond[]>([]);
   const [filtered, setFiltered] = useState<Diamond[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [filters, setFilters] = useState({
     SizeRange: '',
     Shape: '',
@@ -97,18 +98,25 @@ export default function CvdCatalogPage() {
   }, []);
 
   useEffect(() => {
-    const result = diamonds.filter(d =>
-      (filters.SizeRange ? d.SizeRange === filters.SizeRange : true) &&
-      (filters.Shape ? d.Shape === filters.Shape : true) &&
-      (filters.Clarity ? d.Clarity === filters.Clarity : true) &&
-      (filters.Color ? d.Color === filters.Color : true) &&
-      (filters.Cut ? d.Cut === filters.Cut : true) &&
-      (filters.Polish ? d.Polish === filters.Polish : true) &&
-      (filters.Symm ? d.Symm === filters.Symm : true) &&
-      (filters.Fluorescence ? d.Fluorescence === filters.Fluorescence : true)
-    );
+    const result = diamonds
+      .filter(d =>
+        (filters.SizeRange ? d.SizeRange === filters.SizeRange : true) &&
+        (filters.Shape ? d.Shape === filters.Shape : true) &&
+        (filters.Clarity ? d.Clarity === filters.Clarity : true) &&
+        (filters.Color ? d.Color === filters.Color : true) &&
+        (filters.Cut ? d.Cut === filters.Cut : true) &&
+        (filters.Polish ? d.Polish === filters.Polish : true) &&
+        (filters.Symm ? d.Symm === filters.Symm : true) &&
+        (filters.Fluorescence ? d.Fluorescence === filters.Fluorescence : true)
+      )
+      .sort((a, b) => {
+        const sizeA = parseFloat(a.Size) || 0;
+        const sizeB = parseFloat(b.Size) || 0;
+        return sortOrder === 'asc' ? sizeA - sizeB : sizeB - sizeA;
+      });
+
     setFiltered(result);
-  }, [filters, diamonds]);
+  }, [filters, diamonds, sortOrder]);
 
   const unique = (key: keyof Diamond) =>
     Array.from(new Set(diamonds.map(d => d[key]))).sort();
@@ -137,6 +145,19 @@ export default function CvdCatalogPage() {
             ))}
           </select>
         ))}
+      </div>
+
+      {/* Sort Dropdown */}
+      <div className={styles.sortingContainer}>
+        <label htmlFor="sortOrder">Sort by Size:&nbsp;</label>
+        <select
+          id="sortOrder"
+          value={sortOrder}
+          onChange={e => setSortOrder(e.target.value as 'asc' | 'desc')}
+        >
+          <option value="asc">Smallest to Largest</option>
+          <option value="desc">Largest to Smallest</option>
+        </select>
       </div>
 
       {/* Cards */}
