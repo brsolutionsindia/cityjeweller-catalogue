@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import styles from '../navbar.module.css';
-import { goldItems, silverItems, gemstoneItems } from '../../data/catalogMenu';
+import { diamondItems, goldItems, silverItems, gemstoneItems, cvdItems, miscItems } from '../../data/catalogMenu';
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -71,7 +71,15 @@ export default function Navbar() {
       {menuOpen && (
         <div ref={menuRef} className={styles.dropdownMenu}>
           <div className={styles.menuSection}>
-            <h4>Gold & Diamond</h4>
+            <h4>Diamond Jewellery</h4>
+            {diamondItems.map((item) => (
+              <Link key={item.label} href={item.link} onClick={() => setMenuOpen(false)}>
+                <p>{item.label}</p>
+              </Link>
+            ))}
+          </div>
+          <div className={styles.menuSection}>
+            <h4>Gold Jewellery</h4>
             {goldItems.map((item) => (
               <Link key={item.label} href={item.link} onClick={() => setMenuOpen(false)}>
                 <p>{item.label}</p>
@@ -89,6 +97,22 @@ export default function Navbar() {
           <div className={styles.menuSection}>
             <h4>Gemstones Jewellery</h4>
             {gemstoneItems.map((item) => (
+              <Link key={item.label} href={item.link} onClick={() => setMenuOpen(false)}>
+                <p>{item.label}</p>
+              </Link>
+            ))}
+          </div>
+	  <div className={styles.menuSection}>
+            <h4>CVD Lab Grown Diamonds</h4>
+            {cvdItems.map((item) => (
+              <Link key={item.label} href={item.link} onClick={() => setMenuOpen(false)}>
+                <p>{item.label}</p>
+              </Link>
+            ))}
+          </div>
+	  <div className={styles.menuSection}>
+            <h4>Miscellaneous Items</h4>
+            {miscItems.map((item) => (
               <Link key={item.label} href={item.link} onClick={() => setMenuOpen(false)}>
                 <p>{item.label}</p>
               </Link>

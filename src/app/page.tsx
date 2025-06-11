@@ -5,7 +5,7 @@ import { ref, onValue } from 'firebase/database';
 import { db } from '../firebaseConfig';
 import Image from 'next/image';
 import Link from 'next/link';
-import { goldItems, silverItems, gemstoneItems, cvdItems } from '../data/catalogMenu';
+import { diamondItems, goldItems, silverItems, gemstoneItems, cvdItems, miscItems } from '../data/catalogMenu';
 
 import PageLayout from './components/PageLayout';
 import OfferBar from './components/OfferBar';
@@ -33,9 +33,28 @@ export default function Home() {
         <Image src="/hero-banner.png" alt="Jewellery Banner" width={1200} height={400} className={heroStyles.heroImage} />
       </section>
 
-      {/* Gold & Diamond */}
+      {/*Diamond */}
       <section id="catalogue" className={productStyles.catalogSection}>
-        <h2 className={productStyles.sectionHeading}>Gold & Diamond</h2>
+        <h2 className={productStyles.sectionHeading}>Diamond Jewellery</h2>
+        <div className={productStyles.catalogContainer}>
+          <div className={productStyles.catalogSlider}>
+            <div className={productStyles.horizontalScroll}>
+              {diamondItems.map(item => (
+                <div className={productStyles.productCardHorizontal} key={item.label}>
+                  <Link href={item.link}>
+                    <Image src={item.image} alt={item.label} width={160} height={160} className={productStyles.productImg} />
+                    <h4 className={productStyles.productLabel}>{item.label}</h4>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/*Gold */}
+      <section id="gold" className={productStyles.catalogSection}>
+        <h2 className={productStyles.sectionHeading}>Gold Jewellery</h2>
         <div className={productStyles.catalogContainer}>
           <div className={productStyles.catalogSlider}>
             <div className={productStyles.horizontalScroll}>
@@ -51,6 +70,7 @@ export default function Home() {
           </div>
         </div>
       </section>
+
 
       {/* Silver */}
       <section id="silver" className={`${productStyles.catalogSection} ${productStyles.silverSection}`}>
@@ -97,6 +117,25 @@ export default function Home() {
           <div className={productStyles.catalogSlider}>
             <div className={productStyles.horizontalScroll}>
               {cvdItems.map(item => (
+                <div className={productStyles.productCardHorizontal} key={item.label}>
+                  <Link href={item.link}>
+                    <Image src={item.image} alt={item.label} width={160} height={160} className={productStyles.productImg} />
+                    <h4 className={productStyles.productLabel}>{item.label}</h4>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* MISC Items*/}
+      <section id="miscItems" className={productStyles.catalogSection}>
+        <h2 className={productStyles.sectionHeading}>Miscellaneous Items</h2>
+        <div className={productStyles.catalogContainer}>
+          <div className={productStyles.catalogSlider}>
+            <div className={productStyles.horizontalScroll}>
+              {miscItems.map(item => (
                 <div className={productStyles.productCardHorizontal} key={item.label}>
                   <Link href={item.link}>
                     <Image src={item.image} alt={item.label} width={160} height={160} className={productStyles.productImg} />
