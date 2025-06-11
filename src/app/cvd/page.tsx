@@ -26,29 +26,24 @@ type Diamond = {
   Table: string;
 };
 
-// ✅ Extract URL from Excel-style HYPERLINK string
 const extractUrl = (val: string): string => {
   const match = val?.match(/HYPERLINK\("(.+?)"/);
   return match?.[1] || '';
 };
 
-// ✅ IGI Filter
 const isIGICertified = (val: string): boolean => val?.includes('IGI');
 
-// ✅ Obfuscate StoneId by shifting each alphanumeric character by 3
 const obfuscateStoneId = (id: string): string => {
-  return id
-    .split('')
-    .map(char => {
-      if (/[A-Z]/i.test(char)) {
-        const base = char === char.toUpperCase() ? 65 : 97;
-        return String.fromCharCode(((char.charCodeAt(0) - base + 3) % 26) + base);
-      } else if (/\d/.test(char)) {
-        return String.fromCharCode(((+char + 3) % 10) + 48);
-      }
-      return char;
-    })
-    .join('');
+  return id.split('').map(char => {
+    if (/[A-Z]/.test(char)) {
+      return String.fromCharCode(((char.charCodeAt(0) - 65 + 3) % 26) + 65); // A-Z
+    } else if (/[a-z]/.test(char)) {
+      return String.fromCharCode(((char.charCodeAt(0) - 97 + 3) % 26) + 97); // a-z
+    } else if (/[0-9]/.test(char)) {
+      return String.fromCharCode(((parseInt(char) + 3) % 10) + 48); // 0-9
+    }
+    return char;
+  }).join('');
 };
 
 export default function CvdCatalogPage() {
@@ -65,7 +60,6 @@ export default function CvdCatalogPage() {
     Fluorescence: '',
   });
 
-
   useEffect(() => {
     const dataRef = ref(db, 'Global SKU/CVD');
 
@@ -74,26 +68,26 @@ export default function CvdCatalogPage() {
       if (!val || typeof val !== 'object') return;
 
       const parsed: Diamond[] = Object.values(val)
-        .filter((d: any) => d.Status === 'AVAILABLE' && isIGICertified(d.Certified))
-        .map((d: Partial<Diamond>): Diamond => ({
-  StoneId: d.StoneId ?? '',
-  Size: d.Size ?? '',
-  SizeRange: d.SizeRange ?? '',
-  Clarity: d.Clarity ?? '',
-  Color: d.Color ?? '',
-  Cut: d.Cut ?? '',
-  Polish: d.Polish ?? '',
-  Symm: d.Symm ?? '',
-  Fluorescence: d.Fluorescence ?? '',
-  Shape: d.Shape ?? '',
-  Status: d.Status ?? '',
-  CertNo: d.CertNo ?? '',
-  Certified: d.Certified ?? '',
-  VideoURL: extractUrl(d.VideoURL ?? ''),
-  Measurement: d.Measurement ?? '',
-  Depth: d.Depth ?? '',
-  Table: d.Table ?? '',
-}))
+        .filter((d): d is Partial<Diamond> => d.Status === 'AVAILABLE' && isIGICertified(d.Certified))
+        .map((d): Diamond => ({
+          StoneId: d.StoneId ?? '',
+          Size: d.Size ?? '',
+          SizeRange: d.SizeRange ?? '',
+          Clarity: d.Clarity ?? '',
+          Color: d.Color ?? '',
+          Cut: d.Cut ?? '',
+          Polish: d.Polish ?? '',
+          Symm: d.Symm ?? '',
+          Fluorescence: d.Fluorescence ?? '',
+          Shape: d.Shape ?? '',
+          Status: d.Status ?? '',
+          CertNo: d.CertNo ?? '',
+          Certified: d.Certified ?? '',
+          VideoURL: extractUrl(d.VideoURL ?? ''),
+          Measurement: d.Measurement ?? '',
+          Depth: d.Depth ?? '',
+          Table: d.Table ?? '',
+        }));
 
       setDiamonds(parsed);
       setFiltered(parsed);
@@ -119,7 +113,6 @@ export default function CvdCatalogPage() {
 
   return (
     <PageLayout>
-
       <h1 className={styles.pageTitle}>Lab Grown Diamonds</h1>
 
       {/* Filters */}
