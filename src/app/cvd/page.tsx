@@ -75,25 +75,25 @@ export default function CvdCatalogPage() {
 
       const parsed: Diamond[] = Object.values(val)
         .filter((d: any) => d.Status === 'AVAILABLE' && isIGICertified(d.Certified))
-        .map((d: any) => ({
-          StoneId: d.StoneId || '',
-          Size: d.Size || '',
-          SizeRange: d.SizeRange || '',
-          Clarity: d.Clarity || '',
-          Color: d.Color || '',
-          Cut: d.Cut || '',
-          Polish: d.Polish || '',
-          Symm: d.Symm || '',
-          Fluorescence: d.Fluorescence || '',
-          Shape: d.Shape || '',
-          Status: d.Status || '',
-          CertNo: d.CertNo || '',
-          Certified: d.Certified || '',
-          VideoURL: extractUrl(d.VideoURL || ''),
-          Measurement: d.Measurement || '',
-          Depth: d.Depth || '',
-          Table: d.Table || '',
-        }));
+        .map((d: Partial<Diamond>): Diamond => ({
+  StoneId: d.StoneId ?? '',
+  Size: d.Size ?? '',
+  SizeRange: d.SizeRange ?? '',
+  Clarity: d.Clarity ?? '',
+  Color: d.Color ?? '',
+  Cut: d.Cut ?? '',
+  Polish: d.Polish ?? '',
+  Symm: d.Symm ?? '',
+  Fluorescence: d.Fluorescence ?? '',
+  Shape: d.Shape ?? '',
+  Status: d.Status ?? '',
+  CertNo: d.CertNo ?? '',
+  Certified: d.Certified ?? '',
+  VideoURL: extractUrl(d.VideoURL ?? ''),
+  Measurement: d.Measurement ?? '',
+  Depth: d.Depth ?? '',
+  Table: d.Table ?? '',
+}))
 
       setDiamonds(parsed);
       setFiltered(parsed);
