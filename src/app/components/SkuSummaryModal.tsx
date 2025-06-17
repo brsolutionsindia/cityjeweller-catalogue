@@ -15,6 +15,7 @@ type SkuData = {
   goldPurety: number;
   grTotalPrice: number;
   goldPrice?: string;
+  GoldRateUnit?: string; // ✅ ADD THIS LINE
 
   labour?: string;
   labourUnit?: string;
