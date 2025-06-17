@@ -27,6 +27,7 @@ export const goldItems = [
 export const silverItems = [
   { label: 'Utensils', image: '/silver-utensils.png', link: '/catalog?type=SUT' },
   { label: 'Photo Frames', image: '/silver-frames.png', link: '/catalog?type=SPF' },
+  { label: 'Idols', image: '/silver-idols.png', link: '/catalog?type=SID' },
   { label: 'Rings', image: '/silver-rings.png', link: '/catalog?type=SRG' },
   { label: 'Kada', image: '/silver-kada.png', link: '/catalog?type=SOT' },
   { label: 'Nazariye', image: '/silver-nazariye.png', link: '/catalog?type=SBR' },

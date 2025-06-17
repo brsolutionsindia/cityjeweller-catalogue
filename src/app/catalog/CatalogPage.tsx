@@ -114,6 +114,10 @@ export default function CatalogPage() {
   return remarks.includes('sil') && remarks.includes('frame');
 }
 
+            if (typeFilter === 'SID') {
+  return remarks.includes('sil') && remarks.includes('idol');
+}
+
 if (typeFilter.startsWith('S')) {
   const goldType = typeFilter.substring(1).toLowerCase();
   return key.toLowerCase().includes(goldType) && containsSilver;
