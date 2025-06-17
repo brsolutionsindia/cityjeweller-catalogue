@@ -83,17 +83,19 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
   }, [skuId]);
 
   const summary = useMemo(() => {
-    if (!skuData) return null;
-    const gross = parseFloat(String(skuData.gross || '0'));
-    const net = parseFloat(String(skuData.net || '0'));
-    const goldPrice = parseFloat(String(skuData.goldPrice || '0'));
-    const onlyStone = goldPrice === 0;
-    const noStone = gross === net;
-    const NetUnit = skuData.NetUnit || '';
-    const containsD = NetUnit.includes('S1');
-    const containsSt = NetUnit.includes('S2');
-    return { gross, net, goldPrice, onlyStone, noStone, containsD, containsSt };
-  }, [skuData]);
+  if (!skuData) return null;
+  const gross = parseFloat(String(skuData.gross || '0'));
+  const net = parseFloat(String(skuData.net || '0'));
+  const goldPrice = parseFloat(String(skuData.goldPrice || '0'));
+  const onlyStone = goldPrice === 0;
+  const noStone = gross === net;
+  const NetUnit = skuData.NetUnit || '';
+  const containsD = NetUnit.includes('S1');
+  const containsSt = NetUnit.includes('S2');
+  const isSilver = (skuData?.GoldRateUnit || '').toUpperCase().includes('SIL');
+  return { gross, net, goldPrice, onlyStone, noStone, containsD, containsSt, isSilver };
+}, [skuData]);
+
 
   const parsedMrp = useMemo(() => {
     const parsed = parseFloat(String(skuData?.grTotalPrice ?? '0'));
@@ -148,71 +150,80 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
           <div className="text-sm text-gray-700">
             <div className="font-semibold text-base text-gray-800 mb-4">🔍 Product Details</div>
             <div className="grid grid-cols-2 gap-y-1">
-              <div><strong>Item Code:</strong> {skuId}</div>
-              <div className="text-right"></div>
+  <div><strong>Item Code:</strong> {skuId}</div>
+  <div className="text-right"></div>
 
-              {!summary.onlyStone && !summary.noStone && (
-                <>
-                  <div><strong>Gross Weight:</strong> {skuData.gross} gm</div>
-                  <div className="text-right"></div>
-                </>
-              )}
+{skuData.gross && parseFloat(String(skuData.gross)) > 0 && (
+  <>
+    <div><strong>Gross Weight:</strong> {skuData.gross} gm</div>
+    <div className="text-right"></div>
+  </>
+)}
 
-              {skuData.goldPrice && parseFloat(skuData.goldPrice) > 0 && (
-                <>
-                  <div><strong>Net Weight:</strong> {skuData.net} gm ({skuData.goldPurety}kt) × {formatINR(goldRate)}</div>
-                  <div className="text-right">= {formatINR(skuData.goldPrice)}</div>
-                </>
-              )}
 
-              {summary.containsD && skuData.stone1 && parseFloat(skuData.stone1) > 0 && (
-                <>
-                  <div><strong>Diamond:</strong> {skuData.stone1} {skuData.St1Unit} × {skuData.stone1Rate} {skuData.St1RateUnit}</div>
-                  <div className="text-right">= {formatINR(skuData.stone1Price)}</div>
-                </>
-              )}
+  {/* Skip detailed breakdown if it's silver */}
+  {!summary.isSilver && (
+    <>
+      {skuData.goldPrice && parseFloat(skuData.goldPrice) > 0 && (
+        <>
+          <div><strong>Net Weight:</strong> {skuData.net} gm ({skuData.goldPurety}kt) × {formatINR(goldRate)}</div>
+          <div className="text-right">= {formatINR(skuData.goldPrice)}</div>
+        </>
+      )}
 
-              {summary.containsSt && skuData.stone2 && parseFloat(skuData.stone2) > 0 && (
-                <>
-                  <div><strong>Stone:</strong> {skuData.stone2} {skuData.St2Unit} × {skuData.stone2Rate} {skuData.St2RateUnit}</div>
-                  <div className="text-right">= {formatINR(skuData.stone2Price)}</div>
-                </>
-              )}
+      {summary.containsD && skuData.stone1 && parseFloat(skuData.stone1) > 0 && (
+        <>
+          <div><strong>Diamond:</strong> {skuData.stone1} {skuData.St1Unit} × {skuData.stone1Rate} {skuData.St1RateUnit}</div>
+          <div className="text-right">= {formatINR(skuData.stone1Price)}</div>
+        </>
+      )}
 
-              {skuData.labourPrice && parseFloat(skuData.labourPrice) > 0 && (
-                <>
-                  <div><strong>Making Charges:</strong></div>
-                  <div className="text-right">= {formatINR(skuData.labourPrice)}</div>
-                </>
-              )}
+      {summary.containsSt && skuData.stone2 && parseFloat(skuData.stone2) > 0 && (
+        <>
+          <div><strong>Stone:</strong> {skuData.stone2} {skuData.St2Unit} × {skuData.stone2Rate} {skuData.St2RateUnit}</div>
+          <div className="text-right">= {formatINR(skuData.stone2Price)}</div>
+        </>
+      )}
 
-              {skuData.polishPrice && parseFloat(skuData.polishPrice) > 0 && (
-                <>
-                  <div><strong>Polish:</strong></div>
-                  <div className="text-right">{formatINR(skuData.polishPrice)}</div>
-                </>
-              )}
+      {skuData.labourPrice && parseFloat(skuData.labourPrice) > 0 && (
+        <>
+          <div><strong>Making Charges:</strong></div>
+          <div className="text-right">= {formatINR(skuData.labourPrice)}</div>
+        </>
+      )}
 
-              {skuData.miscPrice && parseFloat(skuData.miscPrice) > 0 && (
-                <>
-                  <div><strong>Misc:</strong></div>
-                  <div className="text-right">{formatINR(skuData.miscPrice)}</div>
-                </>
-              )}
-            </div>
+      {skuData.polishPrice && parseFloat(skuData.polishPrice) > 0 && (
+        <>
+          <div><strong>Polish:</strong></div>
+          <div className="text-right">{formatINR(skuData.polishPrice)}</div>
+        </>
+      )}
+
+      {skuData.miscPrice && parseFloat(skuData.miscPrice) > 0 && (
+        <>
+          <div><strong>Misc:</strong></div>
+          <div className="text-right">{formatINR(skuData.miscPrice)}</div>
+        </>
+      )}
+    </>
+  )}
+</div>
+
+
           </div>
 
           {/* Highlights */}
           <div className="text-center mb-4">
             <div className="flex items-center justify-center gap-4">
 {/* Certified Diamonds Logo - Left */}
-              {summary.containsD && skuData.stone1 && parseFloat(skuData.stone1) > 0 && (
-                <Image src="/certified_diamonds.png" alt="Certified Diamonds" width={64} height={64} className="object-contain" />
-              )}
+{!summary.isSilver && summary.containsD && skuData.stone1 && parseFloat(skuData.stone1) > 0 && (
+  <Image src="/certified_diamonds.png" alt="Certified Diamonds" width={64} height={64} className="object-contain" />
+)}
+
 {/* BIS Logo - Right */}
-              {skuData.goldPrice && parseFloat(skuData.goldPrice) > 0 && (
-                <Image src="/bis.png" alt="BIS Hallmark" width={64} height={64} className="object-contain" />
-              )}
+{!summary.isSilver && skuData.goldPrice && parseFloat(skuData.goldPrice) > 0 && (
+  <Image src="/bis.png" alt="BIS Hallmark" width={64} height={64} className="object-contain" />
+)}
             </div>
           </div>
         </div>

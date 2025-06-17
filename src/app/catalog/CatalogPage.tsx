@@ -106,10 +106,19 @@ export default function CatalogPage() {
               const desiredType = typeFilter.replace('LG-', '').toLowerCase();
               return categoryOther === desiredType;
             }
-            if (typeFilter.startsWith('S')) {
-              const goldType = typeFilter.substring(1);
-              return key.includes(goldType) && containsSilver;
-            }
+            if (typeFilter === 'SUT') {
+  return remarks.includes('sil') && remarks.includes('utensil');
+}
+
+            if (typeFilter === 'SPF') {
+  return remarks.includes('sil') && remarks.includes('frame');
+}
+
+if (typeFilter.startsWith('S')) {
+  const goldType = typeFilter.substring(1).toLowerCase();
+  return key.toLowerCase().includes(goldType) && containsSilver;
+}
+
 
             return key.includes(typeFilter) && !containsSilver && !containsGemstone;
           });
