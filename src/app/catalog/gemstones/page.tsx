@@ -2,13 +2,12 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { ref, onValue } from 'firebase/database';
-import { db } from '../../firebaseConfig';
+import { db } from '../../../firebaseConfig';
 import Image from 'next/image';
-import styles from '../page.module.css';
-import { useRouter, useSearchParams } from 'next/navigation';
-import SkuSummaryModal from '../components/SkuSummaryModal';
-import PageLayout from '../components/PageLayout';
-import OfferBar from '../components/OfferBar';
+import styles from '../../page.module.css';
+import { useSearchParams, useRouter } from 'next/navigation';
+import SkuSummaryModal from '../../components/SkuSummaryModal';
+import PageLayout from '../../components/PageLayout';
 
 interface RawSkuData {
   grTotalPrice?: number | string;
@@ -16,32 +15,26 @@ interface RawSkuData {
   jwelleryCategoryOther?: string;
 }
 
-type Props = {
-  category: 'silver' | 'gold' | 'diamond' | 'gemstone' | 'labgrown' | 'misc';
-};
-
-export default function CatalogView({ category }: Props) {
+export default function GemstoneStringCatalog() {
   const [goldRate, setGoldRate] = useState('Loading...');
   const [rateDate, setRateDate] = useState('');
   const [products, setProducts] = useState<{ id: string; price: number | string; image: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [menuOpen, setMenuOpen] = useState<'sort' | null>(null);
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState<'sort' | null>(null);
 
   const searchParams = useSearchParams();
-  const ratti = parseFloat(searchParams.get('ratti') || '0');
+  const typeFilter = searchParams.get('type');
+  const searchParam = (searchParams.get('search') || '').toLowerCase();
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const headingMap: Record<Props['category'], string> = {
-    silver: 'Silver Collection',
-    gold: 'Gold Collection',
-    diamond: 'Diamond Collection',
-    gemstone: 'Gemstone Collection',
-    labgrown: 'Lab-Grown Diamond Collection',
-    misc: 'Miscellaneous Collection',
-  };
+  const heading = (() => {
+    if (searchParam) return `Search Results for "\${searchParam}"`;
+    if (typeFilter === 'ST') return 'Gemstone Strings Collection';
+    return 'Gemstone Products';
+  })();
 
   useEffect(() => {
     const rateRef = ref(db, 'Global SKU/Rates/Gold 22kt');
@@ -65,18 +58,20 @@ export default function CatalogView({ category }: Props) {
         const imgData = imgSnap.val();
         if (skuData) {
           const allItems = Object.entries(skuData) as [string, RawSkuData][];
-
           const filteredItems = allItems.filter(([key, value]) => {
             const remarks = (value.remarks || '').toLowerCase();
             const categoryOther = (value.jwelleryCategoryOther || '').toLowerCase();
 
-            if (category === 'silver') return remarks.includes('sil');
-            if (category === 'gold') return !remarks.includes('sil') && remarks.includes('gold');
-            if (category === 'diamond') return remarks.includes('diamond');
-            if (category === 'gemstone') return remarks.includes('gemstone') || categoryOther.includes('gem');
-            if (category === 'labgrown') return remarks.includes('cvd') || remarks.includes('labgrown');
-            if (category === 'misc') return !remarks.includes('sil') && !remarks.includes('gold') && !remarks.includes('diamond') && !remarks.includes('gemstone');
-            return true;
+            if (searchParam) {
+              return (
+                key.toLowerCase().includes(searchParam) ||
+                remarks.includes(searchParam) ||
+                categoryOther.includes(searchParam)
+              );
+            }
+
+            if (typeFilter === 'ST') return remarks.includes('gemstone');
+            return false;
           });
 
           const items = await Promise.all(
@@ -87,8 +82,7 @@ export default function CatalogView({ category }: Props) {
                 ? parseFloat(String(rawPrice))
                 : NaN;
               const basePrice = !isNaN(parsedPrice) ? parsedPrice / 1.03 : null;
-
-              const adjustedPrice = basePrice && ratti > 0 ? Math.round(basePrice * ratti) : Math.round(basePrice || 0);
+              const adjustedPrice = basePrice ? Math.round(basePrice) : 'N/A';
 
               return { id: key, price: adjustedPrice, image: imageUrl };
             })
@@ -109,13 +103,13 @@ export default function CatalogView({ category }: Props) {
     return () => {
       window.removeEventListener('keydown', escHandler);
     };
-  }, [category, sortOrder, ratti]);
+  }, [typeFilter, sortOrder, searchParam]);
 
   return (
     <PageLayout>
-      <OfferBar goldRate={goldRate} rateDate={rateDate} />
       <section>
-        <h1>{headingMap[category]}</h1>
+      <h1 className={styles.pageTitle}>{heading}</h1>
+
         <p className={styles.itemCount}>{products.length} item(s)</p>
         {loading ? (
           <p>Loading...</p>
@@ -137,14 +131,12 @@ export default function CatalogView({ category }: Props) {
       <footer className={styles.footerMenu}>
         <button className={styles.footerButton} onClick={() => setMenuOpen(menuOpen === 'sort' ? null : 'sort')}>Sort</button>
 
-        {menuOpen && (
-          <div className={styles.popupMenu} id="footerMenuPopup" ref={menuRef}>
-            {menuOpen === 'sort' && (
-              <ul>
-                <li onClick={() => { setSortOrder('asc'); setMenuOpen(null); }}>Price: Low to High</li>
-                <li onClick={() => { setSortOrder('desc'); setMenuOpen(null); }}>Price: High to Low</li>
-              </ul>
-            )}
+        {menuOpen === 'sort' && (
+          <div className={styles.popupMenu} ref={menuRef}>
+            <ul>
+              <li onClick={() => { setSortOrder('asc'); setMenuOpen(null); }}>Price: Low to High</li>
+              <li onClick={() => { setSortOrder('desc'); setMenuOpen(null); }}>Price: High to Low</li>
+            </ul>
           </div>
         )}
       </footer>

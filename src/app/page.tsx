@@ -9,6 +9,8 @@ import { diamondItems, goldItems, silverItems, gemstoneItems, cvdItems, miscItem
 
 import PageLayout from './components/PageLayout';
 import OfferBar from './components/OfferBar';
+import OfferBarSilver from './components/OfferBarSilver';
+
 
 import heroStyles from './hero.module.css';
 import productStyles from './product.module.css';
@@ -16,17 +18,23 @@ import productStyles from './product.module.css';
 export default function Home() {
   const [goldRate, setGoldRate] = useState('Loading...');
   const [rateDate, setRateDate] = useState('');
+  const [silverRate, setSilverRate] = useState('Loading...');
 
   useEffect(() => {
     const rateRef = ref(db, 'Global SKU/Rates/Gold 22kt');
+    const silRateRef = ref(db, 'Global SKU/Rates/Silver');
     const dateRef = ref(db, 'Global SKU/Rates/Date');
     onValue(rateRef, (snapshot) => setGoldRate(snapshot.val()));
     onValue(dateRef, (snapshot) => setRateDate(snapshot.val()));
+    onValue(silRateRef, (snapshot) => setSilverRate(snapshot.val()));
+
   }, []);
 
   return (
     <PageLayout>
       <OfferBar goldRate={goldRate} rateDate={rateDate} />
+      <OfferBarSilver silverRate={silverRate}/>
+
 
       {/* Hero */}
       <section className={heroStyles.hero}>

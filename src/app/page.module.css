@@ -416,6 +416,34 @@
   background-color: #a66f1c;
 }
 
+
+.silverLabel {
+  color: #222;
+}
+
+.silverRateText {
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  font-weight: bold;
+  color: #000;
+}
+
+.bookSilverBtn {
+  background-color: #cc8c23;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: clamp(0.75rem, 2vw, 0.9rem);
+  font-weight: bold;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background-color 0.3s ease;
+}
+
+.bookSilverBtn:hover {
+  background-color: #a66f1c;
+}
+
+
 /* ===============================
    Google Review
 =============================== */
@@ -645,4 +673,13 @@
 .sortingContainer {
   text-align: center;
   margin: 0.5rem 0 1rem;
+}
+
+
+.breadcrumb a {
+  color: #2563eb;
+  text-decoration: none;
+}
+.breadcrumb a:hover {
+  text-decoration: underline;
 }

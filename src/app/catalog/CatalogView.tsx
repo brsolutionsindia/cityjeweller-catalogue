@@ -1,14 +1,17 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState, useRef } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { db } from '../../firebaseConfig';
 import Image from 'next/image';
 import styles from '../page.module.css';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
+
 import SkuSummaryModal from '../components/SkuSummaryModal';
 import PageLayout from '../components/PageLayout';
 import OfferBar from '../components/OfferBar';
+import { applyFiltering } from './CatalogFilterUtil';
 
 interface RawSkuData {
   grTotalPrice?: number | string;
@@ -16,11 +19,12 @@ interface RawSkuData {
   jwelleryCategoryOther?: string;
 }
 
-type Props = {
+interface Props {
   category: 'silver' | 'gold' | 'diamond' | 'gemstone' | 'labgrown' | 'misc';
-};
+}
 
 export default function CatalogView({ category }: Props) {
+  const router = useRouter();
   const [goldRate, setGoldRate] = useState('Loading...');
   const [rateDate, setRateDate] = useState('');
   const [products, setProducts] = useState<{ id: string; price: number | string; image: string }[]>([]);
@@ -28,20 +32,21 @@ export default function CatalogView({ category }: Props) {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [menuOpen, setMenuOpen] = useState<'sort' | null>(null);
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
-
-  const searchParams = useSearchParams();
-  const ratti = parseFloat(searchParams.get('ratti') || '0');
-  const router = useRouter();
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const searchParams = useSearchParams();
+  const searchParam = (searchParams.get('search') || '').toLowerCase();
+  const ratti = parseFloat(searchParams.get('ratti') || '0');
 
-  const headingMap: Record<Props['category'], string> = {
+  const categoryTitleMap: Record<Props['category'], string> = {
     silver: 'Silver Collection',
     gold: 'Gold Collection',
-    diamond: 'Diamond Collection',
-    gemstone: 'Gemstone Collection',
-    labgrown: 'Lab-Grown Diamond Collection',
-    misc: 'Miscellaneous Collection',
+    diamond: 'Diamond Jewellery',
+    gemstone: 'Gemstone Strings',
+    labgrown: 'Lab-Grown Diamonds',
+    misc: 'Miscellaneous Collection'
   };
+
+  const heading = searchParam ? `Search Results for "${searchParam}"` : categoryTitleMap[category];
 
   useEffect(() => {
     const rateRef = ref(db, 'Global SKU/Rates/Gold 22kt');
@@ -63,59 +68,62 @@ export default function CatalogView({ category }: Props) {
       const skuData = skuSnap.val();
       onValue(imgRef, async (imgSnap) => {
         const imgData = imgSnap.val();
-        if (skuData) {
-          const allItems = Object.entries(skuData) as [string, RawSkuData][];
+        if (!skuData) return;
 
-          const filteredItems = allItems.filter(([key, value]) => {
-            const remarks = (value.remarks || '').toLowerCase();
-            const categoryOther = (value.jwelleryCategoryOther || '').toLowerCase();
+        const allItems = Object.entries(skuData) as [string, RawSkuData][];
+        const filteredItems = applyFiltering(allItems, category, searchParam, ratti);
 
-            if (category === 'silver') return remarks.includes('sil');
-            if (category === 'gold') return !remarks.includes('sil') && remarks.includes('gold');
-            if (category === 'diamond') return remarks.includes('diamond');
-            if (category === 'gemstone') return remarks.includes('gemstone') || categoryOther.includes('gem');
-            if (category === 'labgrown') return remarks.includes('cvd') || remarks.includes('labgrown');
-            if (category === 'misc') return !remarks.includes('sil') && !remarks.includes('gold') && !remarks.includes('diamond') && !remarks.includes('gemstone');
-            return true;
-          });
+        const items = await Promise.all(
+          filteredItems.map(async ([key, value]) => {
+            const imageUrl = imgData?.[key]?.Primary || '/product-placeholder.jpg';
+            const rawPrice = value.grTotalPrice;
+            const parsedPrice = typeof rawPrice === 'string' || typeof rawPrice === 'number'
+              ? parseFloat(String(rawPrice))
+              : NaN;
+            const basePrice = !isNaN(parsedPrice) ? parsedPrice / 1.03 : null;
 
-          const items = await Promise.all(
-            filteredItems.map(async ([key, value]) => {
-              const imageUrl = imgData?.[key]?.Primary || '/product-placeholder.jpg';
-              const rawPrice = value.grTotalPrice;
-              const parsedPrice = typeof rawPrice === 'string' || typeof rawPrice === 'number'
-                ? parseFloat(String(rawPrice))
-                : NaN;
-              const basePrice = !isNaN(parsedPrice) ? parsedPrice / 1.03 : null;
+            const adjustedPrice = basePrice
+              ? category === 'labgrown' && ratti > 0
+                ? Math.round(basePrice * ratti)
+                : Math.round(basePrice)
+              : 'N/A';
 
-              const adjustedPrice = basePrice && ratti > 0 ? Math.round(basePrice * ratti) : Math.round(basePrice || 0);
+            return { id: key, price: adjustedPrice, image: imageUrl };
+          })
+        );
 
-              return { id: key, price: adjustedPrice, image: imageUrl };
-            })
-          );
+        items.sort((a, b) => {
+          const priceA = typeof a.price === 'number' ? a.price : 0;
+          const priceB = typeof b.price === 'number' ? b.price : 0;
+          return sortOrder === 'asc' ? priceA - priceB : priceB - priceA;
+        });
 
-          items.sort((a, b) => {
-            const priceA = typeof a.price === 'number' ? a.price : 0;
-            const priceB = typeof b.price === 'number' ? b.price : 0;
-            return sortOrder === 'asc' ? priceA - priceB : priceB - priceA;
-          });
-
-          setProducts(items);
-        }
+        setProducts(items);
         setLoading(false);
       });
     });
 
-    return () => {
-      window.removeEventListener('keydown', escHandler);
-    };
-  }, [category, sortOrder, ratti]);
+    return () => window.removeEventListener('keydown', escHandler);
+  }, [category, searchParam, ratti, sortOrder]);
 
   return (
     <PageLayout>
       <OfferBar goldRate={goldRate} rateDate={rateDate} />
+
       <section>
-        <h1>{headingMap[category]}</h1>
+        <div className="flex items-center gap-2 mb-4 text-sm text-gray-600">
+          <button onClick={() => router.back()} className="text-blue-600 hover:underline flex items-center gap-1">
+            ← Back
+          </button>
+          <span>/</span>
+          <Link href="/" className="hover:underline text-blue-600">Home</Link>
+          <span>/</span>
+          <span className="capitalize text-gray-800 font-medium">
+            {category}
+          </span>
+        </div>
+
+        <h1>{heading}</h1>
         <p className={styles.itemCount}>{products.length} item(s)</p>
         {loading ? (
           <p>Loading...</p>
@@ -136,15 +144,12 @@ export default function CatalogView({ category }: Props) {
 
       <footer className={styles.footerMenu}>
         <button className={styles.footerButton} onClick={() => setMenuOpen(menuOpen === 'sort' ? null : 'sort')}>Sort</button>
-
-        {menuOpen && (
-          <div className={styles.popupMenu} id="footerMenuPopup" ref={menuRef}>
-            {menuOpen === 'sort' && (
-              <ul>
-                <li onClick={() => { setSortOrder('asc'); setMenuOpen(null); }}>Price: Low to High</li>
-                <li onClick={() => { setSortOrder('desc'); setMenuOpen(null); }}>Price: High to Low</li>
-              </ul>
-            )}
+        {menuOpen === 'sort' && (
+          <div className={styles.popupMenu} ref={menuRef}>
+            <ul>
+              <li onClick={() => { setSortOrder('asc'); setMenuOpen(null); }}>Price: Low to High</li>
+              <li onClick={() => { setSortOrder('desc'); setMenuOpen(null); }}>Price: High to Low</li>
+            </ul>
           </div>
         )}
       </footer>

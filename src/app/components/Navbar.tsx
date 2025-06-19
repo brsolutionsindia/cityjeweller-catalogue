@@ -27,7 +27,7 @@ export default function Navbar() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchText.trim()) {
-      router.push(`/catalog?search=${encodeURIComponent(searchText.trim())}`);
+	router.push(`/search?query=${encodeURIComponent(searchText.trim())}`);
       setSearchText('');
     }
   };

@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import productStyles from "../product.module.css";
-import PageLayout from "../components/PageLayout";
+import productStyles from "../../../../product.module.css";
+import PageLayout from "../../../../components/PageLayout";
 
 export default function LooseGemstonesPage() {
   const router = useRouter();
@@ -20,7 +20,7 @@ export default function LooseGemstonesPage() {
     const input = prompt("How much weight (in ratti) are you looking for?");
     const ratti = parseFloat(input || "0");
     if (!isNaN(ratti) && ratti > 0) {
-      router.push(`/catalog?type=${type}&ratti=${ratti}`);
+      router.push(`/catalog/gemstones/loose-gemstones?type=${type}&ratti=${ratti}`);
     } else {
       alert("Please enter a valid number.");
     }
