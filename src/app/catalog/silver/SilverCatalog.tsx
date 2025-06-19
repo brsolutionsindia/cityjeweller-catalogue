@@ -34,7 +34,8 @@ export default function SilverCatalog() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [selectedPurity, setSelectedPurity] = useState('');
-  const [selectedPriceRange, setSelectedPriceRange] = useState<[number, number] | null>(null);
+  const [selectedPriceRange, setSelectedPriceRange] = useState<[number, number | null] | null>(null);
+
 
   const typeMap: { [key: string]: string } = {
     SUT: 'Silver Utensils',
