@@ -9,8 +9,7 @@ interface RawSkuData {
 export function applyFiltering(
   allItems: [string, RawSkuData][],
   typeFilter: string | null,
-  searchParam: string,
-  ratti: number
+  searchParam: string
 ) {
   return allItems.filter(([key, value]) => {
     const remarks = (value.remarks || '').toLowerCase();

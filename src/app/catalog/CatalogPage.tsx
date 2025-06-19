@@ -5,7 +5,7 @@ import { ref, onValue } from 'firebase/database';
 import { db } from '../../firebaseConfig';
 import Image from 'next/image';
 import styles from '../page.module.css';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import SkuSummaryModal from '../components/SkuSummaryModal';
 import PageLayout from '../components/PageLayout';
 import OfferBar from '../components/OfferBar';

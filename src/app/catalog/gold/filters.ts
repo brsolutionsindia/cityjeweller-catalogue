@@ -1,9 +1,10 @@
 // filters.ts for GoldCatalog
 
-interface RawSkuData {
+export interface RawSkuData {
   grTotalPrice?: number | string;
   remarks?: string;
-  [key: string]: any;
+  jwelleryCategoryOther?: string;
+  goldPurety?: string;
 }
 
 /**
@@ -18,20 +19,26 @@ export const filterGoldItems = (
   const remarks = (value.remarks || '').toLowerCase();
   const idLower = skuId.toLowerCase();
 
-  // ✅ More robust gold match (handles ##gold, ###gold, etc.)
-  const isGold = remarks.includes('gold') && !remarks.includes('diamond') && !remarks.includes('silver');
-
+  // ✅ Must contain 'gold' but exclude diamond and silver references
+  const isGold =
+    remarks.includes('gold') &&
+    !remarks.includes('diamond') &&
+    !remarks.includes('silver');
 
   if (!isGold) return false;
 
+  // ✅ Search filter match
   if (searchParam) {
     return (
       idLower.includes(searchParam) ||
       remarks.includes(searchParam)
-       );
+    );
   }
 
-  if (!typeFilter) return true;
+  // ✅ Type code match (ER, RG, etc.)
+  if (typeFilter) {
+    return idLower.includes(typeFilter.toLowerCase());
+  }
 
-  return idLower.includes(typeFilter.toLowerCase());
+  return true;
 };

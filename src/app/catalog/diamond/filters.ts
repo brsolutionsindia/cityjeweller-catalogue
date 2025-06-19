@@ -1,9 +1,10 @@
 // filters.ts for DiamondCatalog
 
-interface RawSkuData {
+export interface RawSkuData {
   grTotalPrice?: number | string;
   remarks?: string;
-  [key: string]: any;
+  jwelleryCategoryOther?: string;
+  goldPurety?: string;
 }
 
 /**
@@ -18,20 +19,22 @@ export const filterDiamondItems = (
   const remarks = (value.remarks || '').toLowerCase();
   const idLower = skuId.toLowerCase();
 
+  // ✅ Diamond check excluding silver content
   const isDiamond = remarks.includes('diamond') && !remarks.includes('silver');
-
-
-
   if (!isDiamond) return false;
 
+  // ✅ Search text match
   if (searchParam) {
     return (
       idLower.includes(searchParam) ||
       remarks.includes(searchParam)
-       );
+    );
   }
 
-  if (!typeFilter) return true;
+  // ✅ Type filter match (e.g., ER, RG, etc.)
+  if (typeFilter) {
+    return idLower.includes(typeFilter.toLowerCase());
+  }
 
-  return idLower.includes(typeFilter.toLowerCase());
+  return true;
 };
