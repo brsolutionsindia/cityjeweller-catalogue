@@ -65,7 +65,7 @@ export default function CatalogView({ category }: Props) {
         if (skuData) {
           const allItems = Object.entries(skuData) as [string, RawSkuData][];
 
-          const filteredItems = allItems.filter(([key, value]) => {
+          const filteredItems = allItems.filter(([, value]) => {
             const remarks = (value.remarks || '').toLowerCase();
             const categoryOther = (value.jwelleryCategoryOther || '').toLowerCase();
 
