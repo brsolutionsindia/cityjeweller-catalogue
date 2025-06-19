@@ -71,7 +71,7 @@ export default function CatalogView({ category }: Props) {
         if (!skuData) return;
 
         const allItems = Object.entries(skuData) as [string, RawSkuData][];
-        const filteredItems = applyFiltering(allItems, category, searchParam, ratti);
+        const filteredItems = applyFiltering(allItems, category, searchParam);
 
         const items = await Promise.all(
           filteredItems.map(async ([key, value]) => {
