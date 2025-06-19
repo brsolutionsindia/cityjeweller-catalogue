@@ -4,7 +4,7 @@ import CatalogPage from './CatalogPage';
 export default function CatalogWrapper() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <CatalogPage />
+      <CatalogPage category="catalog" /> {/* ✅ Replace "gold" with desired category */}
     </Suspense>
   );
 }
