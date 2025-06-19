@@ -16,8 +16,9 @@ export const metadata: Metadata = {
   title: "City Jeweller | The Jewellery Hub",
   description: "Discover curated gold, silver, diamond, and gemstone jewellery from trusted retailers in your city.",
   icons: {
-    icon: "/favicon.png",
-    apple: "/favicon.png",
+    icon: "/cityjewellers-favicon.ico",         // ✅ use .ico file
+    shortcut: "/cityjewellers-favicon.ico",     // ✅ for older browsers
+    apple: "/favicon.png",                      // ✅ keep PNG for Apple devices if needed
   },
   openGraph: {
     title: "City Jeweller | The Jewellery Hub",
@@ -56,3 +57,4 @@ export default function RootLayout({
     </html>
   );
 }
+
