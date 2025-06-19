@@ -79,7 +79,7 @@ export default function CatalogView({ category }: Props) {
           });
 
           const items = await Promise.all(
-            filteredItems.map(async ([, value]) => {
+            filteredItems.map(async ([key, value]) => {
               const imageUrl = imgData?.[key]?.Primary || '/product-placeholder.jpg';
               const rawPrice = value.grTotalPrice;
               const parsedPrice = typeof rawPrice === 'string' || typeof rawPrice === 'number'
