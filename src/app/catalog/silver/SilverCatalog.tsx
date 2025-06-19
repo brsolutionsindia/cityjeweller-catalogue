@@ -22,7 +22,7 @@ interface RawSkuData {
 export default function SilverCatalog() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const typeFilter = searchParams.get('type');
+  const typeFilter = searchParams.get('type') ?? undefined;
   const searchParam = (searchParams.get('search') || '').toLowerCase();
 
   const [silverRate, setSilverRate] = useState('Loading...');
