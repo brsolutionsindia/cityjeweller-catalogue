@@ -1,12 +1,12 @@
 // GoldCatalog.tsx
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { db } from '../../../firebaseConfig';
 import Image from 'next/image';
 import styles from '../../page.module.css';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import SkuSummaryModal from '../../components/SkuSummaryModal';
 import PageLayout from '../../components/PageLayout';
 import OfferBar from '../../components/OfferBar';
@@ -24,10 +24,9 @@ export default function GoldCatalog() {
   const [rateDate, setRateDate] = useState('');
   const [products, setProducts] = useState<{ id: string; price: number | string; image: string }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const searchParams = useSearchParams();
-  const router = useRouter();
   const typeFilter = searchParams.get('type');
   const searchParam = (searchParams.get('search') || '').toLowerCase();
 

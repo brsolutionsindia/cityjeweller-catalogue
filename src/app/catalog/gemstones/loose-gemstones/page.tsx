@@ -5,7 +5,7 @@ import { ref, onValue } from 'firebase/database';
 import { db } from '../../../../firebaseConfig';
 import Image from 'next/image';
 import styles from '../../../page.module.css';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import SkuSummaryModal from '../../../components/SkuSummaryModal';
 import PageLayout from '../../../components/PageLayout';
 import OfferBar from '../../../components/OfferBar';
@@ -30,7 +30,6 @@ export default function GemstoneCatalog() {
   const ratti = parseFloat(searchParams.get('ratti') || '0');
   const searchParam = (searchParams.get('search') || '').toLowerCase();
 
-  const router = useRouter();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const heading = (() => {
@@ -65,7 +64,7 @@ export default function GemstoneCatalog() {
         if (skuData) {
           const allItems = Object.entries(skuData) as [string, RawSkuData][];
 
-          const filteredItems = allItems.filter(([_, value]) => {
+          const filteredItems = allItems.filter(([, value]) => {
             const categoryOther = (value.jwelleryCategoryOther || '').toLowerCase();
             const remarks = (value.remarks || '').toLowerCase();
 

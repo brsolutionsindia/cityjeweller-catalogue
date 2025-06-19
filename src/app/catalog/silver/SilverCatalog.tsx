@@ -29,14 +29,12 @@ export default function SilverCatalog() {
   const [rateDate, setRateDate] = useState('');
   const [products, setProducts] = useState<{ id: string; price: number | string; image: string }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState<'categories' | 'sort' | 'filter' | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [selectedPurity, setSelectedPurity] = useState('');
   const [selectedPriceRange, setSelectedPriceRange] = useState<[number, number] | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const typeMap: { [key: string]: string } = {
     SUT: 'Silver Utensils',
@@ -66,10 +64,6 @@ export default function SilverCatalog() {
     return 'Silver Collection';
   })();
 
-  const handleFilterClick = (type: string) => {
-    router.push(`/catalog/silver?type=${type}`);
-  };
-
   const priceRanges: [number, number | null][] = [
     [0, 3000], [3000, 10000], [10000, 20000], [20000, 50000], [50000, 100000], [100000, null]
   ];
@@ -90,9 +84,10 @@ export default function SilverCatalog() {
 
       // Collect unique categories
       const categorySet = new Set<string>();
-      Object.values(skuData || {}).forEach((item: any) => {
-  const remarks = (item?.remarks || '').toLowerCase();
-  const category = item?.jwelleryCategoryOther?.toLowerCase();
+Object.values(skuData || {}).forEach((item) => {
+  const castedItem = item as RawSkuData;
+  const remarks = (castedItem?.remarks || '').toLowerCase();
+  const category = castedItem?.jwelleryCategoryOther?.toLowerCase();
   if (remarks.includes('silver') && category) {
     categorySet.add(category);
   }
@@ -107,7 +102,7 @@ export default function SilverCatalog() {
         const allItems = Object.entries(skuData) as [string, RawSkuData][];
         const filteredItems = allItems.filter(([key, value]) =>
           filterSilverItems(key, value, searchParam, typeFilter)
-        ).filter(([_, value]) => {
+        ).filter(([, value]) => {
           const isSilver = (value.remarks || '').toLowerCase().includes('sil');
           if (selectedCategory && (!isSilver || value.jwelleryCategoryOther?.toLowerCase() !== selectedCategory)) return false;
 if (selectedPurity && (!isSilver || value.goldPurety !== selectedPurity)) return false;

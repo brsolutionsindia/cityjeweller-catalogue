@@ -31,7 +31,6 @@ export default function CatalogView({ category }: Props) {
 
   const searchParams = useSearchParams();
   const ratti = parseFloat(searchParams.get('ratti') || '0');
-  const router = useRouter();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const headingMap: Record<Props['category'], string> = {

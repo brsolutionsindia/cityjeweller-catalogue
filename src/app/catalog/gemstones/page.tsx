@@ -5,7 +5,7 @@ import { ref, onValue } from 'firebase/database';
 import { db } from '../../../firebaseConfig';
 import Image from 'next/image';
 import styles from '../../page.module.css';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import SkuSummaryModal from '../../components/SkuSummaryModal';
 import PageLayout from '../../components/PageLayout';
 
@@ -16,8 +16,6 @@ interface RawSkuData {
 }
 
 export default function GemstoneStringCatalog() {
-  const [goldRate, setGoldRate] = useState('Loading...');
-  const [rateDate, setRateDate] = useState('');
   const [products, setProducts] = useState<{ id: string; price: number | string; image: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -27,7 +25,6 @@ export default function GemstoneStringCatalog() {
   const searchParams = useSearchParams();
   const typeFilter = searchParams.get('type');
   const searchParam = (searchParams.get('search') || '').toLowerCase();
-  const router = useRouter();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const heading = (() => {
@@ -35,13 +32,6 @@ export default function GemstoneStringCatalog() {
     if (typeFilter === 'ST') return 'Gemstone Strings Collection';
     return 'Gemstone Products';
   })();
-
-  useEffect(() => {
-    const rateRef = ref(db, 'Global SKU/Rates/Gold 22kt');
-    const dateRef = ref(db, 'Global SKU/Rates/Date');
-    onValue(rateRef, (snapshot) => setGoldRate(snapshot.val()));
-    onValue(dateRef, (snapshot) => setRateDate(snapshot.val()));
-  }, []);
 
   useEffect(() => {
     const skuRef = ref(db, 'Global SKU/SKU/');
