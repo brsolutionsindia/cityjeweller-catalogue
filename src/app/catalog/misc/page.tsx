@@ -1,6 +1,10 @@
-// /app/catalog/misc/page.tsx
+import { Suspense } from 'react';
 import CatalogView from '../CatalogView';
 
 export default function MiscPage() {
-  return <CatalogView category="misc" />;
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CatalogView category="misc" />
+    </Suspense>
+  );
 }
