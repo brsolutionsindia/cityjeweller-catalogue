@@ -33,7 +33,7 @@ export default function Home() {
   return (
     <PageLayout>
       <OfferBar goldRate={goldRate} rateDate={rateDate} />
-      <OfferBarSilver silverRate={silverRate}/>
+      <OfferBarSilver silverRate={silverRate} rateDate={rateDate} />
 
 
       {/* Hero */}
