@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { ref, onValue } from 'firebase/database';
+import { ref, get, child, query, orderByChild, equalTo, limitToFirst } from 'firebase/database';
 import { db } from '../../../firebaseConfig';
 import Image from 'next/image';
 import styles from '../../page.module.css';
@@ -35,7 +35,6 @@ export default function SilverCatalog() {
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [selectedPurity, setSelectedPurity] = useState('');
   const [selectedPriceRange, setSelectedPriceRange] = useState<[number, number | null] | null>(null);
-
 
   const typeMap: { [key: string]: string } = {
     SUT: 'Silver Utensils',
@@ -70,72 +69,65 @@ export default function SilverCatalog() {
   ];
 
   useEffect(() => {
-    const rateRef = ref(db, 'Global SKU/Rates/Silver');
-    const dateRef = ref(db, 'Global SKU/Rates/Date');
-    onValue(rateRef, (snapshot) => setSilverRate(snapshot.val()));
-    onValue(dateRef, (snapshot) => setRateDate(snapshot.val()));
+    const fetchRates = async () => {
+      const rateSnap = await get(ref(db, 'Global SKU/Rates/Silver'));
+      const dateSnap = await get(ref(db, 'Global SKU/Rates/Date'));
+      setSilverRate(rateSnap.val());
+      setRateDate(dateSnap.val());
+    };
+    fetchRates();
   }, []);
 
   useEffect(() => {
-    const skuRef = ref(db, 'Global SKU/SKU/');
-    const imgRef = ref(db, 'Global SKU/Images/');
-
-    onValue(skuRef, (skuSnap) => {
+    const fetchData = async () => {
+      const skuSnap = await get(ref(db, 'Global SKU/SKU'));
       const skuData = skuSnap.val();
+      if (!skuData) return;
 
-      // Collect unique categories
       const categorySet = new Set<string>();
-Object.values(skuData || {}).forEach((item) => {
-  const castedItem = item as RawSkuData;
-  const remarks = (castedItem?.remarks || '').toLowerCase();
-  const category = castedItem?.jwelleryCategoryOther?.toLowerCase();
-  if (remarks.includes('silver') && category) {
-    categorySet.add(category);
-  }
-});
+      const allItems = Object.entries(skuData) as [string, RawSkuData][];
+      const filteredItems = allItems.filter(([key, value]) => {
+        const isSilver = (value.remarks || '').toLowerCase().includes('sil');
+        const category = value.jwelleryCategoryOther?.toLowerCase();
+        if (isSilver && category) categorySet.add(category);
+        return filterSilverItems(key, value, searchParam, typeFilter);
+      }).filter(([, value]) => {
+        const isSilver = (value.remarks || '').toLowerCase().includes('sil');
+        if (selectedCategory && (!isSilver || value.jwelleryCategoryOther?.toLowerCase() !== selectedCategory)) return false;
+        if (selectedPurity && (!isSilver || value.goldPurety !== selectedPurity)) return false;
+
+        if (selectedPriceRange) {
+          const price = computeAdjustedPrice(value.grTotalPrice);
+          if (typeof price !== 'number') return false;
+          const [min, max] = selectedPriceRange;
+          if (price < min) return false;
+          if (max !== null && price > max) return false;
+        }
+        return true;
+      });
 
       setAvailableCategories([...categorySet].sort());
 
-      onValue(imgRef, async (imgSnap) => {
-        const imgData = imgSnap.val();
-        if (!skuData) return;
+      const items = await Promise.all(
+        filteredItems.map(async ([key, value]) => {
+          const imageSnap = await get(ref(db, `Global SKU/Images/${key}/Primary`));
+          const imageUrl = imageSnap.exists() ? imageSnap.val() : '/product-placeholder.jpg';
+          const adjustedPrice = computeAdjustedPrice(value.grTotalPrice);
+          return { id: key, price: adjustedPrice, image: imageUrl };
+        })
+      );
 
-        const allItems = Object.entries(skuData) as [string, RawSkuData][];
-        const filteredItems = allItems.filter(([key, value]) =>
-          filterSilverItems(key, value, searchParam, typeFilter)
-        ).filter(([, value]) => {
-          const isSilver = (value.remarks || '').toLowerCase().includes('sil');
-          if (selectedCategory && (!isSilver || value.jwelleryCategoryOther?.toLowerCase() !== selectedCategory)) return false;
-if (selectedPurity && (!isSilver || value.goldPurety !== selectedPurity)) return false;
-
-          if (selectedPriceRange) {
-            const price = computeAdjustedPrice(value.grTotalPrice);
-            if (typeof price !== 'number') return false;
-            const [min, max] = selectedPriceRange;
-            if (price < min) return false;
-            if (max !== null && price > max) return false;
-          }
-          return true;
-        });
-
-        const items = await Promise.all(
-          filteredItems.map(async ([key, value]) => {
-            const imageUrl = imgData?.[key]?.Primary || '/product-placeholder.jpg';
-            const adjustedPrice = computeAdjustedPrice(value.grTotalPrice);
-            return { id: key, price: adjustedPrice, image: imageUrl };
-          })
-        );
-
-        items.sort((a, b) => {
-          const priceA = typeof a.price === 'number' ? a.price : 0;
-          const priceB = typeof b.price === 'number' ? b.price : 0;
-          return sortOrder === 'asc' ? priceA - priceB : priceB - priceA;
-        });
-
-        setProducts(items);
-        setLoading(false);
+      items.sort((a, b) => {
+        const priceA = typeof a.price === 'number' ? a.price : 0;
+        const priceB = typeof b.price === 'number' ? b.price : 0;
+        return sortOrder === 'asc' ? priceA - priceB : priceB - priceA;
       });
-    });
+
+      setProducts(items);
+      setLoading(false);
+    };
+
+    fetchData();
   }, [searchParam, sortOrder, typeFilter, selectedCategory, selectedPurity, selectedPriceRange]);
 
   return (
@@ -148,34 +140,31 @@ if (selectedPurity && (!isSilver || value.goldPurety !== selectedPurity)) return
           display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '1rem auto', gap: '0.75rem', maxWidth: '960px'
         }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0.75rem' }}>
-
             <select
-  onChange={(e) => {
-    const newCat = e.target.value.toLowerCase();
-    setSelectedCategory(newCat);
-    setSelectedPurity('');
-    setSelectedPriceRange(null);
-    router.push('/catalog/silver'); // reset typeFilter & searchParams if needed
-  }}
-  value={selectedCategory}
->
-
-
+              onChange={(e) => {
+                const newCat = e.target.value.toLowerCase();
+                setSelectedCategory(newCat);
+                setSelectedPurity('');
+                setSelectedPriceRange(null);
+                router.push('/catalog/silver');
+              }}
+              value={selectedCategory}
+            >
               <option value=''>All Categories</option>
               {availableCategories.map((cat) => (
                 <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
               ))}
             </select>
 
-<select
-  onChange={(e) => setSelectedPurity(e.target.value)}
-  value={selectedPurity}
->
-  <option value=''>All Purity</option>
-  {['92.5', '99.0'].map(purity => (
-    <option key={purity} value={purity}>{purity}</option>
-  ))}
-</select>
+            <select
+              onChange={(e) => setSelectedPurity(e.target.value)}
+              value={selectedPurity}
+            >
+              <option value=''>All Purity</option>
+              {['92.5', '99.0'].map(purity => (
+                <option key={purity} value={purity}>{purity}</option>
+              ))}
+            </select>
 
             {priceRanges.map(([min, max], index) => (
               <button
