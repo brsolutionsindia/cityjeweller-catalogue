@@ -33,9 +33,9 @@ export default function CatalogView({ category }: Props) {
   const [menuOpen, setMenuOpen] = useState<'sort' | null>(null);
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const searchParams = useSearchParams();
-  const searchParam = (searchParams.get('search') || '').toLowerCase();
-  const ratti = parseFloat(searchParams.get('ratti') || '0');
+const searchParams = useSearchParams();
+const searchParam = (searchParams?.get?.('search') ?? '').toLowerCase();
+const ratti = parseFloat(searchParams?.get?.('ratti') ?? '0');
 
   const categoryTitleMap: Record<Props['category'], string> = {
     silver: 'Silver Collection',
