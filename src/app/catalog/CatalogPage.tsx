@@ -30,7 +30,7 @@ export default function CatalogView({ category }: Props) {
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
-  const ratti = parseFloat(searchParams.get('ratti') || '0');
+  const ratti = parseFloat(searchParams?.get('ratti') ?? '0');
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const headingMap: Record<Props['category'], string> = {
