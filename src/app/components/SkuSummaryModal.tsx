@@ -49,8 +49,8 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
   const [imageUrl, setImageUrl] = useState('/product-placeholder.jpg');
   const [goldRate, setGoldRate] = useState<number>(0);
 
-  const searchParams = useSearchParams();
-  const ratti = parseFloat(searchParams.get('ratti') || '1');
+const searchParams = useSearchParams();
+const ratti = parseFloat(searchParams?.get?.('ratti') ?? '1');
 
   const formatINR = (value?: string | number) => {
     const num = Number(value || 0);
