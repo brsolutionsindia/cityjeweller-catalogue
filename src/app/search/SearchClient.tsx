@@ -16,8 +16,8 @@ interface RawSkuData {
 }
 
 export default function SearchClient() {
-  const searchParams = useSearchParams();
-  const searchQuery = (searchParams.get('query') || '').toLowerCase();
+const searchParams = useSearchParams();
+const searchQuery = (searchParams?.get?.('query') ?? '').toLowerCase();
   const [products, setProducts] = useState<{ id: string; price: number | string; image: string }[]>([]);
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
 
