@@ -27,8 +27,8 @@ export default function GoldCatalog() {
   const [sortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const searchParams = useSearchParams();
-  const typeFilter = searchParams.get('type');
-  const searchParam = (searchParams.get('search') || '').toLowerCase();
+const typeFilter = searchParams?.get?.('type') ?? '';
+const searchParam = (searchParams?.get?.('search') ?? '').toLowerCase();
 
   const typeMap: { [key: string]: string } = {
     ER: 'Earrings Collection',

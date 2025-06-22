@@ -26,9 +26,9 @@ export default function GemstoneCatalog() {
   const [menuOpen, setMenuOpen] = useState<'sort' | null>(null);
 
   const searchParams = useSearchParams();
-  const typeFilter = searchParams.get('type');
-  const ratti = parseFloat(searchParams.get('ratti') || '0');
-  const searchParam = (searchParams.get('search') || '').toLowerCase();
+const typeFilter = searchParams?.get?.('type') ?? '';
+const ratti = parseFloat(searchParams?.get?.('ratti') ?? '0');
+const searchParam = (searchParams?.get?.('search') ?? '').toLowerCase();
 
   const menuRef = useRef<HTMLDivElement | null>(null);
 
