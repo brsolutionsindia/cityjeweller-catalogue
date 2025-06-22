@@ -6,7 +6,7 @@ export default function PrivacyPolicy() {
       <p><strong>App Name:</strong> Jewellers Cataloging App</p>
       <p><strong>Company:</strong> BR Solutions Pvt Ltd</p>
       <p><strong>Website:</strong> www.cityjeweller.in</p>
-      <p><strong>Contact:</strong> cityjeweller.india@gmail.com</p>
+      <p><strong>Contact:</strong> cityjewellers.india@gmail.com</p>
 
       <h2>1. Introduction</h2>
 <p>This Privacy Policy explains how the City Jeweller app collects, uses, and protects user data. BR Solutions Pvt Ltd respects your privacy and ensures data is handled securely and transparently.</p>
