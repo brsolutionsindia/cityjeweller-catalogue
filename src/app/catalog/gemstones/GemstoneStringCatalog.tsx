@@ -22,9 +22,9 @@ export default function GemstoneStringCatalog() {
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState<'sort' | null>(null);
 
-  const searchParams = useSearchParams();
-  const typeFilter = searchParams.get('type');
-  const searchParam = (searchParams.get('search') || '').toLowerCase();
+const searchParams = useSearchParams();
+const typeFilter = searchParams?.get?.('type') ?? '';
+const searchParam = (searchParams?.get?.('search') ?? '').toLowerCase();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const heading = (() => {
