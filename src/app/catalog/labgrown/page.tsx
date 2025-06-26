@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ref, query, orderByChild, equalTo, onValue } from 'firebase/database';
+import { ref, onValue } from 'firebase/database';
 import { db } from '../../../firebaseConfig';
 import PageLayout from '../../components/PageLayout';
 import styles from '../../page.module.css';
