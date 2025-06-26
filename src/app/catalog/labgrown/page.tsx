@@ -226,7 +226,7 @@ useEffect(() => {
           <span className="codeValue">{obfuscateStoneId(d.StoneId)}</span>
         </div>
         <a
-          href={`https://wa.me/?text=I'm interested in diamond code: ${obfuscateStoneId(d.StoneId)}`}
+          href={`https://wa.me/919023130944?text=I'm interested in diamond code: ${obfuscateStoneId(d.StoneId)}`}
           target="_blank"
           rel="noopener noreferrer"
           className={`${styles.enquiryBtn} ${styles.labGrownPage}`}
