@@ -683,3 +683,191 @@
 .breadcrumb a:hover {
   text-decoration: underline;
 }
+
+
+.stickyFilterContainer {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 100;
+  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  border-bottom: 1px solid #ccc;
+}
+
+.filterLabel {
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+
+.shapeImage {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  margin-bottom: 0.5rem;
+}
+
+
+
+
+.catalogCard {
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  background: #fff;
+}
+
+.imageRow {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.imageRow img {
+  width: 48%;
+  height: auto;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.cardContent {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.2rem 1rem;
+  font-size: 0.85rem;
+}
+
+.cardFooter {
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+.catalogCode {
+  font-size: 0.7rem;
+  color: #888;
+}
+
+
+
+
+
+
+
+/* ===============================
+   Lab Grown Catalog Styles
+=============================== */
+
+.labGrownPage .catalogCard {
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  padding: 1rem;
+  width: 100%;
+  max-width: 220px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+  margin: auto; /* center horizontally if needed */
+}
+
+.labGrownPage .imageContainer {
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.labGrownPage .shapeImage {
+  width: 100px;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+  display: block;
+  margin: 0 auto; /* center */
+}
+
+.labGrownPage .cardContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.labGrownPage .cardContent p {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.labGrownPage .cardContent p:nth-child(2n) {
+  font-weight: bold;
+  color: #333;
+}
+
+.labGrownPage .cardContent p:nth-child(2n) {
+  white-space: normal; /* allow wrapping if needed */
+}
+
+.labGrownPage .catalogCode {
+  font-size: 0.75rem;
+  color: #888;
+  margin: 0.5rem 0;
+  text-align: center;
+  word-break: break-all;
+}
+
+.labGrownPage .cardFooter {
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.labGrownPage .codeSection {
+  font-size: 0.8rem;
+  color: #555;
+  margin-bottom: 0.5rem;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.labGrownPage .codeLabel {
+  font-weight: 500;
+}
+
+.labGrownPage .codeValue {
+  color: #000;
+  font-weight: bold;
+  word-break: break-all;
+}
+
+.labGrownPage .enquiryBtn {
+  background-color: #16a34a;
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  margin-top: 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.labGrownPage .enquiryBtn:hover {
+  background-color: #218838;
+  transform: translateY(-1px);
+}
+
