@@ -111,8 +111,7 @@ export default function CvdCatalogPage() {
   const [filtered, setFiltered] = useState<Diamond[]>([]);
   const [availableShapes, setAvailableShapes] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [priceSortOrder, setPriceSortOrder] = useState<'asc' | 'desc' | ''>('');
+  const [sortOption, setSortOption] = useState<'price-asc' | 'price-desc' | 'size-asc' | 'size-desc'>('price-asc');
   const [filters, setFilters] = useState({ SizeRange: '1.000 - 1.100', Shape: 'ROUND', Clarity: '', Color: '', Cut: '', Polish: '', Symm: '', Fluorescence: '' });
 
   useEffect(() => {
@@ -147,10 +146,31 @@ export default function CvdCatalogPage() {
   }, [filters.Shape]);
 
   useEffect(() => {
-    let result = diamonds.filter(d => (!filters.SizeRange || d.SizeRange === filters.SizeRange) && (!filters.Clarity || d.Clarity === filters.Clarity) && (!filters.Color || d.Color === filters.Color) && (!filters.Cut || d.Cut === filters.Cut) && (!filters.Polish || d.Polish === filters.Polish) && (!filters.Symm || d.Symm === filters.Symm) && (!filters.Fluorescence || d.Fluorescence === filters.Fluorescence));
-    result = priceSortOrder ? result.sort((a, b) => (priceSortOrder === 'asc' ? (a.OfferPrice ?? 0) - (b.OfferPrice ?? 0) : (b.OfferPrice ?? 0) - (a.OfferPrice ?? 0))) : result.sort((a, b) => (sortOrder === 'asc' ? parseFloat(a.Size ?? '0') - parseFloat(b.Size ?? '0') : parseFloat(b.Size ?? '0') - parseFloat(a.Size ?? '0')));
-    setFiltered(result);
-  }, [filters, diamonds, sortOrder, priceSortOrder]);
+  let result = diamonds.filter(d =>
+    (!filters.SizeRange || d.SizeRange === filters.SizeRange) &&
+    (!filters.Clarity || d.Clarity === filters.Clarity) &&
+    (!filters.Color || d.Color === filters.Color) &&
+    (!filters.Cut || d.Cut === filters.Cut) &&
+    (!filters.Polish || d.Polish === filters.Polish) &&
+    (!filters.Symm || d.Symm === filters.Symm) &&
+    (!filters.Fluorescence || d.Fluorescence === filters.Fluorescence)
+  );
+
+  result = result.sort((a, b) => {
+    if (sortOption === 'price-asc') {
+      return (a.OfferPrice ?? 0) - (b.OfferPrice ?? 0);
+    } else if (sortOption === 'price-desc') {
+      return (b.OfferPrice ?? 0) - (a.OfferPrice ?? 0);
+    } else if (sortOption === 'size-asc') {
+      return parseFloat(a.Size ?? '0') - parseFloat(b.Size ?? '0');
+    } else {
+      return parseFloat(b.Size ?? '0') - parseFloat(a.Size ?? '0');
+    }
+  });
+
+  setFiltered(result);
+}, [filters, diamonds, sortOption]);
+
 
   const unique = (key: keyof Diamond) => Array.from(new Set(diamonds.map((d) => d[key]))).sort();
 
@@ -161,17 +181,25 @@ export default function CvdCatalogPage() {
         {!isLoading && <p className={styles.itemCount}>Showing {filtered.length} items</p>}
         {isLoading && <p className={styles.loadingBlink}>Loading...</p>}
 
-        <div className={styles.stickyFilterContainer}>
+        <div className={styles.stickyFilterContainer} style={{ justifyContent: 'center', display: 'flex', flexWrap: 'wrap', gap: '1rem', margin: '1rem 0' }}>
           <label className={styles.filterLabel}>Shape: <select value={filters.Shape} onChange={e => setFilters(prev => ({ ...prev, Shape: e.target.value, SizeRange: '' }))}>{availableShapes.map(shape => (<option key={shape} value={shape}>{shape}</option>))}</select></label>
           {[['SizeRange', 'Size'], ['Clarity', 'Clarity'], ['Color', 'Color'], ['Cut', 'Cut'], ['Polish', 'Polish'], ['Symm', 'Symm'], ['Fluorescence', 'Fluorescence']].map(([key, label]) => (<label key={key} className={styles.filterLabel}>{label}: <select value={filters[key as keyof typeof filters]} onChange={e => setFilters(prev => ({ ...prev, [key]: e.target.value }))}><option value="">All {label}</option>{unique(key as keyof Diamond).map(val => (<option key={val} value={val}>{val}</option>))}</select></label>))}
         </div>
 
         <div className={styles.sortingContainer}>
-          <label htmlFor="sortOrder">Sort by Size: </label>
-          <select id="sortOrder" value={sortOrder} onChange={e => setSortOrder(e.target.value as 'asc' | 'desc')} disabled={!!priceSortOrder}><option value="asc">Smallest to Largest</option><option value="desc">Largest to Smallest</option></select>
-          <label htmlFor="priceSortOrder" style={{ marginLeft: '1rem' }}>Sort by Price: </label>
-          <select id="priceSortOrder" value={priceSortOrder} onChange={e => setPriceSortOrder(e.target.value as 'asc' | 'desc' | '')}><option value="">-- None --</option><option value="asc">Low to High</option><option value="desc">High to Low</option></select>
-        </div>
+  <label htmlFor="sortOption">Sort by: </label>
+  <select
+    id="sortOption"
+    value={sortOption}
+    onChange={e => setSortOption(e.target.value as any)} // 'any' because TS needs all values in union type
+  >
+    <option value="price-asc">Price: Low to High</option>
+    <option value="price-desc">Price: High to Low</option>
+    <option value="size-asc">Size: Small to Large</option>
+    <option value="size-desc">Size: Large to Small</option>
+  </select>
+</div>
+
 
         <div className={styles.catalogGrid}>
           {filtered.map((d) => (
