@@ -191,7 +191,11 @@ export default function CvdCatalogPage() {
   <select
     id="sortOption"
     value={sortOption}
-    onChange={e => setSortOption(e.target.value as any)} // 'any' because TS needs all values in union type
+onChange={e =>
+  setSortOption(
+    e.target.value as 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc'
+  )
+}
   >
     <option value="price-asc">Price: Low to High</option>
     <option value="price-desc">Price: High to Low</option>
