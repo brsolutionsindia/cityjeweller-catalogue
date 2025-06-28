@@ -7,6 +7,28 @@ import PageLayout from '../../components/PageLayout';
 import styles from '../../page.module.css';
 import shapeIcon from '../../../../assets/shapeIcons';
 
+interface Diamond {
+  StoneId?: string;
+  Size?: string;
+  SizeRange?: string;
+  Clarity?: string;
+  Color?: string;
+  Cut?: string;
+  Polish?: string;
+  Symm?: string;
+  Fluorescence?: string;
+  Shape?: string;
+  Status?: string;
+  CertNo?: string;
+  Certified?: string;
+  VideoURL?: string;
+  Measurement?: string;
+  Depth?: string;
+  Table?: string;
+  MRP?: number;
+  OfferPrice?: number;
+}
+
 const clarityMap = {
   IF: 'Internally Flawless (best grade)',
   VVS1: 'Very Very Slightly Included 1',
