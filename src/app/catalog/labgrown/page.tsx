@@ -139,8 +139,23 @@ export default function CvdCatalogPage() {
                 {d.MRP && d.OfferPrice ? (<p><span style={{ textDecoration: 'line-through', color: '#888', marginRight: '0.5rem' }}>₹{Math.round(d.MRP)}</span><span style={{ color: '#c00', fontWeight: 'bold' }}>₹{Math.round(d.OfferPrice)}</span></p>) : null}
               </div>
               <div className="cardFooter">
-                <div className="codeSection"><span className="codeLabel">Code:</span><span className="codeValue">{obfuscateStoneId(d.StoneId)}</span></div>
-                <a href={`https://wa.me/919023130944?text=I'm interested in diamond code: ${obfuscateStoneId(d.StoneId)}`} target="_blank" rel="noopener noreferrer" className={`${styles.enquiryBtn} ${styles.labGrownPage}`}>Enquire</a>
+{d.StoneId ? (
+  <>
+    <div className="codeSection">
+      <span className="codeLabel">Code:</span>
+      <span className="codeValue">{obfuscateStoneId(d.StoneId)}</span>
+    </div>
+    <a
+      href={`https://wa.me/919023130944?text=I'm interested in diamond code: ${obfuscateStoneId(d.StoneId)}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`${styles.enquiryBtn} ${styles.labGrownPage}`}
+    >
+      Enquire
+    </a>
+  </>
+) : null}
+
               </div>
             </div>
           ))}
