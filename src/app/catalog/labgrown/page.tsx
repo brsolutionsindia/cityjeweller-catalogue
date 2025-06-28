@@ -126,9 +126,15 @@ export default function CvdCatalogPage() {
               <div className="cardContent">
                 <p>{d.Size}ct ({d.Shape})</p>
                 <div style={{ fontSize: '0.65rem', lineHeight: '1.3', textAlign: 'center' }}>
-                  <p><span onClick={() => alert('Lab-grown diamond using Chemical Vapor Deposition (CVD).')} style={{ cursor: 'pointer', color: '#0070f3', fontWeight: 'bold' }}>CVD</span> ({d.Measurement} mm)</p>
+                  <p><span onClick={() => alert('Lab-grown diamond using Chemical Vapor Deposition (CVD).')} style={{ cursor: 'pointer', color: '#0070f3', fontWeight: 'bold' }}>CVD</span> ({d.Measurement ?? ''} mm)</p>
                   <p>D<InfoPopup text={`${d.Depth}%`} valueMap={{ [`D${d.Depth}%`]: 'Depth % – Ratio of depth to width. Affects brilliance.' }} />; T<InfoPopup text={`${d.Table}%`} valueMap={{ [`T${d.Table}%`]: 'Table % – Size of the flat top facet. Affects sparkle.' }} /></p>
-                  <p><InfoPopup text={d.Clarity} label="Clarity " valueMap={clarityMap} />, <InfoPopup text={d.Color} label="Color " valueMap={colorMap} />, <InfoPopup text={d.Cut} label="Cut " valueMap={gradeMap} />, <InfoPopup text={d.Polish} label="Polish " valueMap={gradeMap} />, <InfoPopup text={d.Symm} label="Symmetry " valueMap={gradeMap} />, <InfoPopup text={d.Fluorescence} label="Fluorescence: " valueMap={fluorescenceMap} /></p>
+                  <p><InfoPopup text={d.Clarity ?? ''} label="Clarity " valueMap={clarityMap} />
+<InfoPopup text={d.Color ?? ''} label="Color " valueMap={colorMap} />
+<InfoPopup text={d.Cut ?? ''} label="Cut " valueMap={gradeMap} />
+<InfoPopup text={d.Polish ?? ''} label="Polish " valueMap={gradeMap} />
+<InfoPopup text={d.Symm ?? ''} label="Symmetry " valueMap={gradeMap} />
+<InfoPopup text={d.Fluorescence ?? ''} label="Fluorescence: " valueMap={fluorescenceMap} />
+</p>
                 </div>
                 {d.MRP && d.OfferPrice ? (<p><span style={{ textDecoration: 'line-through', color: '#888', marginRight: '0.5rem' }}>₹{Math.round(d.MRP)}</span><span style={{ color: '#c00', fontWeight: 'bold' }}>₹{Math.round(d.OfferPrice)}</span></p>) : null}
               </div>
