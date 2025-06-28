@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { db } from '../../../firebaseConfig';
 import PageLayout from '../../components/PageLayout';
 import styles from '../../page.module.css';
 import shapeIcon from '../../../../assets/shapeIcons';
+
 
 interface Diamond {
   StoneId?: string;
@@ -34,13 +35,66 @@ const colorMap = { D: 'Colorless (highest grade)', E: 'Colorless – Slightly le
 const gradeMap = { EX: 'Excellent', VG: 'Very Good', GD: 'Good', ID: 'Ideal', FR: 'Fair' };
 const fluorescenceMap = { NON: 'None – No reaction to UV light', SLT: 'Slight – Very minimal fluorescence', VSL: 'Very Slight – Slightly visible under UV' };
 
-const InfoPopup = ({ text, label, valueMap }: { text: string; label?: string; valueMap: Record<string, string>; }) => {
+const InfoPopup = ({
+  text,
+  label,
+  valueMap,
+}: {
+  text: string;
+  label?: string;
+  valueMap: Record<string, string>;
+}) => {
   const [show, setShow] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setShow(false);
+      }
+    };
+
+    if (show) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [show]);
+
   return (
-    <span style={{ cursor: 'pointer', color: '#0070f3', fontWeight: 'bold', position: 'relative', fontSize: '0.65rem' }} onClick={(e) => { e.stopPropagation(); setShow((prev) => !prev); }}>
+    <span
+      ref={ref}
+      style={{
+        cursor: 'pointer',
+        color: '#0070f3',
+        fontWeight: 'bold',
+        position: 'relative',
+        fontSize: '0.65rem',
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        setShow((prev) => !prev);
+      }}
+    >
       {text}
       {show && (
-        <span style={{ display: 'block', background: '#fff', border: '1px solid #ccc', padding: '0.5rem', marginTop: '0.25rem', borderRadius: '4px', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', position: 'absolute', zIndex: 10, whiteSpace: 'normal', maxWidth: '250px' }}>
+        <span
+          style={{
+            display: 'block',
+            background: '#fff',
+            border: '1px solid #ccc',
+            padding: '0.5rem',
+            marginTop: '0.25rem',
+            borderRadius: '4px',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+            position: 'absolute',
+            zIndex: 10,
+            whiteSpace: 'normal',
+            maxWidth: '250px',
+          }}
+        >
           <strong>{label || text}:</strong> {valueMap[text] || 'No info available'}
         </span>
       )}
