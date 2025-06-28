@@ -122,7 +122,7 @@ export default function CvdCatalogPage() {
         <div className={styles.catalogGrid}>
           {filtered.map((d) => (
             <div className={`${styles.catalogCard} ${styles.labGrownPage}`} key={d.StoneId}>
-              <div className="imageContainer"><img src={shapeIcon[d.Shape] || '/default.png'} alt={d.Shape} className="shapeImage" /></div>
+              <div className="imageContainer"><img src={shapeIcon[d.Shape ?? ''] || '/default.png'} alt={d.Shape} className="shapeImage" /></div>
               <div className="cardContent">
                 <p>{d.Size}ct ({d.Shape})</p>
                 <div style={{ fontSize: '0.65rem', lineHeight: '1.3', textAlign: 'center' }}>
