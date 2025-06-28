@@ -37,7 +37,7 @@ const fluorescenceMap = { NON: 'None – No reaction to UV light', SLT: 'Slight 
 const InfoPopup = ({ text, label, valueMap }: { text: string; label?: string; valueMap: Record<string, string>; }) => {
   const [show, setShow] = useState(false);
   return (
-    <span style={{ cursor: 'pointer', color: '#0070f3', fontWeight: 'bold', position: 'relative' }} onClick={(e) => { e.stopPropagation(); setShow((prev) => !prev); }}>
+    <span style={{ cursor: 'pointer', color: '#0070f3', fontWeight: 'bold', position: 'relative', fontSize: '0.65rem' }} onClick={(e) => { e.stopPropagation(); setShow((prev) => !prev); }}>
       {text}
       {show && (
         <span style={{ display: 'block', background: '#fff', border: '1px solid #ccc', padding: '0.5rem', marginTop: '0.25rem', borderRadius: '4px', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', position: 'absolute', zIndex: 10, whiteSpace: 'normal', maxWidth: '250px' }}>
@@ -109,7 +109,7 @@ export default function CvdCatalogPage() {
 
         <div className={styles.stickyFilterContainer}>
           <label className={styles.filterLabel}>Shape: <select value={filters.Shape} onChange={e => setFilters(prev => ({ ...prev, Shape: e.target.value, SizeRange: '' }))}>{availableShapes.map(shape => (<option key={shape} value={shape}>{shape}</option>))}</select></label>
-          {[['SizeRange', 'Size'], ['Clarity', 'Clarity'], ['Color', 'Color'], ['Cut', 'Cut'], ['Polish', 'Polish'], ['Symm', 'Symm'], ['Fluorescence', 'Fluorescence']].map(([key, label]) => (<label key={key} className={styles.filterLabel}>{label}: <select value={filters[key]} onChange={e => setFilters(prev => ({ ...prev, [key]: e.target.value }))}><option value="">All {label}</option>{unique(key as keyof Diamond).map(val => (<option key={val} value={val}>{val}</option>))}</select></label>))}
+          {[['SizeRange', 'Size'], ['Clarity', 'Clarity'], ['Color', 'Color'], ['Cut', 'Cut'], ['Polish', 'Polish'], ['Symm', 'Symm'], ['Fluorescence', 'Fluorescence']].map(([key, label]) => (<label key={key} className={styles.filterLabel}>{label}: <select value={filters[key as keyof typeof filters]} onChange={e => setFilters(prev => ({ ...prev, [key]: e.target.value }))}><option value="">All {label}</option>{unique(key as keyof Diamond).map(val => (<option key={val} value={val}>{val}</option>))}</select></label>))}
         </div>
 
         <div className={styles.sortingContainer}>
@@ -125,7 +125,7 @@ export default function CvdCatalogPage() {
               <div className="imageContainer"><img src={shapeIcon[d.Shape] || '/default.png'} alt={d.Shape} className="shapeImage" /></div>
               <div className="cardContent">
                 <p>{d.Size}ct ({d.Shape})</p>
-                <div style={{ fontSize: '0.70rem', lineHeight: '1.3', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.65rem', lineHeight: '1.3', textAlign: 'center' }}>
                   <p><span onClick={() => alert('Lab-grown diamond using Chemical Vapor Deposition (CVD).')} style={{ cursor: 'pointer', color: '#0070f3', fontWeight: 'bold' }}>CVD</span> ({d.Measurement} mm)</p>
                   <p>D<InfoPopup text={`${d.Depth}%`} valueMap={{ [`D${d.Depth}%`]: 'Depth % – Ratio of depth to width. Affects brilliance.' }} />; T<InfoPopup text={`${d.Table}%`} valueMap={{ [`T${d.Table}%`]: 'Table % – Size of the flat top facet. Affects sparkle.' }} /></p>
                   <p><InfoPopup text={d.Clarity} label="Clarity " valueMap={clarityMap} />, <InfoPopup text={d.Color} label="Color " valueMap={colorMap} />, <InfoPopup text={d.Cut} label="Cut " valueMap={gradeMap} />, <InfoPopup text={d.Polish} label="Polish " valueMap={gradeMap} />, <InfoPopup text={d.Symm} label="Symmetry " valueMap={gradeMap} />, <InfoPopup text={d.Fluorescence} label="Fluorescence: " valueMap={fluorescenceMap} /></p>
