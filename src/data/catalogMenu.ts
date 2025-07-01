@@ -52,7 +52,9 @@ export const gemstoneItems = [
 ];
 
 export const cvdItems = [
-  { label: 'Loose CVD', image: '/cvd-loose.png', link: '/catalog/labgrown' },
+  { label: 'Natural Diamonds', image: '/diamond-loose.png', link: '/catalog/naturalD' },
+  { label: 'Lab Grown Diamonds', image: '/cvd-loose.png', link: '/catalog/labgrown' },
+
 ];
 
 export const miscItems = [
