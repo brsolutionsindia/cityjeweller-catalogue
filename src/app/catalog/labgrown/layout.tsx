@@ -9,7 +9,7 @@ export const metadata = {
     type: "website",
     images: [
       {
-        url: "https://www.cityjeweller.in/assets/labgrown-thumbnail-wide.png",
+        url: "https://www.cityjeweller.in/assets/labgrown-thumbnail-v2.png",
         width: 1200,
         height: 630,
         alt: "Lab Grown Diamonds – City Jeweller",
@@ -20,7 +20,7 @@ export const metadata = {
     card: "summary_large_image",
     title: "Lab Grown Diamonds | City Jeweller",
     description: "Explore handpicked lab-grown solitaires.",
-    images: ["https://www.cityjeweller.in/assets/labgrown-thumbnail-wide.png"],
+    images: ["https://www.cityjeweller.in/assets/labgrown-thumbnail-v2.png"],
   },
 };
 
