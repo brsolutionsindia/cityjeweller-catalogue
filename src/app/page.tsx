@@ -120,7 +120,7 @@ export default function Home() {
 
       {/* CVD*/}
       <section id="cvd" className={productStyles.catalogSection}>
-        <h2 className={productStyles.sectionHeading}>Lab Grown Diamonds</h2>
+        <h2 className={productStyles.sectionHeading}>Loose Solitaire Diamonds</h2>
         <div className={productStyles.catalogContainer}>
           <div className={productStyles.catalogSlider}>
             <div className={productStyles.horizontalScroll}>
