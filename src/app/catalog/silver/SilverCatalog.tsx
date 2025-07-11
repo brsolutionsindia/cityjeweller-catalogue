@@ -38,6 +38,8 @@ const searchParam = (searchParams?.get?.('search') ?? '').toLowerCase();
 
 
   const typeMap: { [key: string]: string } = {
+    SRK: 'Silver Rakhi',
+    SBL: 'Silver Bracelet',
     SUT: 'Silver Utensils',
     SPF: 'Silver Photo Frames',
     SID: 'Silver Idols',
@@ -140,6 +142,34 @@ if (selectedPurity && (!isSilver || value.goldPurety !== selectedPurity)) return
 
   return (
     <PageLayout>
+
+{/* YouTube Shorts Embed with Height Limit */}
+  <section style={{ maxWidth: '560px', margin: '1rem auto' }}>
+    <div style={{
+      position: 'relative',
+      width: '100%',
+      height: '400px', // ✅ Set your desired height here
+      overflow: 'hidden',
+      borderRadius: '8px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+    }}>
+      <iframe
+        src="https://www.youtube.com/embed/F57sLhe0M0A"
+        title="Rakhi Collection"
+        frameBorder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%'
+        }}
+      ></iframe>
+    </div>
+  </section>
+
       <OfferBarSilver silverRate={silverRate} rateDate={rateDate} />
       <section>
         <h1 style={{ paddingLeft: '1rem', fontSize: '1.5rem', fontWeight: 'bold' }}>{heading}</h1>
