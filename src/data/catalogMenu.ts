@@ -25,6 +25,8 @@ export const goldItems = [
 ];
 
 export const silverItems = [
+  { label: 'Rakhi', image: '/silver-rakhi.png', link: '/catalog/silver?type=SRK' },
+  { label: 'Bracelet', image: '/silver-bracelet.png', link: '/catalog/silver?type=SBL' },
   { label: 'Utensils', image: '/silver-utensils.png', link: '/catalog/silver?type=SUT' },
   { label: 'Photo Frames', image: '/silver-frames.png', link: '/catalog/silver?type=SPF' },
   { label: 'Idols', image: '/silver-idols.png', link: '/catalog/silver?type=SID' },

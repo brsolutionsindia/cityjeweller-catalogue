@@ -27,6 +27,8 @@ export const filterSilverItems = (
   if (!containsSilver) return false;
 
   switch (typeFilter) {
+    case 'SRK': return remarks.includes('rakhi');
+    case 'SBL': return remarks.includes('bracelet');
     case 'SUT': return remarks.includes('utensil');
     case 'SPF': return remarks.includes('frame');
     case 'SID': return remarks.includes('idol');
