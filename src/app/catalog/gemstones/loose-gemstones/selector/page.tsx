@@ -8,13 +8,24 @@ import PageLayout from "../../../../components/PageLayout";
 export default function LooseGemstonesPage() {
   const router = useRouter();
 
-  const gemstoneTypes = [
-    { label: "Moonga", image: "/gemstone-moonga.png", type: "LG-Moonga" },
-    { label: "Emerald", image: "/gemstone-emerald.png", type: "LG-Emerald" },
-    { label: "Blue Sapphire", image: "/gemstone-blue.png", type: "LG-Neelam" },
-    { label: "Yellow Sapphire", image: "/gemstone-yellow.png", type: "LG-Pukhraj" },
-    { label: "OPAL", image: "/gemstone-opal.png", type: "LG-Opal" },
-  ];
+  const gemstoneTypesAvailable = [
+  { label: "Coral (Moonga)", image: "/gemstone-moonga.png", type: "LG-Moonga" },
+  { label: "Emerald (Panna)", image: "/gemstone-emerald.png", type: "LG-Emerald" },
+  { label: "Blue Sapphire (Neelam)", image: "/gemstone-blue.png", type: "LG-Neelam" },
+  { label: "Yellow Sapphire (Pukhraj)", image: "/gemstone-yellow.png", type: "LG-Pukhraj" },
+  { label: "OPAL", image: "/gemstone-opal.png", type: "LG-Opal" },
+];
+
+const gemstoneTypesUpcoming = [
+  { label: "Ruby (Maanik)", image: "/gemstone-ruby.png" },
+  { label: "Pearl (Moti)", image: "/gemstone-pearl.png" },
+  { label: "Hessonite (Gomed)", image: "/gemstone-gomed.png" },
+  { label: "Cats Eye (Lehsuniya)", image: "/gemstone-lehsuniya.png" },
+  { label: "Amethyst", image: "/gemstone-amethyst.png" },
+  { label: "Marca Blue", image: "/gemstone-marcablue.png" },
+  { label: "Marca Yellow", image: "/gemstone-marcayellow.png" },
+];
+
 
   const handleGemstoneClick = (type: string) => {
     const input = prompt("How much weight (in ratti) are you looking for?");
@@ -29,26 +40,52 @@ export default function LooseGemstonesPage() {
   return (
     <PageLayout>
       <main style={{ backgroundColor: "#fff", padding: "1rem" }}>
-        <section id="gemstones" className={productStyles.catalogSection}>
-          <h2 className={productStyles.sectionHeading}>Choose Your Gemstone</h2>
-          <div className={productStyles.catalogContainer}>
-            <div className={productStyles.catalogSlider}>
-              <div className={productStyles.horizontalScroll}>
-                {gemstoneTypes.map(item => (
-                  <div
-                    key={item.label}
-                    className={productStyles.productCardHorizontal}
-                    onClick={() => handleGemstoneClick(item.type)}
-                    style={{ cursor: "pointer" }}
-                  >
-                    <Image src={item.image} alt={item.label} width={160} height={160} className={productStyles.productImg} />
-                    <h4 className={productStyles.productLabel}>{item.label}</h4>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
+<section id="gemstones" className={productStyles.catalogSection}>
+  <h2 className={productStyles.sectionHeading}>Choose Your Gemstone</h2>
+  <div className={productStyles.catalogGrid}>
+    {gemstoneTypesAvailable.map(item => (
+      <div
+        key={item.label}
+        className={productStyles.productCardHorizontal}
+        onClick={() => handleGemstoneClick(item.type)}
+        style={{ cursor: "pointer" }}
+      >
+        <Image
+          src={item.image}
+          alt={item.label}
+          width={160}
+          height={160}
+          className={productStyles.productImg}
+        />
+        <h4 className={productStyles.productLabel}>{item.label}</h4>
+      </div>
+    ))}
+  </div>
+</section>
+
+<section id="upcoming-gemstones" className={productStyles.catalogSection}>
+  <h2 className={productStyles.sectionHeading}>Listings Under Progress</h2>
+  <div className={productStyles.catalogGrid}>
+    {gemstoneTypesUpcoming.map(item => (
+      <div
+        key={item.label}
+        className={productStyles.productCardHorizontal}
+        style={{ opacity: 0.5, pointerEvents: "none" }}
+      >
+        <Image
+          src={item.image}
+          alt={item.label}
+          width={160}
+          height={160}
+          className={productStyles.productImg}
+        />
+        <h4 className={productStyles.productLabel}>{item.label}</h4>
+      </div>
+    ))}
+  </div>
+</section>
+
+
       </main>
     </PageLayout>
   );
