@@ -74,8 +74,7 @@ export default function YellowSapphireCatalogPage() {
       (!filters.Clarity || d.Clarity === filters.Clarity) &&
       (!filters.Cut || d.Cut === filters.Cut) &&
       (!filters.Origin || d.Origin === filters.Origin) &&
-      (!filters.Treatment || d.Treatment === filters.Treatment) &&
-      (!filters.SizeRange || d.SizeRange === filters.SizeRange)
+      (!filters.Treatment || d.Treatment === filters.Treatment)
     );
 
     result = result.sort((a, b) => {
