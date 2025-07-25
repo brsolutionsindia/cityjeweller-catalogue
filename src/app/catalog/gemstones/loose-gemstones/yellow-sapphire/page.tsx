@@ -97,12 +97,13 @@ export default function YellowSapphireCatalogPage() {
 
         <div className={styles.stickyFilterContainer} style={{ justifyContent: 'center', display: 'flex', flexWrap: 'wrap', gap: '1rem', margin: '1rem 0' }}>
           {[
-  ['Cut', 'Cut', {}],
-  ['ColorShade', 'Color Shade', colorMap],
-  ['Clarity', 'Clarity', clarityMap],
-  ['Origin', 'Origin', originMap],
-  ['Treatment', 'Treatment', treatmentMap]
+  ['Cut', 'Cut'],
+  ['ColorShade', 'Color Shade'],
+  ['Clarity', 'Clarity'],
+  ['Origin', 'Origin'],
+  ['Treatment', 'Treatment']
 ].map(([key, label]) => (
+
   <label key={key as string} className={styles.filterLabel}>
     {label}: 
     <select
