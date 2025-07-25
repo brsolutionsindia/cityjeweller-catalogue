@@ -5,7 +5,7 @@ import { ref, onValue } from 'firebase/database';
 import { db } from '../../../../../firebaseConfig';
 import PageLayout from '../../../../components/PageLayout';
 import styles from '../../../../page.module.css';
-import shapeIcon from '../../../../../../assets/shapeIcons';
+
 
 interface Sapphire {
   StoneId?: string;
@@ -55,7 +55,7 @@ export default function YellowSapphireCatalogPage() {
   const [filtered, setFiltered] = useState<Sapphire[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sortOption, setSortOption] = useState<'price-asc' | 'price-desc' | 'carat-asc' | 'carat-desc'>('price-asc');
-  const [filters, setFilters] = useState({ ColorShade: '', Clarity: '', Cut: '', Origin: '', Treatment: '', SizeRange: '' });
+  const [filters, setFilters] = useState({ Cut: 'Oval', ColorShade: '', Clarity: '', Origin: '', Treatment: ''});
 
   useEffect(() => {
     const dataRef = ref(db, 'Global SKU/YellowSapphires');
@@ -98,14 +98,14 @@ export default function YellowSapphireCatalogPage() {
         {isLoading && <p className={styles.loadingBlink}>Loading...</p>}
 
         <div className={styles.stickyFilterContainer} style={{ justifyContent: 'center', display: 'flex', flexWrap: 'wrap', gap: '1rem', margin: '1rem 0' }}>
-          {[['ColorShade', 'Color Shade', colorMap], ['Clarity', 'Clarity', clarityMap], ['Cut', 'Cut', {}], ['Origin', 'Origin', originMap], ['Treatment', 'Treatment', treatmentMap], ['SizeRange', 'Size Range', {}]].map(([key, label, map]) => (
+          {[['Cut', 'Cut', {}], ['ColorShade', 'Color Shade', colorMap], ['Clarity', 'Clarity', clarityMap], ['Origin', 'Origin', originMap], ['Treatment', 'Treatment', treatmentMap]].map(([key, label]) => (
             <label key={key} className={styles.filterLabel}>{label}: <select value={filters[key as keyof typeof filters]} onChange={e => setFilters(prev => ({ ...prev, [key]: e.target.value }))}><option value="">All {label}</option>{unique(key as keyof Sapphire).map(val => (<option key={val} value={val}>{val}</option>))}</select></label>
           ))}
         </div>
 
         <div className={styles.sortingContainer}>
           <label htmlFor="sortOption">Sort by: </label>
-          <select id="sortOption" value={sortOption} onChange={e => setSortOption(e.target.value as any)}>
+          <select id="sortOption" value={sortOption} onChange={e => setSortOption(e.target.value as typeof sortOption)}>
             <option value="price-asc">Price: Low to High</option>
             <option value="price-desc">Price: High to Low</option>
             <option value="carat-asc">Carat: Low to High</option>
