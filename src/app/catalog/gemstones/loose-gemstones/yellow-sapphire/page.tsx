@@ -96,9 +96,29 @@ export default function YellowSapphireCatalogPage() {
         {isLoading && <p className={styles.loadingBlink}>Loading...</p>}
 
         <div className={styles.stickyFilterContainer} style={{ justifyContent: 'center', display: 'flex', flexWrap: 'wrap', gap: '1rem', margin: '1rem 0' }}>
-          {[['Cut', 'Cut', {}], ['ColorShade', 'Color Shade', colorMap], ['Clarity', 'Clarity', clarityMap], ['Origin', 'Origin', originMap], ['Treatment', 'Treatment', treatmentMap]].map(([key, label]) => (
-            <label key={key} className={styles.filterLabel}>{label}: <select value={filters[key as keyof typeof filters]} onChange={e => setFilters(prev => ({ ...prev, [key]: e.target.value }))}><option value="">All {label}</option>{unique(key as keyof Sapphire).map(val => (<option key={val} value={val}>{val}</option>))}</select></label>
-          ))}
+          {[
+  ['Cut', 'Cut', {}],
+  ['ColorShade', 'Color Shade', colorMap],
+  ['Clarity', 'Clarity', clarityMap],
+  ['Origin', 'Origin', originMap],
+  ['Treatment', 'Treatment', treatmentMap]
+].map(([key, label, valueMap]) => (
+  <label key={key as string} className={styles.filterLabel}>
+    {label}: 
+    <select
+      value={filters[key as keyof typeof filters]}
+      onChange={e =>
+        setFilters(prev => ({ ...prev, [key]: e.target.value }))
+      }
+    >
+      <option value="">All {label}</option>
+      {unique(key as keyof Sapphire).map(val => (
+        <option key={val} value={val}>{val}</option>
+      ))}
+    </select>
+  </label>
+))}
+
         </div>
 
         <div className={styles.sortingContainer}>
