@@ -102,7 +102,7 @@ export default function YellowSapphireCatalogPage() {
   ['Clarity', 'Clarity', clarityMap],
   ['Origin', 'Origin', originMap],
   ['Treatment', 'Treatment', treatmentMap]
-].map(([key, label, valueMap]) => (
+].map(([key, label]) => (
   <label key={key as string} className={styles.filterLabel}>
     {label}: 
     <select
