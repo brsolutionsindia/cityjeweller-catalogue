@@ -10,7 +10,6 @@ import styles from '../../../../page.module.css';
 interface Sapphire {
   StoneId?: string;
   Carat?: string;
-  SizeRange?: string;
   ColorShade?: string;
   Clarity?: string;
   Cut?: string;
