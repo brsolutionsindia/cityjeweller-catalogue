@@ -18,6 +18,7 @@ export default function LooseGemstonesPage() {
 
   const gemstonePremiumTypesAvailable = [
   { label: "Yellow Sapphire (Premium)", image: "/gemstone-premium-pukhraj.png", type: "LG-PremiumPukhraj" },
+  { label: "Blue Sapphire (Premium)", image: "/gemstone-premium-neelam.png", type: "LG-PremiumNeelam" }
 ];
 
 const gemstoneTypesUpcoming = [
@@ -36,7 +37,10 @@ const handleGemstoneClick = (type: string) => {
     router.push("/catalog/gemstones/loose-gemstones/yellow-sapphire");
     return;
   }
-
+  if (type === "LG-PremiumNeelam") {
+    router.push("/catalog/gemstones/loose-gemstones/blue-sapphire");
+    return;
+  }
   const input = prompt("How much weight (in ratti) are you looking for?");
   const ratti = parseFloat(input || "0");
   if (!isNaN(ratti) && ratti > 0) {
