@@ -104,7 +104,6 @@ const InfoPopup = ({
 
 const extractUrl = (val: string): string => val?.match(/HYPERLINK\("(.+?)"/)?.[1] || '';
 const isIGICertified = (val: string): boolean => val?.includes('IGI');
-const obfuscateStoneId = (id: string): string => id.split('').map(char => /[A-Z]/.test(char) ? String.fromCharCode(((char.charCodeAt(0) - 65 + 3) % 26) + 65) : /[a-z]/.test(char) ? String.fromCharCode(((char.charCodeAt(0) - 97 + 3) % 26) + 97) : /[0-9]/.test(char) ? String.fromCharCode(((parseInt(char) + 3) % 10) + 48) : char).join('');
 
 export default function CvdCatalogPage() {
   const [diamonds, setDiamonds] = useState<Diamond[]>([]);
@@ -229,10 +228,10 @@ onChange={e =>
   <>
     <div className="codeSection">
       <span className="codeLabel">Code:</span>
-      <span className="codeValue">{obfuscateStoneId(d.StoneId)}</span>
+      <span className="codeValue">{d.StoneId}</span>
     </div>
     <a
-      href={`https://wa.me/919023130944?text=I'm interested in diamond code: ${obfuscateStoneId(d.StoneId)}`}
+      href={`https://wa.me/919023130944?text=I'm interested in diamond code: ${d.StoneId}`}
       target="_blank"
       rel="noopener noreferrer"
       className={`${styles.enquiryBtn} ${styles.labGrownPage}`}
