@@ -9,7 +9,7 @@ import styles from '../../page.module.css';
 import shapeIcon from '../../../../assets/shapeIcons';
 
 interface Diamond {
-  StoneId?: string;
+  StoneId: string;
   Size?: string;
   SizeRange?: string;
   Clarity?: string;
