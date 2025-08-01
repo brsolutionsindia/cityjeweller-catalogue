@@ -879,3 +879,34 @@
   text-align: center;
   white-space: normal;
 }
+
+
+
+
+.compareBtn {
+  background: #0070f3;
+  color: white;
+  font-weight: bold;
+  padding: 0.5rem 1rem;
+  margin: 1rem auto;
+  display: block;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.compareTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+.compareTable th,
+.compareTable td {
+  border: 1px solid #ddd;
+  padding: 0.5rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+.compareTable th {
+  background-color: #f0f0f0;
+  font-weight: bold;
+}
