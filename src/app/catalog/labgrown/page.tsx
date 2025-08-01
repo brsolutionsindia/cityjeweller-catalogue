@@ -68,7 +68,6 @@ export default function CvdCatalogPage() {
   const [sortOption, setSortOption] = useState<'price-asc' | 'price-desc' | 'size-asc' | 'size-desc'>('price-asc');
   const [filters, setFilters] = useState({ SizeRange: '1.000 - 1.100', Shape: 'ROUND', Clarity: '', Color: '', Cut: '', Polish: '', Symm: '', Fluorescence: '' });
   const [selected, setSelected] = useState<string[]>([]);
-  const [cart, setCart] = useState<string[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -131,7 +130,7 @@ export default function CvdCatalogPage() {
         </div>
         <div className={styles.sortingContainer}>
           <label htmlFor="sortOption">Sort by: </label>
-          <select id="sortOption" value={sortOption} onChange={e => setSortOption(e.target.value as any)}>
+          <select id="sortOption" value={sortOption} onChange={e => setSortOption(e.target.value as 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc')}>
             <option value="price-asc">Price: Low to High</option>
             <option value="price-desc">Price: High to Low</option>
             <option value="size-asc">Size: Small to Large</option>
