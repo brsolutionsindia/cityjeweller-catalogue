@@ -33,7 +33,7 @@ export default function CompareLabGrown() {
   const [diamonds, setDiamonds] = useState<Diamond[]>([]);
 
   useEffect(() => {
-    const ids = searchParams.get('ids')?.split(',') || [];
+    const ids = searchParams?.get('ids')?.split(',') || [];
     const dataRef = ref(db, 'Global SKU/CVD');
     onValue(dataRef, (snapshot) => {
       const val = snapshot.val();
