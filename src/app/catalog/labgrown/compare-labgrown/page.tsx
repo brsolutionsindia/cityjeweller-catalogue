@@ -6,6 +6,7 @@ import { db } from '../../../../firebaseConfig';
 import PageLayout from '../../../components/PageLayout';
 import styles from '../../../page.module.css';
 import shapeIcon from '../../../../../assets/shapeIcons';
+import Image from 'next/image';
 
 interface Diamond {
   StoneId?: string;
@@ -29,10 +30,10 @@ interface Diamond {
 
 export default function CompareLabGrown() {
   const searchParams = useSearchParams();
-  const ids = searchParams.get('ids')?.split(',') || [];
   const [diamonds, setDiamonds] = useState<Diamond[]>([]);
 
   useEffect(() => {
+    const ids = searchParams.get('ids')?.split(',') || [];
     const dataRef = ref(db, 'Global SKU/CVD');
     onValue(dataRef, (snapshot) => {
       const val = snapshot.val();
@@ -43,9 +44,9 @@ export default function CompareLabGrown() {
       );
       setDiamonds(filtered);
     });
-  }, [ids]);
+  }, [searchParams]);
 
-  const fields = [
+  const fields: [keyof Diamond, string][] = [
     ['Size', 'Size (ct)'],
     ['Measurement', 'Measurement'],
     ['Clarity', 'Clarity'],
@@ -59,8 +60,8 @@ export default function CompareLabGrown() {
     ['Certified', 'Certified']
   ];
 
-  const getBoldIfDifferent = (key: string, value: any) => {
-    const allValues = diamonds.map((d) => (d as any)[key]);
+  const getBoldIfDifferent = (key: keyof Diamond, value: string | number | undefined) => {
+    const allValues = diamonds.map((d) => d[key]);
     const isDifferent = new Set(allValues).size > 1;
     return isDifferent ? <strong>{value || '-'}</strong> : value || '-';
   };
@@ -82,8 +83,12 @@ export default function CompareLabGrown() {
                 <td style={{ fontWeight: 'bold', background: '#f8f8f8' }}>Price</td>
                 {diamonds.map((d) => (
                   <td key={d.StoneId + 'Price'}>
-                    <span style={{ textDecoration: 'line-through', color: '#888', marginRight: '0.5rem' }}>₹{Math.round(d.MRP || 0)}</span>
-                    <span style={{ color: '#c00', fontWeight: 'bold' }}>₹{Math.round(d.OfferPrice || 0)}</span>
+                    <span style={{ textDecoration: 'line-through', color: '#888', marginRight: '0.5rem' }}>
+                      ₹{Math.round(d.MRP || 0)}
+                    </span>
+                    <span style={{ color: '#c00', fontWeight: 'bold' }}>
+                      ₹{Math.round(d.OfferPrice || 0)}
+                    </span>
                   </td>
                 ))}
               </tr>
@@ -97,22 +102,26 @@ export default function CompareLabGrown() {
               <td>Shape</td>
               {diamonds.map((d) => (
                 <td key={d.StoneId + 'ShapeImg'} style={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                  <img
+                  <Image
                     src={shapeIcon[d.Shape ?? ''] || '/default.png'}
-                    alt={d.Shape}
-                    style={{ width: '160px', height: '160px', objectFit: 'contain' }}
+                    alt={d.Shape || 'Shape'}
+                    width={160}
+                    height={160}
+                    style={{ objectFit: 'contain' }}
                   />
                 </td>
               ))}
             </tr>
+
             {fields.map(([key, label]) => (
               <tr key={key}>
                 <td>{label}</td>
                 {diamonds.map((d) => (
-                  <td key={d.StoneId + key}>{getBoldIfDifferent(key, (d as any)[key])}</td>
+                  <td key={d.StoneId + key}>{getBoldIfDifferent(key, d[key])}</td>
                 ))}
               </tr>
             ))}
+
             <tr>
               <td>Enquire</td>
               {diamonds.map((d) => (
@@ -122,7 +131,15 @@ export default function CompareLabGrown() {
                       const msg = `I am interested in your Product ID ${d.StoneId}.`;
                       window.open(`https://wa.me/919023130944?text=${encodeURIComponent(msg)}`, '_blank');
                     }}
-                    style={{ marginTop: '0.5rem', padding: '0.3rem 0.6rem', backgroundColor: '#25D366', color: '#fff', border: 'none', borderRadius: '3px', cursor: 'pointer' }}
+                    style={{
+                      marginTop: '0.5rem',
+                      padding: '0.3rem 0.6rem',
+                      backgroundColor: '#25D366',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '3px',
+                      cursor: 'pointer',
+                    }}
                   >
                     Enquire
                   </button>
