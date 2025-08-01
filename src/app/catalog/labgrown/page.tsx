@@ -168,7 +168,9 @@ export default function CvdCatalogPage() {
                 checked={selected.includes(d.StoneId!)}
                 disabled={!selected.includes(d.StoneId!) && selected.length >= 4}
                 onChange={(e) => {
-                  if (e.target.checked && d.StoneId) setSelected(prev => [...prev, d.StoneId]);
+                  if (e.target.checked && typeof d.StoneId === 'string') {
+  setSelected(prev => [...prev, d.StoneId]);
+}
                   else setSelected(prev => prev.filter(id => id !== d.StoneId));
                 }}
               />
