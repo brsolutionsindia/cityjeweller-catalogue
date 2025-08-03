@@ -61,7 +61,7 @@ export default function CompareNaturalDiamond() {
     { label: 'Certified By', key: 'Certified' },
   ];
 
-  const getCell = (key: keyof Diamond, value: any, column: number): string | JSX.Element => {
+  const getCell = (key: keyof Diamond, value: string | number | undefined): string | JSX.Element => {
     const baseValue = value ?? '-';
     const otherValues = diamonds.map((d) => d[key]);
     const isDifferent = new Set(otherValues).size > 1;
