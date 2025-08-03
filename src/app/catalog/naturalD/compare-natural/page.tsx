@@ -118,7 +118,7 @@ export default function CompareNaturalDiamond() {
                 <tr key={key}>
                   <td>{label}</td>
                   {diamonds.map((d, idx) => (
-                    <td key={idx}>{getCell(key, d[key], idx)}</td>
+                    <td key={idx}>{getCell(key, d[key])}</td>
                   ))}
                 </tr>
               ))}
