@@ -26,6 +26,7 @@ interface Diamond {
   MRP?: number;
   OfferPrice?: number;
   Certified?: string;
+  Status?: string; // ✅ Add this line
 }
 
 export default function CompareNaturalDiamond() {
