@@ -8,6 +8,7 @@ import { db } from '../../../../firebaseConfig';
 import PageLayout from '../../../components/PageLayout';
 import styles from '../../../page.module.css';
 import shapeIcon from '../../../../../assets/shapeIcons';
+import type { JSX } from 'react';
 
 interface Diamond {
   StoneId?: string;
