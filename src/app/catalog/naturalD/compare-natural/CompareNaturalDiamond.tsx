@@ -63,12 +63,27 @@ export default function CompareNaturalDiamond() {
     { label: 'Certified By', key: 'Certified' },
   ];
 
-  const getCell = (key: keyof Diamond, value: string | number | undefined): string | number | JSX.Element => {
-    const baseValue = value ?? '-';
-    const otherValues = diamonds.map((d) => d[key]);
-    const isDifferent = new Set(otherValues).size > 1;
-    return isDifferent ? <b>{baseValue}</b> : baseValue;
-  };
+const getCell = (key: keyof Diamond, value: string | number | undefined): string | number | JSX.Element => {
+  let displayValue: string | number = value ?? '-';
+
+  if (['Depth', 'Size', 'Table'].includes(key) && value !== undefined) {
+    const num = parseFloat(String(value));
+    displayValue = isNaN(num) ? '-' : num.toFixed(2);
+  }
+
+  const otherValues = diamonds.map((d) => {
+    const val = d[key];
+    if (['Depth', 'Size', 'Table'].includes(key) && val !== undefined) {
+      const num = parseFloat(String(val));
+      return isNaN(num) ? '-' : num.toFixed(2);
+    }
+    return val ?? '-';
+  });
+
+  const isDifferent = new Set(otherValues).size > 1;
+  return isDifferent ? <b>{displayValue}</b> : displayValue;
+};
+
 
   return (
     <PageLayout>

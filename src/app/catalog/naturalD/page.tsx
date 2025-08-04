@@ -166,10 +166,14 @@ export default function NaturalCatalogPage() {
               </div>
               <div className="imageContainer"><img src={shapeIcon[d.Shape ?? ''] || '/default.png'} alt={d.Shape} className="shapeImage" /></div>
               <div className="cardContent">
-                <p>{d.Size}ct ({d.Shape})</p>
+                <p>{(parseFloat(d.Size ?? '0')).toFixed(2)}ct ({d.Shape})</p>
                 <div style={{ fontSize: '0.65rem', lineHeight: '1.3', textAlign: 'center' }}>
                   <p>({d.Measurement ?? ''} mm)</p>
-                  <p>D<InfoPopup text={`${d.Depth}%`} valueMap={{ [`D${d.Depth}%`]: 'Depth % – Ratio of depth to width. Affects brilliance.' }} />; T<InfoPopup text={`${d.Table}%`} valueMap={{ [`T${d.Table}%`]: 'Table % – Size of the flat top facet. Affects sparkle.' }} /></p>
+                  <p>
+  D<InfoPopup text={`${(parseFloat(d.Depth ?? '0')).toFixed(2)}%`} valueMap={{ [`D${d.Depth}%`]: 'Depth % – Ratio of depth to width. Affects brilliance.' }} />,
+  T<InfoPopup text={`${(parseFloat(d.Table ?? '0')).toFixed(2)}%`} valueMap={{ [`T${d.Table}%`]: 'Table % – Size of the flat top facet. Affects sparkle.' }} />
+</p>
+
                   <p><InfoPopup text={d.Clarity ?? ''} label="Clarity " valueMap={clarityMap} />,
 <InfoPopup text={d.Color ?? ''} label="Color " valueMap={colorMap} />,
 <InfoPopup text={d.Cut ?? ''} label="Cut " valueMap={gradeMap} />,
