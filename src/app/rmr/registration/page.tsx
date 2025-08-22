@@ -31,7 +31,8 @@ const PAYMENT = {
 // -----------------------------------------------
 // Schema & Types
 // -----------------------------------------------
-const phoneRegexIN = /^(?:(?:\+?91[\-\s]?)?(?:[6-9]\d{9}))$/
+const phoneRegexIN = /^(?:\+?91[-\s]?)?[6-9]\d{9}$/;
+
 
 const FormSchema = z.object({
   fullName: z.string().min(2, 'Please enter your full name'),
@@ -368,8 +369,17 @@ function StepDesign() {
 
         <div className="grid gap-2">
           <span className="text-sm font-medium">Budget</span>
-          <select className="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-emerald-500 focus:outline-none"
-                  value={methods.watch('budgetRange') || ''} onChange={(e) => methods.setValue('budgetRange', (e.target.value || undefined) as any)}>
+<select
+  className="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-emerald-500 focus:outline-none"
+  value={methods.watch('budgetRange') || ''}
+  onChange={(e) =>
+    methods.setValue(
+      'budgetRange',
+      (e.target.value || undefined) as RegisterForm['budgetRange']
+    )
+  }
+>
+
             <option value="">Optional</option>
             <option value="<2k">Below ₹2,000</option>
             <option value="2k-4k">₹2,000–₹4,000</option>
@@ -516,10 +526,14 @@ function StepReview({ values, totals }: { values: RegisterForm; totals: ReturnTy
 // Small UI helpers
 // -----------------------------------------------
 function FieldError({ name }: { name: keyof RegisterForm }) {
-  const { formState: { errors } } = useFormContext<RegisterForm>()
-  const err = (errors as any)?.[name]
-  if (!err) return null
-  return <p className="text-xs text-red-600">{String((err as any).message)}</p>
+  const {
+    formState: { errors },
+  } = useFormContext<RegisterForm>();
+
+  const err = (errors as FieldErrors<RegisterForm>)[name] as RHFFieldError | undefined;
+  if (!err?.message) return null;
+
+  return <p className="text-xs text-red-600">{String(err.message)}</p>;
 }
 
 function ReviewRow({ label, value }: { label: string; value: string }) {
