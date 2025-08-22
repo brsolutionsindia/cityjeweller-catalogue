@@ -40,12 +40,14 @@ const FormSchema = z.object({
   style: z.enum(['Arabic', 'Bharva', 'Designer', 'Custom design']),
   // SINGLE-SELECT coverage
   coverage: z.enum(['section1', 'section2', 'section3']),
-  figures: z.coerce.number().min(0).max(20).default(0),
+  // ↓ REQUIRED number (coerced), no .default()
+  figures: z.coerce.number().min(0).max(20),
   budgetRange: z.enum(['<2k', '2k-4k', '4k-7k', '7k+']).optional(),
   slot: z.string().min(1, 'Please pick a time slot'),
   notes: z.string().max(500).optional(),
   consent: z.boolean().refine(v => v === true, { message: 'You must accept the terms to proceed' }),
-})
+});
+
 
 
 export type RegisterForm = z.infer<typeof FormSchema>
