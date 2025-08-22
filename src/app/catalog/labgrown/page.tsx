@@ -163,17 +163,22 @@ export default function CvdCatalogPage() {
               key={d.StoneId}
               style={{ border: selected.includes(d.StoneId!) ? '2px solid #0070f3' : '1px solid #ccc' }}
             >
-              <input
-                type="checkbox"
-                checked={selected.includes(d.StoneId!)}
-                disabled={!selected.includes(d.StoneId!) && selected.length >= 4}
-                onChange={(e) => {
-                  if (e.target.checked && typeof d.StoneId === 'string') {
-  setSelected(prev => [...prev, d.StoneId]);
-}
-                  else setSelected(prev => prev.filter(id => id !== d.StoneId));
-                }}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.7rem', fontWeight: 'bold' }}>
+  <input
+    type="checkbox"
+    checked={selected.includes(d.StoneId!)}
+    disabled={!selected.includes(d.StoneId!) && selected.length >= 4}
+    onChange={(e) => {
+      if (e.target.checked && typeof d.StoneId === 'string') {
+        setSelected(prev => [...prev, d.StoneId]);
+      } else {
+        setSelected(prev => prev.filter(id => id !== d.StoneId));
+      }
+    }}
+  />
+  <span>{d.StoneId}</span>
+</div>
+
               <div className="imageContainer">
                 <img src={shapeIcon[d.Shape ?? ''] || '/default.png'} alt={d.Shape} className="shapeImage" />
               </div>

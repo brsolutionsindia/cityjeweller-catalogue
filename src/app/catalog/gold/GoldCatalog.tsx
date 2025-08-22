@@ -19,16 +19,23 @@ interface RawSkuData {
   jwelleryCategoryOther?: string;
 }
 
+type ProductCard = {
+  id: string;
+  price: number | string;
+  image: string;
+  remarksLower?: string;
+};
+
 export default function GoldCatalog() {
   const [goldRate, setGoldRate] = useState('Loading...');
   const [rateDate, setRateDate] = useState('');
-  const [products, setProducts] = useState<{ id: string; price: number | string; image: string }[]>([]);
+  const [products, setProducts] = useState<ProductCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const searchParams = useSearchParams();
-const typeFilter = searchParams?.get?.('type') ?? '';
-const searchParam = (searchParams?.get?.('search') ?? '').toLowerCase();
+  const typeFilter = searchParams?.get?.('type') ?? '';
+  const searchParam = (searchParams?.get?.('search') ?? '').toLowerCase();
 
   const typeMap: { [key: string]: string } = {
     ER: 'Earrings Collection',
@@ -75,7 +82,8 @@ const searchParam = (searchParams?.get?.('search') ?? '').toLowerCase();
           filteredItems.map(async ([key, value]) => {
             const imageUrl = imgData?.[key]?.Primary || '/product-placeholder.jpg';
             const adjustedPrice = computeAdjustedPrice(value.grTotalPrice);
-            return { id: key, price: adjustedPrice, image: imageUrl };
+            const remarksLower = (value.remarks ?? '').toLowerCase();
+            return { id: key, price: adjustedPrice, image: imageUrl, remarksLower };
           })
         );
 
@@ -91,6 +99,44 @@ const searchParam = (searchParams?.get?.('search') ?? '').toLowerCase();
     });
   }, [searchParam, sortOrder, typeFilter]);
 
+  // --- Helpers for Mangalsutra split ---
+  const pendantProducts =
+    typeFilter === 'MG'
+      ? products.filter((p) => (p.remarksLower || '').includes('pendant'))
+      : [];
+
+  const stringProducts =
+    typeFilter === 'MG'
+      ? products.filter((p) => (p.remarksLower || '').includes('string'))
+      : [];
+
+  const CatalogGrid = ({ list }: { list: ProductCard[] }) => (
+    <section className={styles.catalogGrid}>
+      {list.map((item) => (
+        <div
+          key={item.id}
+          className={styles.catalogCard}
+          onClick={() => setSelectedSku(item.id)}
+        >
+          <Image
+            src={item.image}
+            alt={item.id}
+            width={200}
+            height={200}
+            className={styles.catalogImage}
+          />
+          <p className={styles.catalogPrice}>
+            ₹
+            {typeof item.price === 'number'
+              ? item.price.toLocaleString('en-IN')
+              : item.price}
+          </p>
+          <h3 className={styles.catalogCode}>Code: {item.id}</h3>
+        </div>
+      ))}
+    </section>
+  );
+
   return (
     <PageLayout>
       <OfferBar goldRate={goldRate} rateDate={rateDate} />
@@ -99,19 +145,38 @@ const searchParam = (searchParams?.get?.('search') ?? '').toLowerCase();
         <p className={styles.itemCount}>{products.length} item(s)</p>
         {loading ? (
           <p>Loading...</p>
+        ) : typeFilter === 'MG' ? (
+          <>
+            {/* Pendant Section */}
+            <h2 className={styles.subheading}>
+              <span className={styles.sectionTitle}>Pendant Section</span>{' '}
+              <span className={styles.itemCountSmall}>({pendantProducts.length})</span>
+            </h2>
+            {pendantProducts.length > 0 ? (
+              <CatalogGrid list={pendantProducts} />
+            ) : (
+              <p>No pendant-style mangalsutras found.</p>
+            )}
+
+            {/* String Section */}
+            <h2 className={styles.subheading}>
+              <span className={styles.sectionTitle}>String Section</span>{' '}
+              <span className={styles.itemCountSmall}>({stringProducts.length})</span>
+            </h2>
+            {stringProducts.length > 0 ? (
+              <CatalogGrid list={stringProducts} />
+            ) : (
+              <p>No string-style mangalsutras found.</p>
+            )}
+          </>
         ) : (
-          <section className={styles.catalogGrid}>
-            {products.map((item) => (
-              <div key={item.id} className={styles.catalogCard} onClick={() => setSelectedSku(item.id)}>
-                <Image src={item.image} alt={item.id} width={200} height={200} className={styles.catalogImage} />
-                <p className={styles.catalogPrice}>₹{typeof item.price === 'number' ? item.price.toLocaleString('en-IN') : item.price}</p>
-                <h3 className={styles.catalogCode}>Code: {item.id}</h3>
-              </div>
-            ))}
-          </section>
+          <CatalogGrid list={products} />
         )}
       </section>
-      {selectedSku && <SkuSummaryModal skuId={selectedSku} onClose={() => setSelectedSku(null)} />}
+
+      {selectedSku && (
+        <SkuSummaryModal skuId={selectedSku} onClose={() => setSelectedSku(null)} />
+      )}
     </PageLayout>
   );
 }

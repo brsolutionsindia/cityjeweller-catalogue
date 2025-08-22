@@ -912,3 +912,21 @@
 }
 
 
+
+.subheading {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.sectionTitle {
+  font-weight: 700;   /* bold */
+  font-size: 1.4rem;  /* slightly bigger than default */
+}
+
+.itemCountSmall {
+  font-size: 0.9rem;
+  color: #666;
+}
