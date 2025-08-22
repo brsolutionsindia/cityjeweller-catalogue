@@ -41,7 +41,7 @@ const FormSchema = z.object({
   // SINGLE-SELECT coverage
   coverage: z.enum(['section1', 'section2', 'section3']),
   // ↓ REQUIRED number (coerced), no .default()
-  figures: z.coerce.number().min(0).max(20),
+  figures: z.number().min(0).max(20),
   budgetRange: z.enum(['<2k', '2k-4k', '4k-7k', '7k+']).optional(),
   slot: z.string().min(1, 'Please pick a time slot'),
   notes: z.string().max(500).optional(),
