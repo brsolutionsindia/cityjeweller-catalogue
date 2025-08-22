@@ -9,10 +9,14 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.1",
     "firebase": "^11.8.1",
+    "framer-motion": "^12.23.12",
     "next": "15.3.2",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.62.0",
+    "zod": "^4.0.17"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

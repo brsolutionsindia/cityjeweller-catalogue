@@ -138,13 +138,34 @@ export default function DiamondCatalog() {
     </section>
   );
 
-  return (
-    <PageLayout>
-      <OfferBar goldRate={diamondRate} rateDate={rateDate} />
+return (
+  <PageLayout>
+    {/* --- Royal Mehendi Promo Bar --- */}
+    <div
+      style={{
+        width: '100%',
+        cursor: 'pointer',
+        textAlign: 'center',
+        backgroundColor: '#fff',
+        marginBottom: '10px',
+      }}
+      onClick={() => window.open('/rmr/registration', '_blank')}
+    >
+      <Image
+        src="/RoyalMehendiPromotion.png"
+        alt="Royal Mehendi Promotion"
+        width={1600}
+        height={100}
+        style={{ maxWidth: '100%', height: 'auto' }}
+      />
+    </div>
 
-      <section>
-        <h1>{heading}</h1>
-        <p className={styles.itemCount}>{products.length} item(s)</p>
+    {/* Existing OfferBar with Gold Rate */}
+    <OfferBar goldRate={diamondRate} rateDate={rateDate} />
+
+    <section>
+      <h1>{heading}</h1>
+      <p className={styles.itemCount}>{products.length} item(s)</p>
 
         {loading ? (
           <p>Loading...</p>
