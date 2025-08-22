@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useForm, FormProvider, useFormContext } from 'react-hook-form'
+import type { FieldErrors, FieldError as RHFFieldError } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { motion } from 'framer-motion'
