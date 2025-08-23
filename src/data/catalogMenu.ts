@@ -1,30 +1,38 @@
-export const diamondItems = [
-  { label: 'Earrings', image: '/earrings.png', link: '/catalog/diamond?type=ER' },
-  { label: 'Rings', image: '/rings.png', link: '/catalog/diamond?type=RG' },
-  { label: 'Necklace Sets', image: '/necklace.png', link: '/catalog/diamond?type=NK' },
-  { label: 'Pendants', image: '/pendants.png', link: '/catalog/diamond?type=PD' },
+// data/catalogMenu.ts
+export type CatalogItem = {
+  label: string;
+  image: string;
+  link: string;
+  disabled?: boolean; // default false
+};
+
+export const diamondItems: CatalogItem[] = [
   { label: 'Mangalsutra', image: '/mangalsutra.png', link: '/catalog/diamond?type=MG' },
-  { label: 'Bangles', image: '/bangles.png', link: '/catalog/diamond?type=BG' },
-  { label: 'Bracelets', image: '/bracelets.png', link: '/catalog/diamond?type=BR' },
-  { label: 'Chains', image: '/chains.png', link: '/catalog/diamond?type=CH' },
-  { label: 'Nose Pins', image: '/nosepins.png', link: '/catalog/diamond?type=NP' },
-  { label: 'Others', image: '/others.png', link: '/catalog/diamond?type=OT' },
+  { label: 'Rings', image: '/rings.png', link: '/catalog/diamond?type=RG'},
+  { label: 'Pendants', image: '/pendants.png', link: '/catalog/diamond?type=PD' },
+  { label: 'Earrings', image: '/earrings.png', link: '/catalog/diamond?type=ER', disabled: true},
+  { label: 'Necklace Sets', image: '/necklace.png', link: '/catalog/diamond?type=NK', disabled: true},
+  { label: 'Bangles', image: '/bangles.png', link: '/catalog/diamond?type=BG', disabled: true },
+  { label: 'Bracelets', image: '/bracelets.png', link: '/catalog/diamond?type=BR', disabled: true },
+  { label: 'Chains', image: '/chains.png', link: '/catalog/diamond?type=CH', disabled: true },
+  { label: 'Nose Pins', image: '/nosepins.png', link: '/catalog/diamond?type=NP', disabled: true },
+  { label: 'Others', image: '/others.png', link: '/catalog/diamond?type=OT', disabled: true},
 ];
 
-export const goldItems = [
-  { label: 'Earrings', image: '/gold-earrings.png', link: '/catalog/gold?type=ER' },
-  { label: 'Rings', image: '/gold-rings.png', link: '/catalog/gold?type=RG' },
-  { label: 'Necklace Sets', image: '/gold-necklace.png', link: '/catalog/gold?type=NK' },
-  { label: 'Pendants', image: '/gold-pendants.png', link: '/catalog/gold?type=PD' },
+export const goldItems: CatalogItem[] = [
   { label: 'Mangalsutra', image: '/gold-mangalsutra.png', link: '/catalog/gold?type=MG' },
   { label: 'Bangles', image: '/gold-bangles.png', link: '/catalog/gold?type=BG' },
+  { label: 'Necklace Sets', image: '/gold-necklace.png', link: '/catalog/gold?type=NK' },
+  { label: 'Pendants', image: '/gold-pendants.png', link: '/catalog/gold?type=PD' },
   { label: 'Bracelets', image: '/gold-bracelets.png', link: '/catalog/gold?type=BR' },
   { label: 'Chains', image: '/gold-chains.png', link: '/catalog/gold?type=CH' },
-  { label: 'Nose Pins', image: '/gold-nosepins.png', link: '/catalog/gold?type=NP' },
-  { label: 'Others', image: '/gold-others.png', link: '/catalog/gold?type=OT' },
+  { label: 'Earrings', image: '/gold-earrings.png', link: '/catalog/gold?type=ER', disabled: true },
+  { label: 'Rings', image: '/gold-rings.png', link: '/catalog/gold?type=RG', disabled: true },
+  { label: 'Nose Pins', image: '/gold-nosepins.png', link: '/catalog/gold?type=NP', disabled: true },
+  { label: 'Others', image: '/gold-others.png', link: '/catalog/gold?type=OT', disabled: true },
 ];
 
-export const silverItems = [
+export const silverItems: CatalogItem[] = [
   { label: 'Rakhi', image: '/silver-rakhi.png', link: '/catalog/silver?type=SRK' },
   { label: 'Bracelet', image: '/silver-bracelet.png', link: '/catalog/silver?type=SBL' },
   { label: 'Utensils', image: '/silver-utensils.png', link: '/catalog/silver?type=SUT' },
@@ -48,17 +56,16 @@ export const silverItems = [
   { label: 'Pendants', image: '/silver-pendants.png', link: '/catalog/silver?type=SPD' },
 ];
 
-export const gemstoneItems = [
+export const gemstoneItems: CatalogItem[] = [
   { label: 'Loose Gemstones', image: '/gemstone-loose.png', link: '/catalog/gemstones/loose-gemstones/selector' },
   { label: 'Gemstone Strings', image: '/gemstone-strings.png', link: '/catalog/gemstones?type=ST' },
 ];
 
-export const cvdItems = [
+export const cvdItems: CatalogItem[] = [
   { label: 'Natural Diamonds', image: '/diamond-loose.png', link: '/catalog/naturalD' },
   { label: 'Lab Grown Diamonds', image: '/cvd-loose.png', link: '/catalog/labgrown' },
-
 ];
 
-export const miscItems = [
-  { label: 'Miscellaneous', image: '/misc-items.png', link: '/catalog/misc' },
+export const miscItems: CatalogItem[] = [
+  { label: 'Miscellaneous', image: '/misc-items.png', link: '/catalog/misc', disabled: true },
 ];

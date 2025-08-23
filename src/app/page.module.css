@@ -348,6 +348,7 @@
 }
 
 .productCardHorizontal {
+position: relative;
   min-width: 160px;
   border-radius: 10px;
   text-align: center;
@@ -929,4 +930,89 @@
 .itemCountSmall {
   font-size: 0.9rem;
   color: #666;
+}
+
+
+
+
+.disabledCard {
+  opacity: 0.45;              /* dims text + image */
+  filter: grayscale(100%);     /* de-saturate image */
+  cursor: not-allowed;         /* UX hint */
+}
+
+.disabledOverlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 1rem; /* match your card radius */
+}
+
+.disabledImg {
+  filter: grayscale(100%);
+}
+
+/* “Coming Soon” pill */
+.comingSoonBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 12px;
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.75);
+  color: #fff;
+  border-radius: 999px;
+  z-index: 2;
+}
+
+/* Tooltip wrapper */
+.tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+/* Tooltip bubble */
+.tooltipText {
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+  position: absolute;
+  left: 50%;
+  bottom: -6px;               /* start from bottom, we’ll shift with transform */
+  transform: translate(-50%, 100%);
+  white-space: nowrap;
+  background: rgba(0,0,0,0.85);
+  color: #fff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  z-index: 3;
+}
+
+/* Show tooltip on hover */
+.tooltip:hover .tooltipText {
+  visibility: visible;
+  opacity: 1;
+}
+
+
+/* Dim + disable */
+.dimmed {
+  opacity: 0.45;
+  filter: grayscale(100%);
+  cursor: not-allowed;
+}
+
+/* Next/Image sometimes needs this to guarantee grayscale on the <img> */
+.dimmed :global(img) {
+  filter: grayscale(100%) !important;
+}
+
+/* Disable clicks but keep scroll working */
+.dimmed, .dimmed * {
+  pointer-events: none;
+}
+
+/* Optional: soften label color too */
+.dimmed .productLabel {
+  color: #777;
 }
