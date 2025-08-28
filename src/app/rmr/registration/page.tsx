@@ -21,14 +21,17 @@ const ADVANCE_AMOUNT = 1100
 // -----------------------------------------------
 const phoneRegexIN = /^(?:\+?91[-\s]?)?[6-9]\d{9}$/
 
+// ---- Schema: coerce to number ----
 const FormSchema = z.object({
   fullName: z.string().min(2, 'Please enter your full name'),
   whatsapp: z.string().regex(phoneRegexIN, 'Enter a valid WhatsApp number (India)'),
   slot: z.string().min(1, 'Please pick a time slot'),
-  durationMinutes: z.number().min(30, 'Minimum 30 minutes').max(240, 'Max 4 hours'),
+  // ⬇️ coerce + int
+  durationMinutes: z.coerce.number().int().min(30, 'Minimum 30 minutes').max(240, 'Max 4 hours'),
   notes: z.string().max(500).optional(),
   consent: z.boolean().refine(v => v === true, { message: 'You must accept the terms to proceed' }),
 })
+
 
 export type RegisterForm = z.infer<typeof FormSchema>
 
@@ -260,7 +263,6 @@ function StepDetails() {
 function StepSlotsAndDuration() {
   const methods = useFormContext<RegisterForm>()
   const slot = methods.watch('slot')
-  const duration = methods.watch('durationMinutes')
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="grid gap-5">
@@ -268,6 +270,9 @@ function StepSlotsAndDuration() {
         <div><b>Happy Hours:</b> 9:00 AM – 11:00 AM (special offers apply)</div>
         <div className="mt-1"><b>Premium Hours:</b> 5:00 PM onwards (premium charges apply)</div>
       </div>
+
+      {/* Make sure slot is registered for validation */}
+      <input type="hidden" {...methods.register('slot')} />
 
       {/* Slots */}
       <div className="grid gap-2">
@@ -282,7 +287,7 @@ function StepSlotsAndDuration() {
               <button
                 type="button"
                 key={t}
-                onClick={() => methods.setValue('slot', t)}
+                onClick={() => methods.setValue('slot', t, { shouldValidate: true, shouldDirty: true, shouldTouch: true })}
                 className={`rounded-xl border p-3 text-sm ${active ? 'border-emerald-500 bg-emerald-50 font-medium' : 'hover:bg-gray-50'}`}
                 title={isHappy ? 'Happy Hours' : isPremium ? 'Premium Hours' : 'Standard Hours'}
               >
@@ -299,14 +304,14 @@ function StepSlotsAndDuration() {
         <FieldError name="slot" />
       </div>
 
-      {/* Duration */}
+      {/* Duration (REGISTER + valueAsNumber) */}
       <div className="grid gap-2 md:max-w-sm">
         <label htmlFor="duration" className="text-sm font-medium">Duration (in 30-min intervals)</label>
         <select
           id="duration"
           className="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-emerald-500 focus:outline-none"
-          value={duration ?? 30}
-          onChange={(e) => methods.setValue('durationMinutes', Number(e.target.value))}
+          defaultValue={30}
+          {...methods.register('durationMinutes', { valueAsNumber: true })}
         >
           {[30, 60, 90, 120, 150, 180, 210, 240].map(min => (
             <option key={min} value={min}>{min} minutes</option>
