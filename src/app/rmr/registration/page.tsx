@@ -6,6 +6,7 @@ import type { FieldErrors, FieldError as RHFFieldError } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { motion } from 'framer-motion'
+import type { Resolver } from 'react-hook-form'
 
 // -----------------------------------------------
 // Config (put images in /public/images)
@@ -97,7 +98,7 @@ export default function Page() {
   const [step, setStep] = useState(0)
 
   const methods = useForm<RegisterForm>({
-    resolver: zodResolver(FormSchema),
+    resolver: zodResolver(FormSchema) as Resolver<RegisterForm>, // ← fix
     defaultValues: {
       fullName: '',
       whatsapp: '',
