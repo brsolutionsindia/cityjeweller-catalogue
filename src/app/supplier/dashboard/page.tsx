@@ -1,9 +1,9 @@
-//supplier Dashboard
+// supplier Dashboard
 
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth'; // ⬅️ added signOut
 import { auth, db } from '@/firebaseConfig';
 import { ref, get, onValue } from 'firebase/database';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -15,7 +15,6 @@ type Item = {
   Cut?: string; Depth?: number; Discount?: number; Fluorescence?: string;
   Measurement?: string; NetAmt?: number; Polish?: string; RapRate?: number;
   Shape?: string; Size?: number; Status?: string;
-  // MRP/OfferPrice exist in DB but will not be readable due to rules; don't render them
 };
 
 export default function SupplierDashboard() {
@@ -68,12 +67,11 @@ export default function SupplierDashboard() {
 
   const rows = useMemo(() => skuIds.map(k => [k, items[k]] as const), [skuIds, items]);
 
-const goEdit = (key: string) => router.push(`/supplier/edit/${key}`);
+  const goEdit = (key: string) => router.push(`/supplier/edit/${key}`);
 
   const saveEdit = async () => {
     if (!editingKey || !fn) return;
     await fn({ skuId: editingKey, action: 'update', fields: {
-      // allow supplier to change only these; server recomputes prices from NetAmt + hidden globals
       CertNo: editDraft.CertNo, Certified: editDraft.Certified, Clarity: editDraft.Clarity,
       Color: editDraft.Color, Comments: editDraft.Comments, Cut: editDraft.Cut, Depth: Number(editDraft.Depth ?? 0),
       Discount: Number(editDraft.Discount ?? 0), Fluorescence: editDraft.Fluorescence,
@@ -85,51 +83,69 @@ const goEdit = (key: string) => router.push(`/supplier/edit/${key}`);
   };
 
   const del = async (key: string) => {
-  if (!fn) return;
-  if (!confirm(`Delete ${key}?`)) return;
-  await fn({ skuId: key, action: 'delete' });
+    if (!fn) return;
+    if (!confirm(`Delete ${key}?`)) return;
+    await fn({ skuId: key, action: 'delete' });
 
-  // optimistic UI (optional, real-time listener will also reflect it)
-  setSkuIds(prev => prev.filter(id => id !== key));
-  setItems(prev => {
-    const rest = { ...prev };
-    delete rest[key];
-    return rest;
-  });
-};
+    // optimistic UI (real-time listener will also reflect it)
+    setSkuIds(prev => prev.filter(id => id !== key));
+    setItems(prev => {
+      const rest = { ...prev };
+      delete rest[key];
+      return rest;
+    });
+  };
+
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      router.replace('/supplier/login');
+    } catch (e) {
+      console.error('Logout failed', e);
+    }
+  };
 
   if (!uid) return null;
 
   return (
     <main className="p-6">
-<div className="flex items-center justify-between mb-4">
-  <h1 className="text-xl font-semibold">My Natural Diamonds</h1>
-  <button
-    className="border px-3 py-1 rounded"
-    onClick={() => router.push('/supplier/new')}
-    title="Add new item"
-  >
-    + Add
-  </button>
-</div>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-semibold">My Natural Diamonds</h1>
+        <div className="flex items-center gap-2">
+          <button
+            className="border px-3 py-1 rounded"
+            onClick={() => router.push('/supplier/new')}
+            title="Add new item"
+          >
+            + Add
+          </button>
+          <button
+            className="border px-3 py-1 rounded"
+            onClick={logout}
+            title="Log out"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
 
       <p className="text-sm text-gray-600 mb-4">GST: {gst ?? '...'}</p>
 
-<div className="grid gap-3">
-      {rows.map(([key, it]) => (
-        <div key={key} className="border rounded p-4">
-          <div className="font-mono text-sm mb-2">{key}</div>
-          <div className="text-sm">CertNo: {it?.CertNo} | {it?.Certified} | {it?.Shape} | {it?.Size}</div>
-          <div className="text-sm">Clarity/Color: {it?.Clarity}/{it?.Color} | Cut/Polish: {it?.Cut}/{it?.Polish}</div>
-          <div className="text-sm">NetAmt: {it?.NetAmt ?? '-'} | RapRate: {it?.RapRate ?? '-'}</div>
-          <div className="mt-2 flex gap-2">
-            <button className="border px-3 py-1 rounded" onClick={() => goEdit(key)}>Edit</button>
-            <button className="border px-3 py-1 rounded" onClick={() => del(key)}>Delete</button>
+      <div className="grid gap-3">
+        {rows.map(([key, it]) => (
+          <div key={key} className="border rounded p-4">
+            <div className="font-mono text-sm mb-2">{key}</div>
+            <div className="text-sm">CertNo: {it?.CertNo} | {it?.Certified} | {it?.Shape} | {it?.Size}</div>
+            <div className="text-sm">Clarity/Color: {it?.Clarity}/{it?.Color} | Cut/Polish: {it?.Cut}/{it?.Polish}</div>
+            <div className="text-sm">NetAmt: {it?.NetAmt ?? '-'} | RapRate: {it?.RapRate ?? '-'}</div>
+            <div className="mt-2 flex gap-2">
+              <button className="border px-3 py-1 rounded" onClick={() => goEdit(key)}>Edit</button>
+              <button className="border px-3 py-1 rounded" onClick={() => del(key)}>Delete</button>
+            </div>
           </div>
-        </div>
-      ))}
-      {rows.length === 0 && <p className="text-sm text-gray-500">No items found.</p>}
-    </div>
+        ))}
+        {rows.length === 0 && <p className="text-sm text-gray-500">No items found.</p>}
+      </div>
 
       {editingKey && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
