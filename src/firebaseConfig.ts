@@ -1,7 +1,10 @@
-import { initializeApp } from 'firebase/app';
-import { getDatabase } from 'firebase/database';
-import { getStorage } from 'firebase/storage'; // ✅ Ensure this line is present
+// src/firebaseConfig.ts
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getDatabase } from "firebase/database";
+import { getStorage } from "firebase/storage";
 
+// ✅ Use NEXT_PUBLIC_ variables so they are exposed to the browser
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -12,9 +15,9 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+// Prevent re-initializing on hot reload
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-const db = getDatabase(app);
-const storage = getStorage(app); // ✅ Define this only after importing getStorage
-
-export { db, storage };
+export const auth = getAuth(app);
+export const db = getDatabase(app);
+export const storage = getStorage(app);
