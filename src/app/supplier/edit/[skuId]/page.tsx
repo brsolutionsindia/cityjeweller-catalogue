@@ -154,7 +154,15 @@ type UpdateDeleteReq = {
 type UpdateDeleteRes = { ok: boolean; skuId: string; updated?: boolean; deleted?: boolean };
 
 export default function EditNaturalDiamondPage() {
-  const { skuId } = useParams<{ skuId: string }>();
+  const params = useParams() as (Record<string, string | string[]> | null);
+const skuId =
+  typeof params?.skuId === 'string'
+    ? params.skuId
+    : Array.isArray(params?.skuId)
+      ? params!.skuId[0]
+      : '';
+
+
   const router = useRouter();
 
   const [uid, setUid] = useState<string | null>(null);
