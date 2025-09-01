@@ -1,4 +1,4 @@
-//edit diamond page
+// src/app/supplier/edit/[skuId]/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -9,16 +9,15 @@ import { ref, get } from 'firebase/database';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
 type DBItem = {
-  // DB fields (some optional)
   Shape?: string; Size?: number; Clarity?: string; Color?: string;
-  Cut?: string; Polish?: string; Symmetry?: string; Fluorescence?: string;
-  Certified?: string; Measurement?: string; Depth?: number; Table?: number;
+  Cut?: string; Polish?: string; Symmetry?: string; Symm?: string; // Symm for legacy
+  Fluorescence?: string; Certified?: string; Measurement?: string; Depth?: number; Table?: number;
   RapRate?: number; NetAmt?: number; CertNo?: string; Comments?: string; Status?: string;
 };
 
 type FormState = {
   Shape: string;
-  Size: string;                // text for nicer input; parse to number
+  Size: string; // keep as text, parse on save
   Clarity: string;
   Color: string;
   Cut: string;
@@ -27,11 +26,11 @@ type FormState = {
   Fluorescence: string;
   Certified: string;
 
-  ratePerCaratUSD: string;     // maps to RapRate on update (server may recompute downstream)
+  ratePerCaratUSD: string; // maps to RapRate
   Measurement: string;
   Depth: number | '';
   Table: number | '';
-  Remarks: string;             // maps to Comments
+  Remarks: string; // maps to Comments
   CertNo: string;
   Status: string;
 };
@@ -65,6 +64,95 @@ const FLUO   = ['None','Faint','Medium','Strong','Not known','Other'] as const;
 const CERTS  = ['IGI','GIA','HRD','Not Certified','Other'] as const;
 const STATUS = ['Available','Hold','Sold','Hidden'] as const;
 
+/** ---------------- label/code helpers ---------------- */
+const toNumber = (v: unknown): number => {
+  // convert to string, trim, replace commas with dots, remove any non-digit/non-dot chars
+  const t = String(v ?? '')
+    .trim()
+    .replace(/,/g, '.')               // support "1,11"
+    .replace(/\u00A0/g, ' ')          // NBSP -> space
+    .replace(/[^\d.\-+eE]/g, '');     // strip odd chars
+  // guard against multiple dots (e.g., "1.1.1")
+  if ((t.match(/\./g) || []).length > 1) return NaN;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : NaN;
+};
+
+
+
+const upper = (s: unknown) => (s == null ? '' : String(s).trim().toUpperCase());
+const title = (s: unknown) => {
+  const t = String(s ?? '').trim();
+  if (!t) return '';
+  return t[0].toUpperCase() + t.slice(1).toLowerCase();
+};
+
+// Cut/Polish/Symmetry: EX/VG/GD/NA/OT
+const toCode = (v: unknown): 'EX'|'VG'|'GD'|'NA'|'OT' => {
+  const t = upper(v);
+  if (t === 'EX' || t.startsWith('EXCELLENT')) return 'EX';
+  if (t === 'VG' || t.startsWith('VERY GOOD'))  return 'VG';
+  if (t === 'GD' || t === 'GOOD')               return 'GD';
+  if (t === 'NA' || t.startsWith('NOT KNOWN'))  return 'NA';
+  return 'OT';
+};
+const fromCode = (c: unknown): string => {
+  switch (upper(c)) {
+    case 'EX': return 'Excellent';
+    case 'VG': return 'Very Good';
+    case 'GD': return 'Good';
+    case 'NA': return 'Not known';
+    case 'OT': return 'Other';
+    default:   return String(c ?? '');
+  }
+};
+
+// Fluorescence to label
+const fluoFromCaps = (f: unknown): string => {
+  switch (upper(f)) {
+    case 'NONE': return 'None';
+    case 'FAINT': return 'Faint';
+    case 'MEDIUM': return 'Medium';
+    case 'STRONG': return 'Strong';
+    case 'NOT KNOWN': case 'NOTKNOWN': return 'Not known';
+    case 'OTHER': return 'Other';
+    default: return String(f ?? '');
+  }
+};
+
+// Status from ALL CAPS to title-case option
+const statusFromCaps = (s: unknown): string => {
+  switch (upper(s)) {
+    case 'AVAILABLE': return 'Available';
+    case 'HOLD': return 'Hold';
+    case 'SOLD': return 'Sold';
+    case 'HIDDEN': return 'Hidden';
+    default: return String(s ?? 'Available');
+  }
+};
+
+// Shape from ALL CAPS to UI option (only for display)
+const shapeFromCaps = (s: unknown): string => {
+  const t = upper(s);
+  const map: Record<string,string> = {
+    ROUND: 'Round',
+    OVAL: 'Oval',
+    EMERALD: 'Emerald',
+    PRINCESS: 'Princess',
+    PEAR: 'Pear',
+    OTHER: 'Other',
+  };
+  return map[t] ?? title(s);
+};
+
+/** ---------------- callable types ---------------- */
+type UpdateDeleteReq = {
+  skuId: string;
+  action: 'update' | 'delete';
+  fields?: Record<string, unknown>;
+};
+type UpdateDeleteRes = { ok: boolean; skuId: string; updated?: boolean; deleted?: boolean };
+
 export default function EditNaturalDiamondPage() {
   const { skuId } = useParams<{ skuId: string }>();
   const router = useRouter();
@@ -83,7 +171,11 @@ export default function EditNaturalDiamondPage() {
   const [saving, setSaving] = useState(false);
 
   const fnUpdateOrDelete = useMemo(
-    () => httpsCallable(getFunctions(undefined, FUNCTIONS_REGION), 'nd_updateOrDeleteItem'),
+    () =>
+      httpsCallable<UpdateDeleteReq, UpdateDeleteRes>(
+        getFunctions(undefined, FUNCTIONS_REGION),
+        'nd_updateOrDeleteItem'
+      ),
     []
   );
 
@@ -116,20 +208,20 @@ export default function EditNaturalDiamondPage() {
         const data: DBItem | null = itemSnap.exists() ? itemSnap.val() : null;
 
         if (!data) {
-          setError('Item not found'); 
+          setError('Item not found');
           setLoading(false);
           return;
         }
 
         setForm({
-          Shape: data.Shape ?? '',
+          Shape: shapeFromCaps(data.Shape),
           Size: data.Size != null ? String(data.Size) : '',
           Clarity: data.Clarity ?? '',
           Color: data.Color ?? '',
-          Cut: data.Cut ?? '',
-          Polish: data.Polish ?? '',
-          Symmetry: data.Symmetry ?? '',
-          Fluorescence: data.Fluorescence ?? '',
+          Cut: fromCode(data.Cut),
+          Polish: fromCode(data.Polish),
+          Symmetry: fromCode(data.Symmetry ?? data.Symm),
+          Fluorescence: fluoFromCaps(data.Fluorescence),
           Certified: data.Certified ?? '',
 
           ratePerCaratUSD: data.RapRate != null ? String(data.RapRate) : '',
@@ -138,7 +230,7 @@ export default function EditNaturalDiamondPage() {
           Table: data.Table ?? '',
           Remarks: data.Comments ?? '',
           CertNo: data.CertNo ?? '',
-          Status: data.Status ?? 'Available',
+          Status: statusFromCaps(data.Status ?? 'Available'),
         });
 
         setLoading(false);
@@ -147,55 +239,60 @@ export default function EditNaturalDiamondPage() {
     return () => unsub();
   }, [router, skuId]);
 
-  const onChange = (k: keyof FormState, v: any) => setForm(prev => ({ ...prev, [k]: v }));
+  const onChange = <K extends keyof FormState>(k: K, v: FormState[K]) =>
+    setForm(prev => ({ ...prev, [k]: v }));
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    const sizeNum = parseFloat(String(form.Size).trim());
-    const rateUSD = parseFloat(String(form.ratePerCaratUSD).trim());
+const sizeNum = toNumber(form.Size);
+const rateUSD = toNumber(form.ratePerCaratUSD);
 
-    if (isNaN(sizeNum) || sizeNum <= 0) {
-      setError('Please enter a valid Size (Carat), e.g., 1.50');
-      return;
-    }
-    if (isNaN(rateUSD) || rateUSD <= 0) {
-      setError('Please enter a valid Rate per Carat (USD), e.g., 15000');
-      return;
-    }
+if (!Number.isFinite(sizeNum) || sizeNum <= 0) {
+  setError('Please enter a valid Size (Carat), e.g., 1.50');
+  return;
+}
+if (!Number.isFinite(rateUSD) || rateUSD <= 0) {
+  setError('Please enter a valid Rate per Carat (USD), e.g., 15000');
+  return;
+}
 
     try {
       setSaving(true);
+
+      // Normalize before sending to server
+      const normalizedFields: UpdateDeleteReq['fields'] = {
+        // Specs
+        Shape: upper(form.Shape),                   // CAPS
+        Size: sizeNum,
+        Clarity: form.Clarity,
+        Color: form.Color,
+        Cut: toCode(form.Cut),                      // code
+        Polish: toCode(form.Polish),                // code
+        Symmetry: toCode(form.Symmetry),            // code (server expects "Symmetry" key)
+        Fluorescence: upper(form.Fluorescence),     // CAPS
+        Certified: form.Certified,
+
+        RapRate: rateUSD,                           // USD/ct
+        Measurement: form.Measurement,
+        Depth: form.Depth === '' ? null : Number(form.Depth),
+        Table: form.Table === '' ? null : Number(form.Table),
+
+        Comments: form.Remarks,
+        CertNo: form.CertNo,
+        Status: upper(form.Status),                 // CAPS (AVAILABLE/HOLD/SOLD/HIDDEN)
+      };
+
       await fnUpdateOrDelete({
-        skuId,
+        skuId: String(skuId),
         action: 'update',
-        fields: {
-          // editable whitelist; server will recompute hidden prices as needed
-          Shape: form.Shape,
-          Size: sizeNum,
-          Clarity: form.Clarity,
-          Color: form.Color,
-          Cut: form.Cut,
-          Polish: form.Polish,
-          Symmetry: form.Symmetry,
-          Fluorescence: form.Fluorescence,
-          Certified: form.Certified,
-
-          RapRate: rateUSD,                      // map from ratePerCaratUSD
-          Measurement: form.Measurement,
-          Depth: form.Depth === '' ? null : Number(form.Depth),
-          Table: form.Table === '' ? null : Number(form.Table),
-
-          Comments: form.Remarks,
-          CertNo: form.CertNo,
-          Status: form.Status,
-        }
+        fields: normalizedFields,
       });
 
       router.replace('/supplier/dashboard');
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save');
     } finally {
       setSaving(false);
     }
@@ -205,10 +302,10 @@ export default function EditNaturalDiamondPage() {
     if (!confirm(`Delete ${skuId}?`)) return;
     try {
       setSaving(true);
-      await fnUpdateOrDelete({ skuId, action: 'delete' });
+      await fnUpdateOrDelete({ skuId: String(skuId), action: 'delete' });
       router.replace('/supplier/dashboard');
-    } catch (err: any) {
-      setError(err?.message || 'Failed to delete');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to delete');
     } finally {
       setSaving(false);
     }
@@ -261,7 +358,8 @@ export default function EditNaturalDiamondPage() {
           <input className="border p-2 rounded w-full" type="text" inputMode="decimal"
                  placeholder="e.g., 1.50"
                  value={form.Size} onChange={e=>onChange('Size', e.target.value)}
-                 pattern="^[0-9]*\.?[0-9]*$" />
+                 ///pattern="^[0-9]*\\.?[0-9]*$" 
+	  />
         </label>
 
         <label className="col-span-1">
@@ -334,7 +432,8 @@ export default function EditNaturalDiamondPage() {
           <input className="border p-2 rounded w-full" type="text" inputMode="decimal"
                  placeholder="e.g., 15000"
                  value={form.ratePerCaratUSD} onChange={e=>onChange('ratePerCaratUSD', e.target.value)}
-                 pattern="^[0-9]*\.?[0-9]*$" />
+                 //pattern="^[0-9]*\\.?[0-9]*$" 
+		/>
         </label>
 
         <label className="col-span-1">

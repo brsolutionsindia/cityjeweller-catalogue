@@ -68,12 +68,6 @@ export default function SupplierDashboard() {
 
   const rows = useMemo(() => skuIds.map(k => [k, items[k]] as const), [skuIds, items]);
 
-
-  const startEdit = (key: string) => {
-    setEditingKey(key);
-    setEditDraft(items[key] || {});
-  };
-
 const goEdit = (key: string) => router.push(`/supplier/edit/${key}`);
 
   const saveEdit = async () => {
@@ -98,7 +92,8 @@ const goEdit = (key: string) => router.push(`/supplier/edit/${key}`);
   // optimistic UI (optional, real-time listener will also reflect it)
   setSkuIds(prev => prev.filter(id => id !== key));
   setItems(prev => {
-    const { [key]: _removed, ...rest } = prev;
+    const rest = { ...prev };
+    delete rest[key];
     return rest;
   });
 };
