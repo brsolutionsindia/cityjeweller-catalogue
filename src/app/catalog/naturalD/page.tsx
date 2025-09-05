@@ -82,7 +82,7 @@ export default function NaturalCatalogPage() {
       const shapes = new Set<string>();
       Object.values(val).forEach((dRaw) => {
         const d = dRaw as Diamond;
-        if (d.Shape && d.Status === 'AVAILABLE' && isIGICertified(d.Certified ?? '')) {
+        if (d.Shape && d.Status === 'AVAILABLE') {
           shapes.add(d.Shape);
         }
       });
@@ -98,7 +98,7 @@ export default function NaturalCatalogPage() {
       if (!val) return;
       const parsed = Object.values(val)
         .map(dRaw => dRaw as Diamond)
-        .filter(d => d.Status === 'AVAILABLE' && isIGICertified(d.Certified ?? '') && d.Shape === filters.Shape)
+        .filter(d => d.Status === 'AVAILABLE' && d.Shape === filters.Shape)
         .map(d => ({ ...d, VideoURL: extractUrl(d.VideoURL ?? '') }));
       setDiamonds(parsed);
       setIsLoading(false);
