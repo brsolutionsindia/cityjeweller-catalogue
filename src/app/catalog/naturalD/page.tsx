@@ -36,7 +36,7 @@ const gradeMap = { EX: 'Excellent', VG: 'Very Good', GD: 'Good', ID: 'Ideal', FR
 const fluorescenceMap = { NON: 'None – No reaction to UV light', SLT: 'Slight – Very minimal fluorescence', VSL: 'Very Slight – Slightly visible under UV' };
 
 const extractUrl = (val: string): string => val?.match(/HYPERLINK\("(.+?)"/)?.[1] || '';
-const isIGICertified = (val: string): boolean => val?.includes('IGI');
+//const isIGICertified = (val: string): boolean => val?.includes('IGI');
 //const obfuscateStoneId = (id: string): string => id.split('').map(char => /[A-Z]/.test(char) ? String.fromCharCode(((char.charCodeAt(0) - 65 + 3) % 26) + 65) : /[a-z]/.test(char) ? String.fromCharCode(((char.charCodeAt(0) - 97 + 3) % 26) + 97) : /[0-9]/.test(char) ? String.fromCharCode(((parseInt(char) + 3) % 10) + 48) : char).join('');
 
 const InfoPopup = ({ text, label, valueMap }: { text: string; label?: string; valueMap: Record<string, string>; }) => {
