@@ -7,6 +7,8 @@ import { db } from '../../../firebaseConfig';
 import PageLayout from '../../components/PageLayout';
 import styles from '../../page.module.css';
 import shapeIcon from '../../../../assets/shapeIcons';
+import Image from 'next/image';
+
 
 interface Diamond {
   StoneId?: string;
@@ -53,12 +55,36 @@ const InfoPopup = ({ text, label, valueMap }: { text: string; label?: string; va
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [show]);
 
-  return (
-    <span ref={ref} style={{ cursor: 'pointer', color: '#0070f3', fontWeight: 'bold', position: 'relative', fontSize: '0.65rem' }} onClick={(e) => { e.stopPropagation(); setShow((prev) => !prev); }}>
-      {text}
-      {show && <span style={{ display: 'block', background: '#fff', border: '1px solid #ccc', padding: '0.5rem', marginTop: '0.25rem', borderRadius: '4px', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', position: 'absolute', zIndex: 10, whiteSpace: 'normal', maxWidth: '250px' }}><strong>{label || text}:</strong> {valueMap[text] || 'No info available'}</span>}
-    </span>
-  );
+  // replace the return of InfoPopup (just the outer <span> style part changed)
+return (
+  <span
+    ref={ref}
+    style={{ cursor: 'pointer', color: '#0070f3', fontWeight: 'bold', position: 'relative' /* fontSize removed so it inherits */ }}
+    onClick={(e) => { e.stopPropagation(); setShow((prev) => !prev); }}
+  >
+    {text}
+    {show && (
+      <span
+        style={{
+          display: 'block',
+          background: '#fff',
+          border: '1px solid #ccc',
+          padding: '0.5rem',
+          marginTop: '0.25rem',
+          borderRadius: '4px',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+          position: 'absolute',
+          zIndex: 10,
+          whiteSpace: 'normal',
+          maxWidth: '250px'
+        }}
+      >
+        <strong>{label || text}:</strong> {valueMap[text] || 'No info available'}
+      </span>
+    )}
+  </span>
+);
+
 };
 
 export default function NaturalCatalogPage() {
@@ -170,17 +196,25 @@ export default function NaturalCatalogPage() {
         </label>
       </div>
 
-      <div className="imageContainer">
-        <img src={shapeIcon[d.Shape ?? ''] || '/default.png'} alt={d.Shape} className="shapeImage" />
-      </div>
+<div className="imageContainer">
+  <Image
+    src={shapeIcon[d.Shape ?? ''] || '/default.png'}
+    alt={d.Shape || 'shape'}
+    className="shapeImage"
+    width={120}
+    height={120}
+  />
+</div>
+
 
       <div className="cardContent">
         {/* Size & Shape */}
         <p>{(parseFloat(d.Size ?? '0')).toFixed(2)}ct ({d.Shape})</p>
 
-        {/* NEW: Color & Clarity just below, larger font */}
-        <p style={{ fontSize: '0.95rem', fontWeight: 600, margin: '4px 0', textAlign: 'center' }}>
-  {d.Color ?? ''} · {d.Clarity ?? ''}
+<p style={{ fontSize: '0.95rem', fontWeight: 600, margin: '4px 0', textAlign: 'center' }}>
+  <InfoPopup text={d.Color ?? ''} label="Color" valueMap={colorMap} />
+  {' · '}
+  <InfoPopup text={d.Clarity ?? ''} label="Clarity" valueMap={clarityMap} />
 </p>
 
         {/* Rest of the details (smaller font as before) */}
