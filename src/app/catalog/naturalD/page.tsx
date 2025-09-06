@@ -157,42 +157,86 @@ export default function NaturalCatalogPage() {
         )}
 
         <div className={styles.catalogGrid}>
-          {filtered.map((d) => (
-            <div className={`${styles.catalogCard} ${styles.labGrownPage}`} key={d.StoneId}>
-              <div className="compareCheckbox" style={{ textAlign: 'center', marginBottom: '4px' }}>
-                <label style={{ fontSize: '0.65rem' }}>
-                  <input type="checkbox" checked={selectedIds.includes(d.StoneId ?? '')} onChange={() => handleSelectionToggle(d.StoneId ?? '')} /> Compare
-                </label>
-              </div>
-              <div className="imageContainer"><img src={shapeIcon[d.Shape ?? ''] || '/default.png'} alt={d.Shape} className="shapeImage" /></div>
-              <div className="cardContent">
-                <p>{(parseFloat(d.Size ?? '0')).toFixed(2)}ct ({d.Shape})</p>
-                <div style={{ fontSize: '0.65rem', lineHeight: '1.3', textAlign: 'center' }}>
-                  <p>({d.Measurement ?? ''} mm)</p>
-                  <p>
-  D<InfoPopup text={`${(parseFloat(d.Depth ?? '0')).toFixed(2)}%`} valueMap={{ [`D${d.Depth}%`]: 'Depth % – Ratio of depth to width. Affects brilliance.' }} />,
-  T<InfoPopup text={`${(parseFloat(d.Table ?? '0')).toFixed(2)}%`} valueMap={{ [`T${d.Table}%`]: 'Table % – Size of the flat top facet. Affects sparkle.' }} />
+  {filtered.map((d) => (
+    <div className={`${styles.catalogCard} ${styles.labGrownPage}`} key={d.StoneId}>
+      <div className="compareCheckbox" style={{ textAlign: 'center', marginBottom: '4px' }}>
+        <label style={{ fontSize: '0.65rem' }}>
+          <input
+            type="checkbox"
+            checked={selectedIds.includes(d.StoneId ?? '')}
+            onChange={() => handleSelectionToggle(d.StoneId ?? '')}
+          />{' '}
+          Compare
+        </label>
+      </div>
+
+      <div className="imageContainer">
+        <img src={shapeIcon[d.Shape ?? ''] || '/default.png'} alt={d.Shape} className="shapeImage" />
+      </div>
+
+      <div className="cardContent">
+        {/* Size & Shape */}
+        <p>{(parseFloat(d.Size ?? '0')).toFixed(2)}ct ({d.Shape})</p>
+
+        {/* NEW: Color & Clarity just below, larger font */}
+        <p style={{ fontSize: '0.95rem', fontWeight: 600, margin: '4px 0', textAlign: 'center' }}>
+  {d.Color ?? ''} · {d.Clarity ?? ''}
 </p>
 
-                  <p><InfoPopup text={d.Clarity ?? ''} label="Clarity " valueMap={clarityMap} />,
-<InfoPopup text={d.Color ?? ''} label="Color " valueMap={colorMap} />,
-<InfoPopup text={d.Cut ?? ''} label="Cut " valueMap={gradeMap} />,
-<InfoPopup text={d.Polish ?? ''} label="Polish " valueMap={gradeMap} />,
-<InfoPopup text={d.Symm ?? ''} label="Symmetry " valueMap={gradeMap} />,
-<InfoPopup text={d.Fluorescence ?? ''} label="Fluorescence: " valueMap={fluorescenceMap} />
-</p>
-                </div>
-                {d.MRP && d.OfferPrice ? (<p><span style={{ textDecoration: 'line-through', color: '#888', marginRight: '0.5rem' }}>₹{Math.round(d.MRP)}</span><span style={{ color: '#c00', fontWeight: 'bold' }}>₹{Math.round(d.OfferPrice)}</span></p>) : null}
-              </div>
-              <div className="cardFooter">
-                <div className="codeSection">
-                  <span className="codeValue">{d.StoneId ?? ''}</span>
-                </div>
-                <a href={`https://wa.me/919023130944?text=I am interested in Product ID ${d.StoneId ?? ''}.`} target="_blank" rel="noopener noreferrer" className={`${styles.enquiryBtn} ${styles.labGrownPage}`}>Enquire</a>
-              </div>
-            </div>
-          ))}
+        {/* Rest of the details (smaller font as before) */}
+        <div style={{ fontSize: '0.65rem', lineHeight: '1.3', textAlign: 'center' }}>
+          <p>({d.Measurement ?? ''} mm)</p>
+          <p>
+            D
+            <InfoPopup
+              text={`${(parseFloat(d.Depth ?? '0')).toFixed(2)}%`}
+              valueMap={{ [`D${d.Depth}%`]: 'Depth % – Ratio of depth to width. Affects brilliance.' }}
+            />
+            , T
+            <InfoPopup
+              text={`${(parseFloat(d.Table ?? '0')).toFixed(2)}%`}
+              valueMap={{ [`T${d.Table}%`]: 'Table % – Size of the flat top facet. Affects sparkle.' }}
+            />
+          </p>
+
+          <p>
+            <InfoPopup text={d.Cut ?? ''} label="Cut" valueMap={gradeMap} />,{' '}
+            <InfoPopup text={d.Polish ?? ''} label="Polish" valueMap={gradeMap} />,{' '}
+            <InfoPopup text={d.Symm ?? ''} label="Symmetry" valueMap={gradeMap} />,{' '}
+            <InfoPopup text={d.Fluorescence ?? ''} label="Fluorescence" valueMap={fluorescenceMap} />
+          </p>
         </div>
+
+        {d.MRP && d.OfferPrice ? (
+          <p>
+            <span style={{ textDecoration: 'line-through', color: '#888', marginRight: '0.5rem' }}>
+              ₹{Math.round(d.MRP)}
+            </span>
+            <span style={{ color: '#c00', fontWeight: 'bold' }}>₹{Math.round(d.OfferPrice)}</span>
+          </p>
+        ) : null}
+      </div>
+
+      <div className="cardFooter">
+        <div className="codeSection">
+          <span className="codeValue">{d.StoneId ?? ''}</span>
+        </div>
+        <a
+          href={`https://wa.me/919023130944?text=I am interested in Product ID ${d.StoneId ?? ''}.`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${styles.enquiryBtn} ${styles.labGrownPage}`}
+        >
+          Enquire
+        </a>
+      </div>
+    </div>
+  ))}
+</div>
+
+
+
+
       </div>
     </PageLayout>
   );
