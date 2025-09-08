@@ -39,7 +39,6 @@ export default function DigitalGoldPage() {
 
     return () => {
       un1();
-      un2();
       un3();
     };
   }, []);
