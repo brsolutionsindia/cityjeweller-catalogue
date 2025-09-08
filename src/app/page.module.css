@@ -1016,3 +1016,246 @@ position: relative;
 .dimmed .productLabel {
   color: #777;
 }
+
+
+/* ===============================
+   Fix: heroImage property typo
+=============================== */
+.heroImage {
+  width: 100%;
+  height: auto;
+  object-fit: cover;   /* was objectFit */
+  filter: brightness(0.8);
+}
+
+/* ===============================
+   Digital Gold – Layout
+=============================== */
+.dgContainer {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.dgSection {
+  padding: 24px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.dgH1 {
+  margin: 0 0 8px;
+  font-size: clamp(1.6rem, 2.6vw, 2rem);
+  font-weight: 800;
+}
+
+.dgH2 {
+  margin: 0 0 12px;
+  font-size: clamp(1.25rem, 2.2vw, 1.6rem);
+  font-weight: 800;
+}
+
+.dgMuted {
+  color: #4b5563;
+  margin-bottom: 16px;
+}
+
+.dgP {
+  margin: 0;
+  color: #374151;
+  line-height: 1.6;
+}
+
+/* ===============================
+   Rate strip
+=============================== */
+.dgRateCard {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #eee;
+  margin: 12px 0 6px;
+}
+
+.dgRateLabel {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.dgRateValue {
+  font-size: clamp(1.25rem, 2.6vw, 1.6rem);
+  font-weight: 800;
+}
+
+/* ===============================
+   Two-column hero (text + calculator)
+=============================== */
+.dgHeroGrid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 24px;
+}
+@media (max-width: 900px) {
+  .dgHeroGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===============================
+   Card + Inputs + CTA
+=============================== */
+.dgCard {
+  border: 1px solid #eee;
+  border-radius: 14px;
+  padding: 16px;
+  background: #fff;
+}
+
+.dgLabel {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.dgInput {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  outline: none;
+}
+
+.dgNote {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 8px;
+}
+
+.dgCTA {
+  margin-top: 12px;
+  display: block;
+  text-align: center;
+  padding: 12px 14px;
+  background: #111827;
+  color: #fff;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 700;
+  transition: transform 0.06s ease, opacity 0.15s ease;
+}
+.dgCTA:hover { opacity: 0.95; }
+.dgCTA:active { transform: translateY(1px); }
+
+/* Optional: sticky calculator on mobile */
+@media (max-width: 600px) {
+  .dgCardSticky {
+    position: sticky;
+    top: 64px; /* below navbar */
+    z-index: 5;
+  }
+}
+
+/* ===============================
+   Feature grid + Redeem cards
+=============================== */
+.dgGrid4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .dgGrid4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 520px) {
+  .dgGrid4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dgFeature {
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+.dgFeatureTitle {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.dgFeatureText {
+  color: #4b5563;
+  font-size: 14px;
+}
+
+.dgRedeemCard {
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  text-align: center;
+}
+.dgRedeemPreview {
+  height: 120px;
+  background: #f5f5f5;
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+/* ===============================
+   Steps
+=============================== */
+.dgSteps {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.8;
+  color: #374151;
+}
+
+/* ===============================
+   FAQs
+=============================== */
+.dgFaq {
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  margin-bottom: 10px;
+}
+.dgFaqQ {
+  cursor: pointer;
+  font-weight: 600;
+}
+.dgFaqA {
+  margin-top: 8px;
+  color: #374151;
+  line-height: 1.6;
+}
+
+/* ===============================
+   Final CTA section
+=============================== */
+.dgFinalCenter {
+  text-align: center;
+}
+
+/* ===============================
+   Small polish (optional)
+=============================== */
+/* Make WhatsApp floating button readable */
+.whatsappBtn {
+  background: #25D366;  /* WhatsApp green */
+  color: #fff;          /* ensure visible */
+}
+
+/* Nudge offer banner button for consistency */
+.bookGoldBtn {
+  background-color: #111827;
+}
+.bookGoldBtn:hover {
+  background-color: #000;
+}
