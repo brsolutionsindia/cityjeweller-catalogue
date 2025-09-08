@@ -214,7 +214,6 @@ export default function DigitalGoldPage() {
               <RedeemCard title="Bangles & Bracelets" />
             </div>
             <div className={styles.dgNote} style={{ marginTop: 8 }}>
-              Tip: Showcase 4–8 representative SKUs here to inspire confidence.
             </div>
           </section>
 
@@ -225,7 +224,7 @@ export default function DigitalGoldPage() {
             <FAQ q="How do I buy without a payment gateway?" a="Use the calculator, click WhatsApp, and confirm. We’ll share a payment link or offline options and record your units." />
             <FAQ q="Can I sell back for cash?" a="Currently, redemption is against jewellery purchases on CityJeweller.in. Cash buy-back is not enabled." />
             <FAQ q="Are there hidden charges?" a="No hidden charges. You purchase at live 22kt rate. Standard making/wastage/stone charges apply only when you redeem for jewellery, as per product." />
-            <FAQ q="How do I track my holdings?" a="We’ll message your current grams and maintain records against your mobile number. A login dashboard can be added later." />
+            <FAQ q="How do I track my holdings?" a="We’ll message your current grams and maintain records against your mobile number. A login dashboard shall be provided later." />
           </section>
 
           {/* Final CTA */}
