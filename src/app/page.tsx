@@ -81,9 +81,19 @@ export default function Home() {
       <OfferBar goldRate={goldRate} rateDate={rateDate} />
       <OfferBarSilver silverRate={silverRate} rateDate={rateDate} />
 
-      <section className={heroStyles.hero}>
-        <Image src="/hero-banner.png" alt="Jewellery Banner" width={1200} height={400} className={heroStyles.heroImage} />
-      </section>
+<section className={heroStyles.hero}>
+  <Link href="http://localhost:3000/rmr/registration">
+    <Image
+      src="/hero-banner.png"
+      alt="Jewellery Banner"
+      width={1200}
+      height={400}
+      className={heroStyles.heroImage}
+      priority
+    />
+  </Link>
+</section>
+
 
       <section id="cvd" className={productStyles.catalogSection}>
         <h2 className={productStyles.sectionHeading}>Loose Solitaire Diamonds</h2>
