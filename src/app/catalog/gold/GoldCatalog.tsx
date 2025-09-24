@@ -100,6 +100,34 @@ export default function GoldCatalog() {
   }, [searchParam, sortOrder, typeFilter]);
 
   // --- Helpers for Mangalsutra split ---
+// --- Helpers for Mangalsutra split (mutually exclusive) ---
+const mangalsutraSections = (() => {
+  if (typeFilter !== 'MG') return null;
+
+  const pendant: ProductCard[] = [];
+  const stringOnly: ProductCard[] = [];
+  const mangalsutraPure: ProductCard[] = [];
+
+  for (const p of products) {
+    const r = (p.remarksLower || '').toLowerCase();
+    const hasPendant = r.includes('pendant');
+    const hasString = r.includes('string');
+
+    if (hasPendant) {
+      pendant.push(p);
+    } else if (hasString) {
+      stringOnly.push(p);
+    } else {
+      // neither "pendant" nor "string"
+      mangalsutraPure.push(p);
+    }
+  }
+
+  return { pendant, stringOnly, mangalsutraPure };
+})();
+
+
+
   const pendantProducts =
     typeFilter === 'MG'
       ? products.filter((p) => (p.remarksLower || '').includes('pendant'))
@@ -140,39 +168,57 @@ export default function GoldCatalog() {
   return (
     <PageLayout>
       <OfferBar goldRate={goldRate} rateDate={rateDate} />
-      <section>
-        <h1>{heading}</h1>
-        <p className={styles.itemCount}>{products.length} item(s)</p>
-        {loading ? (
-          <p>Loading...</p>
-        ) : typeFilter === 'MG' ? (
-          <>
-            {/* Pendant Section */}
-            <h2 className={styles.subheading}>
-              <span className={styles.sectionTitle}>Pendant Section</span>{' '}
-              <span className={styles.itemCountSmall}>({pendantProducts.length})</span>
-            </h2>
-            {pendantProducts.length > 0 ? (
-              <CatalogGrid list={pendantProducts} />
-            ) : (
-              <p>No pendant-style mangalsutras found.</p>
-            )}
+<section>
+  <h1>{heading}</h1>
+  <p className={styles.itemCount}>{products.length} item(s)</p>
 
-            {/* String Section */}
-            <h2 className={styles.subheading}>
-              <span className={styles.sectionTitle}>String Section</span>{' '}
-              <span className={styles.itemCountSmall}>({stringProducts.length})</span>
-            </h2>
-            {stringProducts.length > 0 ? (
-              <CatalogGrid list={stringProducts} />
-            ) : (
-              <p>No string-style mangalsutras found.</p>
-            )}
-          </>
-        ) : (
-          <CatalogGrid list={products} />
-        )}
-      </section>
+  {loading ? (
+    <p>Loading...</p>
+  ) : typeFilter === 'MG' && mangalsutraSections ? (
+    <>
+      {/* Mangalsutra Section (remarks WITHOUT "pendant" or "string") */}
+      <h2 className={styles.subheading}>
+        <span className={styles.sectionTitle}>Mangalsutra Section</span>{' '}
+        <span className={styles.itemCountSmall}>
+          ({mangalsutraSections.mangalsutraPure.length})
+        </span>
+      </h2>
+      {mangalsutraSections.mangalsutraPure.length > 0 ? (
+        <CatalogGrid list={mangalsutraSections.mangalsutraPure} />
+      ) : (
+        <p>No classic mangalsutras found.</p>
+      )}
+
+      {/* Pendant Section */}
+      <h2 className={styles.subheading}>
+        <span className={styles.sectionTitle}>Pendant Section</span>{' '}
+        <span className={styles.itemCountSmall}>
+          ({mangalsutraSections.pendant.length})
+        </span>
+      </h2>
+      {mangalsutraSections.pendant.length > 0 ? (
+        <CatalogGrid list={mangalsutraSections.pendant} />
+      ) : (
+        <p>No pendant-style mangalsutras found.</p>
+      )}
+
+      {/* String Section */}
+      <h2 className={styles.subheading}>
+        <span className={styles.sectionTitle}>String Section</span>{' '}
+        <span className={styles.itemCountSmall}>
+          ({mangalsutraSections.stringOnly.length})
+        </span>
+      </h2>
+      {mangalsutraSections.stringOnly.length > 0 ? (
+        <CatalogGrid list={mangalsutraSections.stringOnly} />
+      ) : (
+        <p>No string-style mangalsutras found.</p>
+      )}
+    </>
+  ) : (
+    <CatalogGrid list={products} />
+  )}
+</section>
 
       {selectedSku && (
         <SkuSummaryModal skuId={selectedSku} onClose={() => setSelectedSku(null)} />
