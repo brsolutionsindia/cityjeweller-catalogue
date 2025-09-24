@@ -126,18 +126,6 @@ const mangalsutraSections = (() => {
   return { pendant, stringOnly, mangalsutraPure };
 })();
 
-
-
-  const pendantProducts =
-    typeFilter === 'MG'
-      ? products.filter((p) => (p.remarksLower || '').includes('pendant'))
-      : [];
-
-  const stringProducts =
-    typeFilter === 'MG'
-      ? products.filter((p) => (p.remarksLower || '').includes('string'))
-      : [];
-
   const CatalogGrid = ({ list }: { list: ProductCard[] }) => (
     <section className={styles.catalogGrid}>
       {list.map((item) => (
