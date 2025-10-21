@@ -19,6 +19,9 @@ export const filterDiamondItems = (
   const remarks = (value.remarks || '').toLowerCase();
   const idLower = skuId.toLowerCase();
 
+  // ❌ Exclude solitaire items
+  if (remarks.includes('solitaire')) return false;
+
   // ✅ Diamond check excluding silver content
   const isDiamond = remarks.includes('diamond') && !remarks.includes('silver');
   if (!isDiamond) return false;

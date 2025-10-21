@@ -82,7 +82,7 @@ export default function Home() {
       <OfferBarSilver silverRate={silverRate} rateDate={rateDate} />
 
 <section className={heroStyles.hero}>
-  <Link href="/rmr/registration">
+  <Link href="/catalog/solitaireRG">
     <Image
       src="/hero-banner.png"
       alt="Jewellery Banner"

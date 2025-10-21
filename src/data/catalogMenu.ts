@@ -64,6 +64,7 @@ export const gemstoneItems: CatalogItem[] = [
 export const cvdItems: CatalogItem[] = [
   { label: 'Natural Diamonds', image: '/diamond-loose.png', link: '/catalog/naturalD' },
   { label: 'Lab Grown Diamonds', image: '/cvd-loose.png', link: '/catalog/labgrown' },
+  { label: 'Solitaire Rings', image: '/solitaire-rings.png', link: '/catalog/solitaireRG' },
 ];
 
 export const miscItems: CatalogItem[] = [
