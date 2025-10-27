@@ -20,6 +20,7 @@ export const diamondItems: CatalogItem[] = [
 ];
 
 export const goldItems: CatalogItem[] = [
+  { label: 'Rings', image: '/gold-rings.png', link: '/catalog/gold?type=RG'},
   { label: 'Mangalsutra', image: '/gold-mangalsutra.png', link: '/catalog/gold?type=MG' },
   { label: 'Bangles', image: '/gold-bangles.png', link: '/catalog/gold?type=BG' },
   { label: 'Necklace Sets', image: '/gold-necklace.png', link: '/catalog/gold?type=NK' },
@@ -27,7 +28,6 @@ export const goldItems: CatalogItem[] = [
   { label: 'Bracelets', image: '/gold-bracelets.png', link: '/catalog/gold?type=BR' },
   { label: 'Chains', image: '/gold-chains.png', link: '/catalog/gold?type=CH' },
   { label: 'Earrings', image: '/gold-earrings.png', link: '/catalog/gold?type=ER', disabled: true },
-  { label: 'Rings', image: '/gold-rings.png', link: '/catalog/gold?type=RG', disabled: true },
   { label: 'Nose Pins', image: '/gold-nosepins.png', link: '/catalog/gold?type=NP', disabled: true },
   { label: 'Others', image: '/gold-others.png', link: '/catalog/gold?type=OT', disabled: true },
 ];
