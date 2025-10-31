@@ -11,11 +11,6 @@ import OfferBar from '../../components/OfferBar';
 import SkuSummaryModal from '../../components/SkuSummaryModal';
 import { computeAdjustedPrice } from '../utils';
 
-interface RawSkuData {
-  grTotalPrice?: number | string;
-  remarks?: string;
-}
-
 interface ProductCard {
   id: string;
   price: number | string;
