@@ -1,115 +1,151 @@
-// DiamondCatalog.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ref, onValue } from 'firebase/database';
+import { ref, get } from 'firebase/database';
 import { db } from '../../../firebaseConfig';
 import Image from 'next/image';
-import styles from '../../page.module.css';
 import { useSearchParams } from 'next/navigation';
-import SkuSummaryModal from '../../components/SkuSummaryModal';
+import styles from '../../page.module.css';
 import PageLayout from '../../components/PageLayout';
 import OfferBar from '../../components/OfferBar';
+import SkuSummaryModal from '../../components/SkuSummaryModal';
 import { computeAdjustedPrice } from '../utils';
-import { filterDiamondItems } from './filters';
 
 interface RawSkuData {
   grTotalPrice?: number | string;
   remarks?: string;
-  jwelleryCategoryOther?: string;
 }
 
 type ProductCard = {
   id: string;
   price: number | string;
   image: string;
-  remarksLower?: string;
+  remarksLower: string;
 };
 
+// --- Helper: extract 2–3 letter type code (RG, ER, MG, etc.) from SKU ID ---
+// Supports forms like "RG101", "2665-RG101", "8165_NK009"
+function extractSkuType(id: string): string | null {
+  const up = id.toUpperCase();
+  let m = up.match(/^([A-Z]{2,3})(?=\d)/);
+  if (m) return m[1];
+  m = up.match(/[-_ ]([A-Z]{2,3})(?=\d)/);
+  if (m) return m[1];
+  m = up.match(/(?:^|[-_ ])([A-Z]{2,3})(?:\D|$)/);
+  return m ? m[1] : null;
+}
+
 export default function DiamondCatalog() {
-  const [diamondRate, setDiamondRate] = useState('Loading...');
+  const [rate, setRate] = useState('Loading...');
   const [rateDate, setRateDate] = useState('');
   const [products, setProducts] = useState<ProductCard[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const searchParams = useSearchParams();
-  const typeFilter = searchParams?.get?.('type') ?? '';
+  const typeFilter = (searchParams?.get?.('type') ?? '').toUpperCase(); // e.g. RG, MG
+  const subFilter = (searchParams?.get?.('sub') ?? '').toLowerCase();   // e.g. pendant, string, antique
   const searchParam = (searchParams?.get?.('search') ?? '').toLowerCase();
 
-  const typeMap: { [key: string]: string } = {
-    ER: 'Earrings Collection',
-    RG: 'Rings Collection',
-    NK: 'Necklace Sets Collection',
-    PD: 'Pendants Collection',
-    MG: 'Mangalsutra Collection',
-    BG: 'Bangles Collection',
-    BR: 'Bracelets Collection',
-    CH: 'Chains Collection',
-    NP: 'Nose Pins Collection',
-    OT: 'Others Collection',
-  };
-
   const heading = (() => {
-    if (searchParam) return `Search Results for "${searchParam}"`;
-    if (typeFilter && typeMap[typeFilter]) return typeMap[typeFilter];
+    if (searchParam) return `Search results for "${searchParam}"`;
+    if (subFilter && typeFilter) return `Diamond ${typeFilter} – ${subFilter}`;
+    if (subFilter) return `Diamond ${subFilter} Collection`;
+    if (typeFilter) return `Diamond ${typeFilter} Collection`;
     return 'Diamond Collection';
   })();
 
+  // --- Load rate/date (keeping your existing paths) ---
   useEffect(() => {
-    const rateRef = ref(db, 'Global SKU/Rates/Gold 22kt');
-    const dateRef = ref(db, 'Global SKU/Rates/Date');
-    onValue(rateRef, (snapshot) => setDiamondRate(snapshot.val()));
-    onValue(dateRef, (snapshot) => setRateDate(snapshot.val()));
+    // If you have a dedicated diamond rate path, change these two refs
+    import('firebase/database').then(({ ref, onValue }) => {
+      const rateRef = ref(db, 'Global SKU/Rates/Gold 22kt');
+      const dateRef = ref(db, 'Global SKU/Rates/Date');
+      onValue(rateRef, (s) => setRate(s.val()));
+      onValue(dateRef, (s) => setRateDate(s.val()));
+    });
   }, []);
 
+  // --- Load Diamond SKUs using the tag index ---
   useEffect(() => {
-    const skuRef = ref(db, 'Global SKU/SKU/');
-    const imgRef = ref(db, 'Global SKU/Images/');
+    async function loadDiamond() {
+      setLoading(true);
 
-    onValue(skuRef, (skuSnap) => {
-      const skuData = skuSnap.val();
-      onValue(imgRef, async (imgSnap) => {
-        const imgData = imgSnap.val();
-        if (!skuData) return;
-
-        const allItems = Object.entries(skuData) as [string, RawSkuData][];
-        const filteredItems = allItems.filter(([key, value]) =>
-          filterDiamondItems(key, value, searchParam, typeFilter)
-        );
-
-        const items = await Promise.all(
-          filteredItems.map(async ([key, value]) => {
-            const imageUrl = imgData?.[key]?.Primary || '/product-placeholder.jpg';
-            const adjustedPrice = computeAdjustedPrice(value.grTotalPrice);
-            const remarksLower = (value.remarks ?? '').toLowerCase();
-            return { id: key, price: adjustedPrice, image: imageUrl, remarksLower };
-          })
-        );
-
-        items.sort((a, b) => {
-          const priceA = typeof a.price === 'number' ? a.price : 0;
-          const priceB = typeof b.price === 'number' ? b.price : 0;
-          return sortOrder === 'asc' ? priceA - priceB : priceB - priceA;
-        });
-
-        setProducts(items);
+      // 1) Get the diamond index: /Global SKU/SKU/indices/tags/diamond
+      const diamondRef = ref(db, 'Global SKU/SKU/indices/tags/diamond');
+      const diamondSnap = await get(diamondRef);
+      if (!diamondSnap.exists()) {
+        setProducts([]);
         setLoading(false);
+        return;
+      }
+      const diamondIds = Object.keys(diamondSnap.val()); // SKU IDs
+
+      // 2) Load SKU and Image data
+      const [skuSnap, imgSnap] = await Promise.all([
+        get(ref(db, 'Global SKU/SKU')),
+        get(ref(db, 'Global SKU/Images')),
+      ]);
+      const skuData = skuSnap.val() || {};
+      const imgData = imgSnap.val() || {};
+
+      // 3) Build + filter
+      const filtered: ProductCard[] = [];
+      for (const id of diamondIds) {
+        const rec: RawSkuData = skuData[id];
+        if (!rec) continue;
+
+        const remarksLower = (rec.remarks || '').toLowerCase();
+        const idLower = id.toLowerCase();
+
+        // type (parse from SKU ID)
+        if (typeFilter) {
+          const actual = extractSkuType(id);
+          if (actual !== typeFilter) continue;
+        }
+
+        // sub (keyword in remarks)
+        if (subFilter && !remarksLower.includes(subFilter)) continue;
+
+        // search (in id or remarks)
+        if (searchParam && !idLower.includes(searchParam) && !remarksLower.includes(searchParam)) continue;
+
+        filtered.push({
+          id,
+          price: computeAdjustedPrice(rec.grTotalPrice),
+          image: imgData?.[id]?.Primary || '/product-placeholder.jpg',
+          remarksLower,
+        });
+      }
+
+      // 4) Sort by price asc
+      filtered.sort((a, b) => {
+        const pa = typeof a.price === 'number' ? a.price : 0;
+        const pb = typeof b.price === 'number' ? b.price : 0;
+        return pa - pb;
       });
-    });
-  }, [searchParam, sortOrder, typeFilter]);
 
-  // --- Helpers for Mangalsutra split ---
-  const pendantProducts =
-    typeFilter === 'MG'
-      ? products.filter((p) => (p.remarksLower || '').includes('pendant'))
-      : [];
+      setProducts(filtered);
+      setLoading(false);
+    }
 
-  const stringProducts =
-    typeFilter === 'MG'
-      ? products.filter((p) => (p.remarksLower || '').includes('string'))
-      : [];
+    loadDiamond();
+  }, [typeFilter, subFilter, searchParam]);
+
+  // --- MG special split (only when type=MG & no "sub") ---
+  const mgSections = (() => {
+    if (typeFilter !== 'MG' || subFilter) return null;
+    const pendant: ProductCard[] = [];
+    const stringOnly: ProductCard[] = [];
+    const mangalsutraPure: ProductCard[] = [];
+    for (const p of products) {
+      const r = p.remarksLower;
+      if (r.includes('pendant')) pendant.push(p);
+      else if (r.includes('string')) stringOnly.push(p);
+      else mangalsutraPure.push(p);
+    }
+    return { pendant, stringOnly, mangalsutraPure };
+  })();
 
   const CatalogGrid = ({ list }: { list: ProductCard[] }) => (
     <section className={styles.catalogGrid}>
@@ -127,10 +163,7 @@ export default function DiamondCatalog() {
             className={styles.catalogImage}
           />
           <p className={styles.catalogPrice}>
-            ₹
-            {typeof item.price === 'number'
-              ? item.price.toLocaleString('en-IN')
-              : item.price}
+            ₹{typeof item.price === 'number' ? item.price.toLocaleString('en-IN') : item.price}
           </p>
           <h3 className={styles.catalogCode}>Code: {item.id}</h3>
         </div>
@@ -138,44 +171,40 @@ export default function DiamondCatalog() {
     </section>
   );
 
-return (
-  <PageLayout>
+  return (
+    <PageLayout>
+      <OfferBar goldRate={rate} rateDate={rateDate} />
 
-    {/* Existing OfferBar with Gold Rate */}
-    <OfferBar goldRate={diamondRate} rateDate={rateDate} />
-
-    <section>
-      <h1>{heading}</h1>
-      <p className={styles.itemCount}>{products.length} item(s)</p>
+      <section>
+        <h1>{heading}</h1>
+        <p className={styles.itemCount}>{products.length} item(s)</p>
 
         {loading ? (
           <p>Loading...</p>
-        ) : typeFilter === 'MG' ? (
+        ) : mgSections ? (
           <>
-            {/* Pendant Section */}
-<h2 className={styles.subheading}>
-  <span className={styles.sectionTitle}>Pendant Section</span>{' '}
-  <span className={styles.itemCountSmall}>({pendantProducts.length})</span>
-</h2>
-            {pendantProducts.length > 0 ? (
-              <CatalogGrid list={pendantProducts} />
-            ) : (
-              <p>No pendant-style mangalsutras found.</p>
-            )}
+            {/* Mangalsutra (neither "pendant" nor "string") */}
+            <h2 className={styles.subheading}>
+              <span className={styles.sectionTitle}>Mangalsutra Section</span>{' '}
+              <span className={styles.itemCountSmall}>({mgSections.mangalsutraPure.length})</span>
+            </h2>
+            <CatalogGrid list={mgSections.mangalsutraPure} />
 
-            {/* String Section */}
-<h2 className={styles.subheading}>
-  <span className={styles.sectionTitle}>String Section</span>{' '}
-  <span className={styles.itemCountSmall}>({stringProducts.length})</span>
-</h2>
-            {stringProducts.length > 0 ? (
-              <CatalogGrid list={stringProducts} />
-            ) : (
-              <p>No string-style mangalsutras found.</p>
-            )}
+            {/* Pendant */}
+            <h2 className={styles.subheading}>
+              <span className={styles.sectionTitle}>Pendant Section</span>{' '}
+              <span className={styles.itemCountSmall}>({mgSections.pendant.length})</span>
+            </h2>
+            <CatalogGrid list={mgSections.pendant} />
+
+            {/* String */}
+            <h2 className={styles.subheading}>
+              <span className={styles.sectionTitle}>String Section</span>{' '}
+              <span className={styles.itemCountSmall}>({mgSections.stringOnly.length})</span>
+            </h2>
+            <CatalogGrid list={mgSections.stringOnly} />
           </>
         ) : (
-          // Default single grid for all other types
           <CatalogGrid list={products} />
         )}
       </section>

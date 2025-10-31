@@ -7,17 +7,26 @@ export type CatalogItem = {
 };
 
 export const diamondItems: CatalogItem[] = [
+  { label: 'Necklace Sets', image: '/necklace.png', link: '/catalog/diamond?type=NK'},
+  { label: 'Bracelets', image: '/bracelets.png', link: '/catalog/diamond?type=BR'},
   { label: 'Mangalsutra', image: '/mangalsutra.png', link: '/catalog/diamond?type=MG' },
   { label: 'Rings', image: '/rings.png', link: '/catalog/diamond?type=RG'},
   { label: 'Pendants', image: '/pendants.png', link: '/catalog/diamond?type=PD' },
   { label: 'Earrings', image: '/earrings.png', link: '/catalog/diamond?type=ER'},
-  { label: 'Necklace Sets', image: '/necklace.png', link: '/catalog/diamond?type=NK', disabled: true},
   { label: 'Bangles', image: '/bangles.png', link: '/catalog/diamond?type=BG', disabled: true },
-  { label: 'Bracelets', image: '/bracelets.png', link: '/catalog/diamond?type=BR', disabled: true },
-  { label: 'Chains', image: '/chains.png', link: '/catalog/diamond?type=CH', disabled: true },
   { label: 'Nose Pins', image: '/nosepins.png', link: '/catalog/diamond?type=NP', disabled: true },
   { label: 'Others', image: '/others.png', link: '/catalog/diamond?type=OT', disabled: true},
 ];
+
+export const goldCollections: CatalogItem[] = [
+  { label: 'Antique', image: '/gold-antique.png', link: '/catalog/gold?sub=antique'},
+  { label: 'Personalized', image: '/gold-personalized.png', link: '/catalog/gold?sub=name'},
+  { label: 'Hybrid', image: '/gold-hybrid.png', link: '/catalog/gold?sub=rubber'},
+  { label: 'Multi Tone', image: '/gold-multitone.png', link: '/catalog/gold?sub=tone', disabled: true },
+  { label: 'Bridal', image: '/gold-bridal.png', link: '/catalog/gold?sub=bridal', disabled: true },
+  { label: 'Temple', image: '/gold-temple.png', link: '/catalog/gold?sub=temple', disabled: true },
+];
+
 
 export const goldItems: CatalogItem[] = [
   { label: 'Rings', image: '/gold-rings.png', link: '/catalog/gold?type=RG'},
@@ -27,6 +36,7 @@ export const goldItems: CatalogItem[] = [
   { label: 'Pendants', image: '/gold-pendants.png', link: '/catalog/gold?type=PD' },
   { label: 'Bracelets', image: '/gold-bracelets.png', link: '/catalog/gold?type=BR' },
   { label: 'Chains', image: '/gold-chains.png', link: '/catalog/gold?type=CH' },
+  { label: 'Kundan', image: '/gold-kundan.png', link: '/catalog/gold?sub=kundan', disabled: true },
   { label: 'Earrings', image: '/gold-earrings.png', link: '/catalog/gold?type=ER', disabled: true },
   { label: 'Nose Pins', image: '/gold-nosepins.png', link: '/catalog/gold?type=NP', disabled: true },
   { label: 'Others', image: '/gold-others.png', link: '/catalog/gold?type=OT', disabled: true },
@@ -59,6 +69,7 @@ export const silverItems: CatalogItem[] = [
 export const gemstoneItems: CatalogItem[] = [
   { label: 'Loose Gemstones', image: '/gemstone-loose.png', link: '/catalog/gemstones/loose-gemstones/selector' },
   { label: 'Gemstone Strings', image: '/gemstone-strings.png', link: '/catalog/gemstones?type=ST' },
+  { label: 'Astrologer Jewellery', image: '/astro.png', link: '/catalog/gold?type=ASTRO', disabled: true },
 ];
 
 export const cvdItems: CatalogItem[] = [

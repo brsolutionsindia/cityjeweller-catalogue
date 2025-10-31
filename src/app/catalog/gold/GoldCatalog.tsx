@@ -1,212 +1,197 @@
-// GoldCatalog.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ref, onValue } from 'firebase/database';
+import { ref, get } from 'firebase/database';
 import { db } from '../../../firebaseConfig';
 import Image from 'next/image';
-import styles from '../../page.module.css';
 import { useSearchParams } from 'next/navigation';
-import SkuSummaryModal from '../../components/SkuSummaryModal';
+import styles from '../../page.module.css';
 import PageLayout from '../../components/PageLayout';
 import OfferBar from '../../components/OfferBar';
+import SkuSummaryModal from '../../components/SkuSummaryModal';
 import { computeAdjustedPrice } from '../utils';
-import { filterGoldItems } from './filters';
 
 interface RawSkuData {
   grTotalPrice?: number | string;
   remarks?: string;
-  jwelleryCategoryOther?: string;
 }
 
-type ProductCard = {
+interface ProductCard {
   id: string;
   price: number | string;
   image: string;
-  remarksLower?: string;
-};
+  remarksLower: string;
+}
+
+
+function extractSkuType(id: string): string | null {
+  // Normalize
+  const up = id.toUpperCase();
+
+  // Case A: code at start e.g. "RG101"
+  let m = up.match(/^([A-Z]{2})(?=\d)/);
+  if (m) return m[1];
+
+  // Case B: code after hyphen e.g. "2665-RG101", "8165-NK009"
+  m = up.match(/[-_ ]([A-Z]{2})(?=\d)/);
+  if (m) return m[1];
+
+  // Case C: fallback — two letters between separators (before next non-digit)
+  m = up.match(/(?:^|[-_ ])([A-Z]{2})(?:\D|$)/);
+  return m ? m[1] : null;
+}
+
 
 export default function GoldCatalog() {
   const [goldRate, setGoldRate] = useState('Loading...');
   const [rateDate, setRateDate] = useState('');
   const [products, setProducts] = useState<ProductCard[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
+
   const typeFilter = searchParams?.get?.('type') ?? '';
+  const subFilter = (searchParams?.get?.('sub') ?? '').toLowerCase();
   const searchParam = (searchParams?.get?.('search') ?? '').toLowerCase();
 
-  const typeMap: { [key: string]: string } = {
-    ER: 'Earrings Collection',
-    RG: 'Rings Collection',
-    NK: 'Necklace Sets Collection',
-    PD: 'Pendants Collection',
-    MG: 'Mangalsutra Collection',
-    BG: 'Bangles Collection',
-    BR: 'Bracelets Collection',
-    CH: 'Chains Collection',
-    NP: 'Nose Pins Collection',
-    OT: 'Others Collection',
-  };
-
   const heading = (() => {
-    if (searchParam) return `Search Results for "${searchParam}"`;
-    if (typeFilter && typeMap[typeFilter]) return typeMap[typeFilter];
+    if (searchParam) return `Search results for "${searchParam}"`;
+    if (subFilter) return `Gold ${subFilter} Collection`;
+    if (typeFilter) return `Gold ${typeFilter} Collection`;
     return 'Gold Collection';
   })();
 
+  // --- Load rates ---
   useEffect(() => {
-    const rateRef = ref(db, 'Global SKU/Rates/Gold 22kt');
-    const dateRef = ref(db, 'Global SKU/Rates/Date');
-    onValue(rateRef, (snapshot) => setGoldRate(snapshot.val()));
-    onValue(dateRef, (snapshot) => setRateDate(snapshot.val()));
+    import('firebase/database').then(({ ref, onValue }) => {
+      const rateRef = ref(db, 'Global SKU/Rates/Gold 22kt');
+      const dateRef = ref(db, 'Global SKU/Rates/Date');
+      onValue(rateRef, (s) => setGoldRate(s.val()));
+      onValue(dateRef, (s) => setRateDate(s.val()));
+    });
   }, []);
 
+  // --- Load SKUs by index ---
   useEffect(() => {
-    const skuRef = ref(db, 'Global SKU/SKU/');
-    const imgRef = ref(db, 'Global SKU/Images/');
+    async function loadGoldItems() {
+      setLoading(true);
 
-    onValue(skuRef, (skuSnap) => {
-      const skuData = skuSnap.val();
-      onValue(imgRef, async (imgSnap) => {
-        const imgData = imgSnap.val();
-        if (!skuData) return;
-
-        const allItems = Object.entries(skuData) as [string, RawSkuData][];
-        const filteredItems = allItems.filter(([key, value]) =>
-          filterGoldItems(key, value, searchParam, typeFilter)
-        );
-
-        const items = await Promise.all(
-          filteredItems.map(async ([key, value]) => {
-            const imageUrl = imgData?.[key]?.Primary || '/product-placeholder.jpg';
-            const adjustedPrice = computeAdjustedPrice(value.grTotalPrice);
-            const remarksLower = (value.remarks ?? '').toLowerCase();
-            return { id: key, price: adjustedPrice, image: imageUrl, remarksLower };
-          })
-        );
-
-        items.sort((a, b) => {
-          const priceA = typeof a.price === 'number' ? a.price : 0;
-          const priceB = typeof b.price === 'number' ? b.price : 0;
-          return sortOrder === 'asc' ? priceA - priceB : priceB - priceA;
-        });
-
-        setProducts(items);
+      // Step 1: Get all gold SKUs from index
+      const goldRef = ref(db, 'Global SKU/SKU/indices/tags/gold');
+      const goldSnap = await get(goldRef);
+      if (!goldSnap.exists()) {
+        setProducts([]);
         setLoading(false);
+        return;
+      }
+      const goldIds = Object.keys(goldSnap.val());
+
+      // Step 2: Load SKU + Image data
+      const [skuSnap, imgSnap] = await Promise.all([
+        get(ref(db, 'Global SKU/SKU')),
+        get(ref(db, 'Global SKU/Images'))
+      ]);
+      const skuData = skuSnap.val() || {};
+      const imgData = imgSnap.val() || {};
+
+      // Step 3: Filter by type + sub + search
+      const filtered: ProductCard[] = [];
+      for (const id of goldIds) {
+        if (!skuData[id]) continue;
+        const r = (skuData[id].remarks || '').toLowerCase();
+        const price = computeAdjustedPrice(skuData[id].grTotalPrice);
+        const image = imgData?.[id]?.Primary || '/product-placeholder.jpg';
+        const idLower = id.toLowerCase();
+
+        if (typeFilter) {
+  const desired = typeFilter.toUpperCase();   // e.g. "RG"
+  const actual  = extractSkuType(id);         // parse from SKU ID
+  if (actual !== desired) continue;
+}
+
+
+        if (subFilter && !r.includes(subFilter)) continue;
+        if (searchParam && !r.includes(searchParam) && !idLower.includes(searchParam)) continue;
+
+        filtered.push({ id, price, image, remarksLower: r });
+      }
+
+      filtered.sort((a, b) => {
+        const pa = typeof a.price === 'number' ? a.price : 0;
+        const pb = typeof b.price === 'number' ? b.price : 0;
+        return pa - pb;
       });
-    });
-  }, [searchParam, sortOrder, typeFilter]);
 
-  // --- Helpers for Mangalsutra split ---
-// --- Helpers for Mangalsutra split (mutually exclusive) ---
-const mangalsutraSections = (() => {
-  if (typeFilter !== 'MG') return null;
-
-  const pendant: ProductCard[] = [];
-  const stringOnly: ProductCard[] = [];
-  const mangalsutraPure: ProductCard[] = [];
-
-  for (const p of products) {
-    const r = (p.remarksLower || '').toLowerCase();
-    const hasPendant = r.includes('pendant');
-    const hasString = r.includes('string');
-
-    if (hasPendant) {
-      pendant.push(p);
-    } else if (hasString) {
-      stringOnly.push(p);
-    } else {
-      // neither "pendant" nor "string"
-      mangalsutraPure.push(p);
+      setProducts(filtered);
+      setLoading(false);
     }
-  }
 
-  return { pendant, stringOnly, mangalsutraPure };
-})();
+    loadGoldItems();
+  }, [typeFilter, subFilter, searchParam]);
 
   const CatalogGrid = ({ list }: { list: ProductCard[] }) => (
     <section className={styles.catalogGrid}>
-      {list.map((item) => (
+      {list.map((p) => (
         <div
-          key={item.id}
+          key={p.id}
           className={styles.catalogCard}
-          onClick={() => setSelectedSku(item.id)}
+          onClick={() => setSelectedSku(p.id)}
         >
           <Image
-            src={item.image}
-            alt={item.id}
+            src={p.image}
+            alt={p.id}
             width={200}
             height={200}
             className={styles.catalogImage}
           />
           <p className={styles.catalogPrice}>
-            ₹
-            {typeof item.price === 'number'
-              ? item.price.toLocaleString('en-IN')
-              : item.price}
+            ₹{typeof p.price === 'number' ? p.price.toLocaleString('en-IN') : p.price}
           </p>
-          <h3 className={styles.catalogCode}>Code: {item.id}</h3>
+          <h3 className={styles.catalogCode}>{p.id}</h3>
         </div>
       ))}
     </section>
   );
 
+  // --- Mangalsutra special split ---
+  const mangalsutraSections = (() => {
+    if (typeFilter !== 'MG') return null;
+    const pendant: ProductCard[] = [];
+    const stringOnly: ProductCard[] = [];
+    const pure: ProductCard[] = [];
+    for (const p of products) {
+      const r = p.remarksLower;
+      if (r.includes('pendant')) pendant.push(p);
+      else if (r.includes('string')) stringOnly.push(p);
+      else pure.push(p);
+    }
+    return { pendant, stringOnly, pure };
+  })();
+
   return (
     <PageLayout>
       <OfferBar goldRate={goldRate} rateDate={rateDate} />
-<section>
-  <h1>{heading}</h1>
-  <p className={styles.itemCount}>{products.length} item(s)</p>
+      <section>
+        <h1>{heading}</h1>
+        <p className={styles.itemCount}>{products.length} item(s)</p>
 
-  {loading ? (
-    <p>Loading...</p>
-  ) : typeFilter === 'MG' && mangalsutraSections ? (
-    <>
-      {/* Mangalsutra Section (remarks WITHOUT "pendant" or "string") */}
-      <h2 className={styles.subheading}>
-        <span className={styles.sectionTitle}>Mangalsutra Section</span>{' '}
-        <span className={styles.itemCountSmall}>
-          ({mangalsutraSections.mangalsutraPure.length})
-        </span>
-      </h2>
-      {mangalsutraSections.mangalsutraPure.length > 0 ? (
-        <CatalogGrid list={mangalsutraSections.mangalsutraPure} />
-      ) : (
-        <p>No classic mangalsutras found.</p>
-      )}
+        {loading ? (
+          <p>Loading...</p>
+        ) : typeFilter === 'MG' && mangalsutraSections ? (
+          <>
+            <h2>Mangalsutra Section ({mangalsutraSections.pure.length})</h2>
+            <CatalogGrid list={mangalsutraSections.pure} />
 
-      {/* Pendant Section */}
-      <h2 className={styles.subheading}>
-        <span className={styles.sectionTitle}>Pendant Section</span>{' '}
-        <span className={styles.itemCountSmall}>
-          ({mangalsutraSections.pendant.length})
-        </span>
-      </h2>
-      {mangalsutraSections.pendant.length > 0 ? (
-        <CatalogGrid list={mangalsutraSections.pendant} />
-      ) : (
-        <p>No pendant-style mangalsutras found.</p>
-      )}
+            <h2>Pendant Section ({mangalsutraSections.pendant.length})</h2>
+            <CatalogGrid list={mangalsutraSections.pendant} />
 
-      {/* String Section */}
-      <h2 className={styles.subheading}>
-        <span className={styles.sectionTitle}>String Section</span>{' '}
-        <span className={styles.itemCountSmall}>
-          ({mangalsutraSections.stringOnly.length})
-        </span>
-      </h2>
-      {mangalsutraSections.stringOnly.length > 0 ? (
-        <CatalogGrid list={mangalsutraSections.stringOnly} />
-      ) : (
-        <p>No string-style mangalsutras found.</p>
-      )}
-    </>
-  ) : (
-    <CatalogGrid list={products} />
-  )}
-</section>
+            <h2>String Section ({mangalsutraSections.stringOnly.length})</h2>
+            <CatalogGrid list={mangalsutraSections.stringOnly} />
+          </>
+        ) : (
+          <CatalogGrid list={products} />
+        )}
+      </section>
 
       {selectedSku && (
         <SkuSummaryModal skuId={selectedSku} onClose={() => setSelectedSku(null)} />

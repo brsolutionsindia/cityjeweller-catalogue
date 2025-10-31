@@ -9,6 +9,7 @@ import Link from 'next/link';
 import {
   diamondItems,
   goldItems,
+    goldCollections,
   silverItems,
   gemstoneItems,
   cvdItems,
@@ -96,17 +97,22 @@ export default function Home() {
 
 
       <section id="cvd" className={productStyles.catalogSection}>
-        <h2 className={productStyles.sectionHeading}>Loose Solitaire Diamonds</h2>
+        <h2 className={productStyles.sectionHeading}>Solitaires</h2>
         {renderRow(cvdItems)}
       </section>
 
+      <section id="goldCollections" className={productStyles.catalogSection}>
+        <h2 className={productStyles.sectionHeading}>Collections</h2>
+        {renderRow(goldCollections)}
+      </section>
+
       <section id="catalogue" className={productStyles.catalogSection}>
-        <h2 className={productStyles.sectionHeading}>Diamond Jewellery</h2>
+        <h2 className={productStyles.sectionHeading}>Diamonds</h2>
         {renderRow(diamondItems)}
       </section>
 
       <section id="gold" className={productStyles.catalogSection}>
-        <h2 className={productStyles.sectionHeading}>Gold Jewellery</h2>
+        <h2 className={productStyles.sectionHeading}>Gold</h2>
         {renderRow(goldItems)}
       </section>
 
