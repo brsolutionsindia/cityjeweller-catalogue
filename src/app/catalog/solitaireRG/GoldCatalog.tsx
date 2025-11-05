@@ -17,6 +17,12 @@ import { filterSolitaireRings } from './filters';
 /* =========================
    Types
 ========================= */
+
+type ImageIndex = Record<string, { Primary?: string }>;
+
+type SortKey = 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc';
+
+
 type RawSkuData = {
   grTotalPrice?: number | string;
   remarks?: string;
@@ -134,13 +140,6 @@ const getStone2Ct = (sku: RawSkuData): number | null => {
   return null;
 };
 
-const withinCtBand = (sizeStr?: string, target?: number | null, delta = 0.1) => {
-  if (!sizeStr || target == null) return false;
-  const n = parseFloat(sizeStr);
-  if (!isFinite(n)) return false;
-  return Math.abs(n - target) <= delta;
-};
-
 const toFloat = (s: string) => parseFloat((s || '').trim());
 const fmtDec = (n: number, places = 2) => (Number.isFinite(n) ? n.toFixed(places) : '');
 
@@ -155,24 +154,6 @@ const parseRangeStr = (range?: string): { min: number; max: number; decimals: nu
   const d2 = (m[2].split('.')[1]?.length ?? 0);
   return { min, max, decimals: Math.max(d1, d2, 2) };
 };
-
-const canonicalRangeLabel = (min: number, max: number, preferDecimals = 2) =>
-  `${fmtDec(min, preferDecimals)} - ${fmtDec(max, preferDecimals)}`;
-
-// Replace findBestRangeForCt with this version
-const findBestRangeForCt = (ct: number, allRanges: string[]): string | '' => {
-  let best: { label: string; dist: number } | null = null;
-  for (const r of allRanges) {
-    const pr = parseRangeStr(r);
-    if (!pr) continue;
-    const center = (pr.min + pr.max) / 2;
-    const dist = Math.abs(center - ct);
-    if (ct >= pr.min && ct <= pr.max) return r; // return the ORIGINAL string
-    if (!best || dist < best.dist) best = { label: r, dist };
-  }
-  return best?.label || '';
-};
-
 
 // Replace keepInChosenRange with direct equality on SizeRange
 const keepInChosenRange = (d: Diamond, chosen: string) => {
@@ -275,12 +256,12 @@ export default function SolitaireRingConfigurator() {
   // Diamonds
   const [natAll, setNatAll] = useState<Diamond[]>([]);
   const [natFiltered, setNatFiltered] = useState<Diamond[]>([]);
-  const [natSort, setNatSort] = useState<'price-asc' | 'price-desc' | 'size-asc' | 'size-desc'>('price-asc');
+  const [natSort, setNatSort] = useState<SortKey>('price-asc');
   const [selectedNatural, setSelectedNatural] = useState<Diamond | null>(null);
 
   const [labAll, setLabAll] = useState<Diamond[]>([]);
   const [labFiltered, setLabFiltered] = useState<Diamond[]>([]);
-  const [labSort, setLabSort] = useState<'price-asc' | 'price-desc' | 'size-asc' | 'size-desc'>('price-asc');
+const [labSort, setLabSort] = useState<SortKey>('price-asc');
   const [selectedLab, setSelectedLab] = useState<Diamond | null>(null);
 
 const [lockNat, setLockNat] = useState(true);
@@ -378,10 +359,10 @@ const handleChangeLab = () => {
     const unsub = onValue(skuRef, async (skuSnap) => {
       try {
         const skuData = skuSnap.val() || {};
-        let imgData: Record<string, any> = {};
+        let imgData: ImageIndex = {};
         try {
           const imgSnap = await get(imgRef);
-          imgData = imgSnap.exists() ? (imgSnap.val() as Record<string, any>) : {};
+          imgData = imgSnap.exists() ? (imgSnap.val() as ImageIndex) : {};
         } catch {
           imgData = {};
         }
@@ -447,8 +428,7 @@ const handleChangeLab = () => {
     if (!shapes.includes(common.Shape)) {
       setCommon(prev => ({ ...prev, Shape: shapes[0] || 'ROUND' }));
     }
-  }, [natAll, labAll]); // eslint-disable-line react-hooks/exhaustive-deps
-
+  }, [natAll, labAll]);
   /* Size union + AUTO pick to 1.00ct if ring is selected */
 useEffect(() => {
   // independent size-range option lists
@@ -522,7 +502,6 @@ useEffect(() => {
     Symm: pools.Symm.includes(prev.Symm) ? prev.Symm : '',
     Fluorescence: pools.Fluorescence.includes(prev.Fluorescence) ? prev.Fluorescence : '',
   }));
-// eslint-disable-next-line react-hooks/exhaustive-deps
 }, [common.Shape, natAll, labAll, activeTab]);
 
 
@@ -622,15 +601,8 @@ useEffect(() => {
   }
 
   setAutoSeedKey(null); // do it once per ring pick
-// eslint-disable-next-line react-hooks/exhaustive-deps
 }, [autoSeedKey, selectedRingId, natFiltered, labFiltered, selectedNatural, selectedLab]);
 
-
-  /* Totals */
-  const natPrice = selectedNatural ? (selectedNatural.OfferPrice ?? selectedNatural.MRP ?? 0) : 0;
-  const labPrice = selectedLab ? (selectedLab.OfferPrice ?? selectedLab.MRP ?? 0) : 0;
-  const totalNat = ringPrice + (natPrice || 0);
-  const totalLab = ringPrice + (labPrice || 0);
 
   /* CTA */
 const handleEnquire = () => {
@@ -944,7 +916,12 @@ function DiamondCard({
           {activeTab === 'NAT' ? (
             <>
               <label htmlFor="natSort">Sort (Natural): </label>
-              <select id="natSort" value={natSort} onChange={(e) => setNatSort(e.target.value as any)}>
+              <select
+  id="natSort"
+  value={natSort}
+  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNatSort(e.target.value as SortKey)}
+>
+
                 <option value="price-asc">Price: Low → High</option>
                 <option value="price-desc">Price: High → Low</option>
                 <option value="size-asc">Size: Small → Large</option>
@@ -954,7 +931,12 @@ function DiamondCard({
           ) : (
             <>
               <label htmlFor="labSort">Sort (Lab): </label>
-              <select id="labSort" value={labSort} onChange={(e) => setLabSort(e.target.value as any)}>
+              <select
+  id="labSort"
+  value={labSort}
+  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setLabSort(e.target.value as SortKey)}
+>
+
                 <option value="price-asc">Price: Low → High</option>
                 <option value="price-desc">Price: High → Low</option>
                 <option value="size-asc">Size: Small → Large</option>
