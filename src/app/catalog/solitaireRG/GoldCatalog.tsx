@@ -141,7 +141,6 @@ const getStone2Ct = (sku: RawSkuData): number | null => {
 };
 
 const toFloat = (s: string) => parseFloat((s || '').trim());
-const fmtDec = (n: number, places = 2) => (Number.isFinite(n) ? n.toFixed(places) : '');
 
 const parseRangeStr = (range?: string): { min: number; max: number; decimals: number } | null => {
   if (!range) return null;
