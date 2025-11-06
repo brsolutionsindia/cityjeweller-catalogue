@@ -8,7 +8,6 @@ import { useSearchParams } from 'next/navigation';
 
 import PageLayout from '../../components/PageLayout';
 import OfferBar from '../../components/OfferBar';
-import SkuSummaryModal from '../../components/SkuSummaryModal';
 
 import styles from '../../page.module.css';
 import shapeIcon from '../../../../assets/shapeIcons';
@@ -374,7 +373,6 @@ export default function SolitaireRingConfigurator() {
   const [rings, setRings] = useState<ProductCard[]>([]);
   const [ringsLoading, setRingsLoading] = useState(true);
   const [selectedRingId, setSelectedRingId] = useState<string | null>(null);
-  const [selectedRingCt, setSelectedRingCt] = useState<number | null>(null);
   const [ringPrice, setRingPrice] = useState<number>(0);
   const [collapseRings, setCollapseRings] = useState(false);
 
@@ -456,22 +454,6 @@ export default function SolitaireRingConfigurator() {
     step2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const handleChangeNatural = () => {
-    setSelectedNatural(null);
-    setUserPickedNat(false);
-    setLockNat(false);
-    setSourceChoice('NAT');
-    jumpToDiamonds('NAT');
-  };
-
-  const handleChangeLab = () => {
-    setSelectedLab(null);
-    setUserPickedLab(false);
-    setLockLab(false);
-    setSourceChoice('LAB');
-    jumpToDiamonds('LAB');
-  };
-
   const chooseNat = (d: Diamond | null) => {
     setSelectedNatural(d);
     setUserPickedNat(true);
@@ -542,114 +524,151 @@ export default function SolitaireRingConfigurator() {
     return () => unsub();
   }, [searchParam]);
 
-  /* Diamonds data */
-  useEffect(() => {
-    const natRef = ref(db, 'Global SKU/NaturalDiamonds');
-    const unNat = onValue(natRef, (snapshot) => {
-      const val = snapshot.val() || {};
-      const arr: Diamond[] = Object.values(val).map(d => d as Diamond).filter(d => d.Status === 'AVAILABLE');
-      setNatAll(arr);
-    });
+/* Diamonds data — load ONLY after a ring is chosen */
+useEffect(() => {
+  // when no ring is selected, make sure lists are empty and no listeners are active
+  if (!selectedRingId) {
+    setNatAll([]);
+    setLabAll([]);
+    return;
+  }
 
-    const labRef = ref(db, 'Global SKU/CVD');
-    const unLab = onValue(labRef, (snapshot) => {
-      const val = snapshot.val() || {};
-      const arr: Diamond[] = Object.values(val).map(d => d as Diamond).filter(d => d.Status === 'AVAILABLE');
-      setLabAll(arr);
-    });
+  const natRef = ref(db, 'Global SKU/NaturalDiamonds');
+  const labRef = ref(db, 'Global SKU/CVD');
 
-    return () => { unNat(); unLab(); };
-  }, []);
+  const unNat = onValue(natRef, (snapshot) => {
+    const val = snapshot.val() || {};
+    const arr: Diamond[] = Object.values(val)
+      .map(d => d as Diamond)
+      .filter(d => d.Status === 'AVAILABLE');
+    setNatAll(arr);
+  });
 
-  /* Unions */
-  useEffect(() => {
-    const shapes = Array.from(new Set([
-      ...natAll.map(d => d.Shape).filter(Boolean) as string[],
-      ...labAll.map(d => d.Shape).filter(Boolean) as string[],
-    ])).sort();
-    setShapeUnion(shapes.length ? shapes : ['ROUND']);
-    if (!shapes.includes(common.Shape)) {
-      setCommon(prev => ({ ...prev, Shape: shapes[0] || 'ROUND' }));
-    }
-  }, [natAll, labAll]); // eslint-disable-line react-hooks/exhaustive-deps
+  const unLab = onValue(labRef, (snapshot) => {
+    const val = snapshot.val() || {};
+    const arr: Diamond[] = Object.values(val)
+      .map(d => d as Diamond)
+      .filter(d => d.Status === 'AVAILABLE');
+    setLabAll(arr);
+  });
 
-  /* Size unions + set DEFAULT ranges (~0.50ct bands) AFTER ring select */
-  useEffect(() => {
-    const natRanges = rangesFromRaw(natAll, common.Shape);
-    const labRanges = rangesFromRaw(labAll, common.Shape);
-    setRangeUnionNat(natRanges);
-    setRangeUnionLab(labRanges);
+  return () => { unNat(); unLab(); };
+}, [selectedRingId]);
 
-    // validate current selected ranges against unions (normalize both sides)
-    setNatSizeRange(prev => {
-      const p = normalizeRangeStr(prev);
-      return p && !natRanges.map(normalizeRangeStr).includes(p) ? '' : p;
-    });
-    setLabSizeRange(prev => {
-      const p = normalizeRangeStr(prev);
-      return p && !labRanges.map(normalizeRangeStr).includes(p) ? '' : p;
-    });
 
-    // On ring select, set to our DEFAULT bands (not just >= 0.50)
-    if (selectedRingId) {
-      const natPick = resolveInitialRange(natRanges, DEFAULT_RANGE_NAT);
-      const labPick = resolveInitialRange(labRanges, DEFAULT_RANGE_LAB);
-      setNatSizeRange(natPick);
-      setLabSizeRange(labPick);
-    }
-  }, [natAll, labAll, common.Shape, selectedRingId]);
+/* Unions (shapes across datasets) */
+useEffect(() => {
+  if (!selectedRingId) {
+    // reset unions when no ring is chosen
+    setShapeUnion(['ROUND']);
+    return;
+  }
+  const shapes = Array.from(new Set([
+    ...natAll.map(d => d.Shape).filter(Boolean) as string[],
+    ...labAll.map(d => d.Shape).filter(Boolean) as string[],
+  ])).sort();
 
-  /* Dataset-specific attribute unions & validate current filters per active tab */
-  useEffect(() => {
-    const scopedNat = natAll.filter(d => d.Shape === common.Shape);
-    const scopedLab = labAll.filter(d => d.Shape === common.Shape);
+  setShapeUnion(shapes.length ? shapes : ['ROUND']);
+  if (!shapes.includes(common.Shape)) {
+    setCommon(prev => ({ ...prev, Shape: shapes[0] || 'ROUND' }));
+  }
+}, [natAll, labAll, selectedRingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const uniq = (arr: Diamond[], key: keyof Diamond) =>
-      Array.from(new Set(arr.map(d => d[key]).filter(Boolean) as string[])).sort();
 
-    setClarityNat(uniq(scopedNat, 'Clarity'));
-    setColorNat(uniq(scopedNat, 'Color'));
-    setCutNat(uniq(scopedNat, 'Cut'));
-    setPolishNat(uniq(scopedNat, 'Polish'));
-    setSymmNat(uniq(scopedNat, 'Symm'));
-    setFluorNat(uniq(scopedNat, 'Fluorescence'));
+/* Size unions + set DEFAULT ranges (~0.50ct bands) AFTER ring select */
+useEffect(() => {
+  if (!selectedRingId) {
+    setRangeUnionNat([]);
+    setRangeUnionLab([]);
+    setNatSizeRange('');
+    setLabSizeRange('');
+    return;
+  }
 
-    setClarityLab(uniq(scopedLab, 'Clarity'));
-    setColorLab(uniq(scopedLab, 'Color'));
-    setCutLab(uniq(scopedLab, 'Cut'));
-    setPolishLab(uniq(scopedLab, 'Polish'));
-    setSymmLab(uniq(scopedLab, 'Symm'));
-    setFluorLab(uniq(scopedLab, 'Fluorescence'));
+  const natRanges = rangesFromRaw(natAll, common.Shape);
+  const labRanges = rangesFromRaw(labAll, common.Shape);
+  setRangeUnionNat(natRanges);
+  setRangeUnionLab(labRanges);
 
-    // ensure currently chosen common filters are valid for the ACTIVE pool
-    const pools = (activeTab === 'NAT' || sourceChoice === 'NAT')
-      ? {
-          Clarity: uniq(scopedNat, 'Clarity'),
-          Color:   uniq(scopedNat, 'Color'),
-          Cut:     uniq(scopedNat, 'Cut'),
-          Polish:  uniq(scopedNat, 'Polish'),
-          Symm:    uniq(scopedNat, 'Symm'),
-          Fluorescence: uniq(scopedNat, 'Fluorescence'),
-        }
-      : {
-          Clarity: uniq(scopedLab, 'Clarity'),
-          Color:   uniq(scopedLab, 'Color'),
-          Cut:     uniq(scopedLab, 'Cut'),
-          Polish:  uniq(scopedLab, 'Polish'),
-          Symm:    uniq(scopedLab, 'Symm'),
-          Fluorescence: uniq(scopedLab, 'Fluorescence'),
-        };
+  // validate current selected ranges against unions (normalize both sides)
+  setNatSizeRange(prev => {
+    const p = normalizeRangeStr(prev);
+    return p && !natRanges.map(normalizeRangeStr).includes(p) ? '' : p;
+  });
+  setLabSizeRange(prev => {
+    const p = normalizeRangeStr(prev);
+    return p && !labRanges.map(normalizeRangeStr).includes(p) ? '' : p;
+  });
 
-    setCommon(prev => ({
-      ...prev,
-      Clarity: pools.Clarity.includes(prev.Clarity) ? prev.Clarity : '',
-      Color: pools.Color.includes(prev.Color) ? prev.Color : '',
-      Cut: pools.Cut.includes(prev.Cut) ? prev.Cut : '',
-      Polish: pools.Polish.includes(prev.Polish) ? prev.Polish : '',
-      Symm: pools.Symm.includes(prev.Symm) ? prev.Symm : '',
-      Fluorescence: pools.Fluorescence.includes(prev.Fluorescence) ? prev.Fluorescence : '',
-    }));
-  }, [common.Shape, natAll, labAll, activeTab, sourceChoice]);
+  // On ring select, set to our DEFAULT bands
+  const natPick = resolveInitialRange(natRanges, DEFAULT_RANGE_NAT);
+  const labPick = resolveInitialRange(labRanges, DEFAULT_RANGE_LAB);
+  setNatSizeRange(natPick);
+  setLabSizeRange(labPick);
+}, [natAll, labAll, common.Shape, selectedRingId]);
+
+
+/* Dataset-specific attribute unions & validate current filters per active tab */
+useEffect(() => {
+  if (!selectedRingId) {
+    // clear option lists when not in step 2 yet
+    setClarityNat([]); setColorNat([]); setCutNat([]); setPolishNat([]); setSymmNat([]); setFluorNat([]);
+    setClarityLab([]); setColorLab([]); setCutLab([]); setPolishLab([]); setSymmLab([]); setFluorLab([]);
+    // also clear common attribute selections so step 1 stays light
+    setCommon(prev => ({ ...prev, Clarity: '', Color: '', Cut: '', Polish: '', Symm: '', Fluorescence: '' }));
+    return;
+  }
+
+  const scopedNat = natAll.filter(d => d.Shape === common.Shape);
+  const scopedLab = labAll.filter(d => d.Shape === common.Shape);
+
+  const uniq = (arr: Diamond[], key: keyof Diamond) =>
+    Array.from(new Set(arr.map(d => d[key]).filter(Boolean) as string[])).sort();
+
+  setClarityNat(uniq(scopedNat, 'Clarity'));
+  setColorNat(uniq(scopedNat, 'Color'));
+  setCutNat(uniq(scopedNat, 'Cut'));
+  setPolishNat(uniq(scopedNat, 'Polish'));
+  setSymmNat(uniq(scopedNat, 'Symm'));
+  setFluorNat(uniq(scopedNat, 'Fluorescence'));
+
+  setClarityLab(uniq(scopedLab, 'Clarity'));
+  setColorLab(uniq(scopedLab, 'Color'));
+  setCutLab(uniq(scopedLab, 'Cut'));
+  setPolishLab(uniq(scopedLab, 'Polish'));
+  setSymmLab(uniq(scopedLab, 'Symm'));
+  setFluorLab(uniq(scopedLab, 'Fluorescence'));
+
+  // ensure common filters valid for the ACTIVE pool
+  const pools = (activeTab === 'NAT' || sourceChoice === 'NAT')
+    ? {
+        Clarity: uniq(scopedNat, 'Clarity'),
+        Color:   uniq(scopedNat, 'Color'),
+        Cut:     uniq(scopedNat, 'Cut'),
+        Polish:  uniq(scopedNat, 'Polish'),
+        Symm:    uniq(scopedNat, 'Symm'),
+        Fluorescence: uniq(scopedNat, 'Fluorescence'),
+      }
+    : {
+        Clarity: uniq(scopedLab, 'Clarity'),
+        Color:   uniq(scopedLab, 'Color'),
+        Cut:     uniq(scopedLab, 'Cut'),
+        Polish:  uniq(scopedLab, 'Polish'),
+        Symm:    uniq(scopedLab, 'Symm'),
+        Fluorescence: uniq(scopedLab, 'Fluorescence'),
+      };
+
+  setCommon(prev => ({
+    ...prev,
+    Clarity: pools.Clarity.includes(prev.Clarity) ? prev.Clarity : '',
+    Color: pools.Color.includes(prev.Color) ? prev.Color : '',
+    Cut: pools.Cut.includes(prev.Cut) ? prev.Cut : '',
+    Polish: pools.Polish.includes(prev.Polish) ? prev.Polish : '',
+    Symm: pools.Symm.includes(prev.Symm) ? prev.Symm : '',
+    Fluorescence: pools.Fluorescence.includes(prev.Fluorescence) ? prev.Fluorescence : '',
+  }));
+}, [common.Shape, natAll, labAll, activeTab, sourceChoice, selectedRingId]);
+
 
   /* Sync sourceChoice with tabs & selections */
   useEffect(() => {
@@ -667,7 +686,6 @@ export default function SolitaireRingConfigurator() {
   useEffect(() => {
     const ring = rings.find(r => r.id === selectedRingId);
     const ct = ring?.stone2Ct ?? null;
-    setSelectedRingCt(ct);
 
     // clear selections (fresh start)
     setSelectedNatural(null);
@@ -694,53 +712,49 @@ export default function SolitaireRingConfigurator() {
     setLockLab(true);
   }, [selectedRingId, rings]);
 
-  /* Filter diamonds strictly by chosen size range (if any) */
-  useEffect(() => {
-    const applyCommon = (list: Diamond[]) => {
-      let result = list.filter(d => (!common.Shape || d.Shape === common.Shape));
-      if (common.Clarity)   result = result.filter(d => d.Clarity === common.Clarity);
-      if (common.Color)     result = result.filter(d => d.Color === common.Color);
-      if (common.Cut)       result = result.filter(d => d.Cut === common.Cut);
-      if (common.Polish)    result = result.filter(d => d.Polish === common.Polish);
-      if (common.Symm)      result = result.filter(d => d.Symm === common.Symm);
-      if (common.Fluorescence) result = result.filter(d => d.Fluorescence === common.Fluorescence);
-      return result;
-    };
+/* Filter diamonds strictly by chosen size range (if any) */
+useEffect(() => {
+  if (!selectedRingId) {  // <- do nothing until a ring is chosen
+    setNatFiltered([]); setLabFiltered([]);
+    return;
+  }
 
-    // NATURAL
-    let nat = applyCommon(natAll);
-    if (selectedRingId) {
-      if (natSizeRange) {
-        nat = nat.filter(d => keepInChosenRange(d, natSizeRange));
-      } else {
-        nat = nat.filter(d => sizeNum(d.Size) >= BASE_CT);
-      }
-    }
-    nat = nat.sort((a, b) => {
-      if (natSort === 'price-asc') return (a.OfferPrice ?? a.MRP ?? 0) - (b.OfferPrice ?? b.MRP ?? 0);
-      if (natSort === 'price-desc') return (b.OfferPrice ?? b.MRP ?? 0) - (a.OfferPrice ?? a.MRP ?? 0);
-      if (natSort === 'size-asc')   return sizeNum(a.Size) - sizeNum(b.Size);
-      return sizeNum(b.Size) - sizeNum(a.Size);
-    });
-    setNatFiltered(nat);
+  const applyCommon = (list: Diamond[]) => {
+    let result = list.filter(d => (!common.Shape || d.Shape === common.Shape));
+    if (common.Clarity)   result = result.filter(d => d.Clarity === common.Clarity);
+    if (common.Color)     result = result.filter(d => d.Color === common.Color);
+    if (common.Cut)       result = result.filter(d => d.Cut === common.Cut);
+    if (common.Polish)    result = result.filter(d => d.Polish === common.Polish);
+    if (common.Symm)      result = result.filter(d => d.Symm === common.Symm);
+    if (common.Fluorescence) result = result.filter(d => d.Fluorescence === common.Fluorescence);
+    return result;
+  };
 
-    // LAB
-    let lab = applyCommon(labAll);
-    if (selectedRingId) {
-      if (labSizeRange) {
-        lab = lab.filter(d => keepInChosenRange(d, labSizeRange));
-      } else {
-        lab = lab.filter(d => sizeNum(d.Size) >= BASE_CT);
-      }
-    }
-    lab = lab.sort((a, b) => {
-      if (labSort === 'price-asc') return (a.OfferPrice ?? a.MRP ?? 0) - (b.OfferPrice ?? b.MRP ?? 0);
-      if (labSort === 'price-desc') return (b.OfferPrice ?? b.MRP ?? 0) - (a.OfferPrice ?? a.MRP ?? 0);
-      if (labSort === 'size-asc')   return sizeNum(a.Size) - sizeNum(b.Size);
-      return sizeNum(b.Size) - sizeNum(a.Size);
-    });
-    setLabFiltered(lab);
-  }, [common, natAll, labAll, natSort, labSort, selectedRingId, natSizeRange, labSizeRange]);
+  // NATURAL
+  let nat = applyCommon(natAll);
+  if (natSizeRange) nat = nat.filter(d => keepInChosenRange(d, natSizeRange));
+  else nat = nat.filter(d => sizeNum(d.Size) >= BASE_CT);
+  nat = nat.sort((a, b) => {
+    if (natSort === 'price-asc') return (a.OfferPrice ?? a.MRP ?? 0) - (b.OfferPrice ?? b.MRP ?? 0);
+    if (natSort === 'price-desc') return (b.OfferPrice ?? b.MRP ?? 0) - (a.OfferPrice ?? a.MRP ?? 0);
+    if (natSort === 'size-asc')   return sizeNum(a.Size) - sizeNum(b.Size);
+    return sizeNum(b.Size) - sizeNum(a.Size);
+  });
+  setNatFiltered(nat);
+
+  // LAB
+  let lab = applyCommon(labAll);
+  if (labSizeRange) lab = lab.filter(d => keepInChosenRange(d, labSizeRange));
+  else lab = lab.filter(d => sizeNum(d.Size) >= BASE_CT);
+  lab = lab.sort((a, b) => {
+    if (labSort === 'price-asc') return (a.OfferPrice ?? a.MRP ?? 0) - (b.OfferPrice ?? b.MRP ?? 0);
+    if (labSort === 'price-desc') return (b.OfferPrice ?? b.MRP ?? 0) - (a.OfferPrice ?? a.MRP ?? 0);
+    if (labSort === 'size-asc')   return sizeNum(a.Size) - sizeNum(b.Size);
+    return sizeNum(b.Size) - sizeNum(a.Size);
+  });
+  setLabFiltered(lab);
+}, [common, natAll, labAll, natSort, labSort, selectedRingId, natSizeRange, labSizeRange]);
+
 
   /* Auto-pick cheapest within filtered lists, respecting source choice */
 useEffect(() => {
@@ -813,7 +827,6 @@ useEffect(() => {
 
   const handleChangeRing = () => {
     setSelectedRingId(null);
-    setSelectedRingCt(null);
     setCollapseRings(false);
     setSelectedNatural(null);
     setSelectedLab(null);
@@ -1391,9 +1404,6 @@ onContinue={() => {
 
         />
       )}
-
-      {/* If you still want the SKU quick view elsewhere */}
-      {/* <SkuSummaryModal skuId={...} onClose={() => ...} /> */}
     </PageLayout>
   );
 }
