@@ -15,13 +15,19 @@ import shapeIcon from '../../../../assets/shapeIcons';
 import { filterSolitaireRings } from './filters';
 
 /* =========================
+   Config
+========================= */
+const BASE_CT = 0.50; // baseline carat for auto picks & defaults
+const DEFAULT_RANGE_NAT = '0.50-0.59';
+const DEFAULT_RANGE_LAB = '0.50-0.69';
+
+/* =========================
    Types
 ========================= */
 
 type ImageIndex = Record<string, { Primary?: string }>;
-
 type SortKey = 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc';
-
+type SourceChoice = 'BOTH' | 'NAT' | 'LAB';
 
 type RawSkuData = {
   grTotalPrice?: number | string;
@@ -44,8 +50,8 @@ type ProductCard = {
 
 type Diamond = {
   StoneId: string;
-  Size?: string;
-  SizeRange?: string;
+  Size?: string;       // e.g. "0.52"
+  SizeRange?: string;  // e.g. "0.50-0.59"
   Shape?: string;
   Status?: string;
   Color?: string;
@@ -67,9 +73,37 @@ type Diamond = {
 
 // === Size helpers
 const sizeNum = (s?: string) => {
-  const n = parseFloat(s ?? '0');
+  const n = parseFloat((s ?? '').toString());
   return Number.isFinite(n) ? n : 0;
 };
+
+const toFloat = (s: string) => parseFloat((s || '').trim());
+
+// Normalize "0.50 – 0.59", " 0.50-0.59 " etc → "0.50-0.59"
+const normalizeRangeStr = (raw?: string): string => {
+  const s = (raw ?? '').toString().trim().replace(/[–—]/g, '-');
+  return s.replace(/\s*-\s*/g, '-');
+};
+
+// Pretty print from parsed range (keeps at least 2 decimals)
+const prettyRange = (min: number, max: number, decimals = 2) =>
+  `${min.toFixed(decimals)}-${max.toFixed(decimals)}`;
+
+const parseRangeStr = (range?: string): { min: number; max: number; decimals: number } | null => {
+  const r = normalizeRangeStr(range);
+  if (!r) return null;
+  const m = r.match(/([0-9]*\.?[0-9]+)-([0-9]*\.?[0-9]+)/);
+  if (!m) return null;
+  const min = toFloat(m[1]);
+  const max = toFloat(m[2]);
+  if (!isFinite(min) || !isFinite(max)) return null;
+  const d1 = (m[1].split('.')[1]?.length ?? 0);
+  const d2 = (m[2].split('.')[1]?.length ?? 0);
+  return { min, max, decimals: Math.max(d1, d2, 2) };
+};
+
+const inParsedRange = (val: number, parsed: { min: number; max: number } | null) =>
+  parsed ? (val >= parsed.min && val <= parsed.max) : true;
 
 // Choose the first (sorted) SizeRange that is >= minCt (prefer ranges whose min >= minCt)
 const findFirstRangeAtLeast = (minCt: number, allRanges: string[]): string | '' => {
@@ -90,14 +124,30 @@ const findFirstRangeAtLeast = (minCt: number, allRanges: string[]): string | '' 
   return fallback[0]?.raw || '';
 };
 
-
-// Replace old rangesFrom with this "raw" version
+// Returns unique, normalized size ranges for a given shape (sorted by numeric min/max)
 const rangesFromRaw = (arr: Diamond[], shape: string): string[] => {
-  const chosen = arr
+  const raw = arr
     .filter(d => d.Shape === shape)
-    .map(d => d.SizeRange ?? '')
+    .map(d => normalizeRangeStr(d.SizeRange ?? ''))
     .filter(Boolean) as string[];
-  return Array.from(new Set(chosen)).sort();
+
+  const unique = Array.from(new Set(raw));
+  const parsed = unique
+    .map(r => ({ raw: r, pr: parseRangeStr(r)! }))
+    .filter(x => !!x.pr)
+    .sort((a, b) => (a.pr.min - b.pr.min) || (a.pr.max - b.pr.max));
+
+  return parsed.map(x => prettyRange(x.pr.min, x.pr.max, x.pr.decimals));
+};
+
+// If preferred range exists, use it; else use any union range that contains BASE_CT; else closest >= BASE_CT
+const resolveInitialRange = (union: string[], preferred: string) => {
+  const prefNorm = normalizeRangeStr(preferred);
+  const unionNorm = union.map(normalizeRangeStr);
+  if (unionNorm.includes(prefNorm)) return prefNorm;
+  const containsBase = unionNorm.find(r => inParsedRange(BASE_CT, parseRangeStr(r)));
+  if (containsBase) return containsBase;
+  return findFirstRangeAtLeast(BASE_CT, unionNorm) || '';
 };
 
 const buildAdminProductLines = (
@@ -106,18 +156,10 @@ const buildAdminProductLines = (
   lab?: Diamond | null
 ) => {
   const lines: string[] = [];
-  if (lab?.StoneId) {
-    // e.g., "I am interested in your Product ID 8165-CVD1912."
-    lines.push(`I am interested in your Product ID ${lab.StoneId}.`);
-  }
-  if (nat?.StoneId) {
-    // e.g., "I am interested in Product ID 8165NDIAMS246."
-    lines.push(`I am interested in Product ID ${nat.StoneId}.`);
-  }
-  return lines.join('\n\n'); // blank line between the two lines
+  if (lab?.StoneId) lines.push(`I am interested in your Product ID ${lab.StoneId}.`);
+  if (nat?.StoneId) lines.push(`I am interested in Product ID ${nat.StoneId}.`);
+  return lines.join('\n\n');
 };
-
-
 
 const parseCt = (v: unknown): number | null => {
   if (v == null) return null;
@@ -140,26 +182,16 @@ const getStone2Ct = (sku: RawSkuData): number | null => {
   return null;
 };
 
-const toFloat = (s: string) => parseFloat((s || '').trim());
-
-const parseRangeStr = (range?: string): { min: number; max: number; decimals: number } | null => {
-  if (!range) return null;
-  const m = range.match(/([0-9]*\.?[0-9]+)\s*[-–]\s*([0-9]*\.?[0-9]+)/);
-  if (!m) return null;
-  const min = toFloat(m[1]);
-  const max = toFloat(m[2]);
-  if (!isFinite(min) || !isFinite(max)) return null;
-  const d1 = (m[1].split('.')[1]?.length ?? 0);
-  const d2 = (m[2].split('.')[1]?.length ?? 0);
-  return { min, max, decimals: Math.max(d1, d2, 2) };
-};
-
-// Replace keepInChosenRange with direct equality on SizeRange
+// If a range is chosen, accept SizeRange === chosen (normalized) OR numeric Size within chosen.
 const keepInChosenRange = (d: Diamond, chosen: string) => {
   if (!chosen) return true;
-  return (d.SizeRange ?? '') === chosen;
+  const chosenNorm = normalizeRangeStr(chosen);
+  const recNorm = normalizeRangeStr(d.SizeRange ?? '');
+  if (recNorm && recNorm === chosenNorm) return true;
+  const pr = parseRangeStr(chosenNorm);
+  const sz = sizeNum(d.Size);
+  return inParsedRange(sz, pr);
 };
-
 
 const money = (n?: number | string | null) => {
   const v = typeof n === 'number' ? n : Number(n ?? 0);
@@ -236,6 +268,101 @@ function InfoPopup({ text, label, valueMap }: { text?: string; label?: string; v
 }
 
 /* =========================
+   Lightweight Ring Confirm Modal
+========================= */
+function RingConfirmModal({
+  ring,
+  sourceChoice,
+  onChangeSourceChoice,
+  onClose,
+  onContinue
+}: {
+  ring: ProductCard | null;
+  sourceChoice: SourceChoice;
+  onChangeSourceChoice: (s: SourceChoice) => void;
+  onClose: () => void;
+  onContinue: () => void;
+}) {
+  if (!ring) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-xl rounded-2xl bg-white shadow-lg overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-2">
+          <div className="relative aspect-square">
+            <Image
+              src={ring.image}
+              alt={ring.id}
+              fill
+              sizes="400px"
+              className="object-cover"
+            />
+          </div>
+          <div className="p-4 flex flex-col gap-3">
+            <h3 className="text-lg font-semibold">{ring.id}</h3>
+            <p className="text-sm text-neutral-700">
+              Mount price: <b>{money(ring.price)}</b>
+            </p>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              We’ll show <b>starting totals</b> using auto-picked{' '}
+              <b>~{BASE_CT.toFixed(2)} ct ROUND</b> options. You can replace or clear them anytime.
+            </div>
+
+            {/* Choose type: synced with Step 2 */}
+            <div className="mt-1 text-sm">
+              <div className="font-medium mb-1">Choose type:</div>
+              <div className="flex flex-col gap-1">
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="ringConfirmSource"
+                    checked={sourceChoice === 'NAT'}
+                    onChange={() => onChangeSourceChoice('NAT')}
+                  />
+                  <span>Natural only</span>
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="ringConfirmSource"
+                    checked={sourceChoice === 'LAB'}
+                    onChange={() => onChangeSourceChoice('LAB')}
+                  />
+                  <span>Lab-Grown only</span>
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="ringConfirmSource"
+                    checked={sourceChoice === 'BOTH'}
+                    onChange={() => onChangeSourceChoice('BOTH')}
+                  />
+                  <span>Both</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-auto flex items-center justify-end gap-2">
+              <button
+                className="px-3 py-2 rounded-lg bg-neutral-100 hover:bg-neutral-200"
+                onClick={onClose}
+              >
+                Back
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
+                onClick={onContinue}
+              >
+                Continue to diamonds
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================
    Component
 ========================= */
 export default function SolitaireRingConfigurator() {
@@ -249,8 +376,13 @@ export default function SolitaireRingConfigurator() {
   const [selectedRingId, setSelectedRingId] = useState<string | null>(null);
   const [selectedRingCt, setSelectedRingCt] = useState<number | null>(null);
   const [ringPrice, setRingPrice] = useState<number>(0);
-  const [ringPreview, setRingPreview] = useState<string | null>(null);
   const [collapseRings, setCollapseRings] = useState(false);
+
+  // Ring confirm modal
+  const [ringCandidateId, setRingCandidateId] = useState<string | null>(null);
+
+  // Source choice (NAT only, LAB only, or BOTH)
+  const [sourceChoice, setSourceChoice] = useState<SourceChoice>('BOTH');
 
   // Diamonds
   const [natAll, setNatAll] = useState<Diamond[]>([]);
@@ -260,72 +392,51 @@ export default function SolitaireRingConfigurator() {
 
   const [labAll, setLabAll] = useState<Diamond[]>([]);
   const [labFiltered, setLabFiltered] = useState<Diamond[]>([]);
-const [labSort, setLabSort] = useState<SortKey>('price-asc');
+  const [labSort, setLabSort] = useState<SortKey>('price-asc');
   const [selectedLab, setSelectedLab] = useState<Diamond | null>(null);
 
-const [lockNat, setLockNat] = useState(true);
-const [lockLab, setLockLab] = useState(true);
+  // auto-pick state flags
+  const [userPickedNat, setUserPickedNat] = useState(false);
+  const [userPickedLab, setUserPickedLab] = useState(false);
 
-  // Tabs
+  const [lockNat, setLockNat] = useState(true);
+  const [lockLab, setLockLab] = useState(true);
+
+  // Tabs (hidden when user chooses single source)
   const [activeTab, setActiveTab] = useState<'NAT' | 'LAB'>('NAT');
 
-// Common filters (shared) + independent size range filters
-const [common, setCommon] = useState({
-  Shape: 'ROUND',
-  Clarity: '',
-  Color: '',
-  Cut: '',
-  Polish: '',
-  Symm: '',
-  Fluorescence: '',
-});
+  // Common filters (shared) + independent size range filters
+  const [common, setCommon] = useState({
+    Shape: 'ROUND',
+    Clarity: '',
+    Color: '',
+    Cut: '',
+    Polish: '',
+    Symm: '',
+    Fluorescence: '',
+  });
 
-// Independent size ranges
-// under other useState lines
-const [autoSeedKey, setAutoSeedKey] = useState<string | null>(null);
+  const [natSizeRange, setNatSizeRange] = useState<string>('');
+  const [labSizeRange, setLabSizeRange] = useState<string>('');
 
+  // Options (shared unions) + independent size-range option lists
+  const [shapeUnion, setShapeUnion] = useState<string[]>([]);
+  const [rangeUnionNat, setRangeUnionNat] = useState<string[]>([]);
+  const [rangeUnionLab, setRangeUnionLab] = useState<string[]>([]);
 
-const [natSizeRange, setNatSizeRange] = useState<string>('');
-const [labSizeRange, setLabSizeRange] = useState<string>('');
+  const [clarityNat, setClarityNat] = useState<string[]>([]);
+  const [colorNat, setColorNat] = useState<string[]>([]);
+  const [cutNat, setCutNat] = useState<string[]>([]);
+  const [polishNat, setPolishNat] = useState<string[]>([]);
+  const [symmNat, setSymmNat] = useState<string[]>([]);
+  const [fluorNat, setFluorNat] = useState<string[]>([]);
 
-// Options (shared unions) + independent size-range option lists
-const [shapeUnion, setShapeUnion] = useState<string[]>([]);
-const [rangeUnionNat, setRangeUnionNat] = useState<string[]>([]);
-const [rangeUnionLab, setRangeUnionLab] = useState<string[]>([]);
-
-const [clarityNat, setClarityNat] = useState<string[]>([]);
-const [colorNat, setColorNat] = useState<string[]>([]);
-const [cutNat, setCutNat] = useState<string[]>([]);
-const [polishNat, setPolishNat] = useState<string[]>([]);
-const [symmNat, setSymmNat] = useState<string[]>([]);
-const [fluorNat, setFluorNat] = useState<string[]>([]);
-
-const [clarityLab, setClarityLab] = useState<string[]>([]);
-const [colorLab, setColorLab] = useState<string[]>([]);
-const [cutLab, setCutLab] = useState<string[]>([]);
-const [polishLab, setPolishLab] = useState<string[]>([]);
-const [symmLab, setSymmLab] = useState<string[]>([]);
-const [fluorLab, setFluorLab] = useState<string[]>([]);
-
-
-const jumpToDiamonds = (tab: 'NAT' | 'LAB') => {
-  setActiveTab(tab);
-  step2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-};
-
-const handleChangeNatural = () => {
-  setSelectedNatural(null);
-  setLockNat(false);      // <— unlock NAT grid
-  jumpToDiamonds('NAT');
-};
-
-const handleChangeLab = () => {
-  setSelectedLab(null);
-  setLockLab(false);      // <— unlock LAB grid
-  jumpToDiamonds('LAB');
-};
-
-
+  const [clarityLab, setClarityLab] = useState<string[]>([]);
+  const [colorLab, setColorLab] = useState<string[]>([]);
+  const [cutLab, setCutLab] = useState<string[]>([]);
+  const [polishLab, setPolishLab] = useState<string[]>([]);
+  const [symmLab, setSymmLab] = useState<string[]>([]);
+  const [fluorLab, setFluorLab] = useState<string[]>([]);
 
   // Search param
   const searchParams = useSearchParams();
@@ -339,6 +450,39 @@ const handleChangeLab = () => {
     if (searchParam) return `Solitaire Rings — search: "${searchParam}"`;
     return 'Build Your Solitaire Ring';
   }, [searchParam]);
+
+  const jumpToDiamonds = (tab: 'NAT' | 'LAB') => {
+    setActiveTab(tab);
+    step2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleChangeNatural = () => {
+    setSelectedNatural(null);
+    setUserPickedNat(false);
+    setLockNat(false);
+    setSourceChoice('NAT');
+    jumpToDiamonds('NAT');
+  };
+
+  const handleChangeLab = () => {
+    setSelectedLab(null);
+    setUserPickedLab(false);
+    setLockLab(false);
+    setSourceChoice('LAB');
+    jumpToDiamonds('LAB');
+  };
+
+  const chooseNat = (d: Diamond | null) => {
+    setSelectedNatural(d);
+    setUserPickedNat(true);
+    setLockNat(false);
+  };
+
+  const chooseLab = (d: Diamond | null) => {
+    setSelectedLab(d);
+    setUserPickedLab(true);
+    setLockLab(false);
+  };
 
   /* Rates */
   useEffect(() => {
@@ -427,294 +571,322 @@ const handleChangeLab = () => {
     if (!shapes.includes(common.Shape)) {
       setCommon(prev => ({ ...prev, Shape: shapes[0] || 'ROUND' }));
     }
-  }, [natAll, labAll]);
-  /* Size union + AUTO pick to 1.00ct if ring is selected */
-useEffect(() => {
-  // independent size-range option lists
-  const natRanges = rangesFromRaw(natAll, common.Shape);
-  const labRanges = rangesFromRaw(labAll, common.Shape);
-  setRangeUnionNat(natRanges);
-  setRangeUnionLab(labRanges);
+  }, [natAll, labAll]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // if current selection no longer valid for this shape, clear it
-  setNatSizeRange(prev => (prev && !natRanges.includes(prev) ? '' : prev));
-  setLabSizeRange(prev => (prev && !labRanges.includes(prev) ? '' : prev));
+  /* Size unions + set DEFAULT ranges (~0.50ct bands) AFTER ring select */
+  useEffect(() => {
+    const natRanges = rangesFromRaw(natAll, common.Shape);
+    const labRanges = rangesFromRaw(labAll, common.Shape);
+    setRangeUnionNat(natRanges);
+    setRangeUnionLab(labRanges);
 
-  // On ring select, auto-pick ~1.00 ct for BOTH datasets independently
-  if (selectedRingId) {
-const pickNat = findFirstRangeAtLeast(1.0, natRanges);
-const pickLab = findFirstRangeAtLeast(1.0, labRanges);
-setNatSizeRange(pickNat || '');
-setLabSizeRange(pickLab || '');
-}
+    // validate current selected ranges against unions (normalize both sides)
+    setNatSizeRange(prev => {
+      const p = normalizeRangeStr(prev);
+      return p && !natRanges.map(normalizeRangeStr).includes(p) ? '' : p;
+    });
+    setLabSizeRange(prev => {
+      const p = normalizeRangeStr(prev);
+      return p && !labRanges.map(normalizeRangeStr).includes(p) ? '' : p;
+    });
 
-}, [natAll, labAll, common.Shape, selectedRingId]);
+    // On ring select, set to our DEFAULT bands (not just >= 0.50)
+    if (selectedRingId) {
+      const natPick = resolveInitialRange(natRanges, DEFAULT_RANGE_NAT);
+      const labPick = resolveInitialRange(labRanges, DEFAULT_RANGE_LAB);
+      setNatSizeRange(natPick);
+      setLabSizeRange(labPick);
+    }
+  }, [natAll, labAll, common.Shape, selectedRingId]);
 
+  /* Dataset-specific attribute unions & validate current filters per active tab */
+  useEffect(() => {
+    const scopedNat = natAll.filter(d => d.Shape === common.Shape);
+    const scopedLab = labAll.filter(d => d.Shape === common.Shape);
 
+    const uniq = (arr: Diamond[], key: keyof Diamond) =>
+      Array.from(new Set(arr.map(d => d[key]).filter(Boolean) as string[])).sort();
 
-useEffect(() => {
-  const scopedNat = natAll.filter(d => d.Shape === common.Shape);
-  const scopedLab = labAll.filter(d => d.Shape === common.Shape);
+    setClarityNat(uniq(scopedNat, 'Clarity'));
+    setColorNat(uniq(scopedNat, 'Color'));
+    setCutNat(uniq(scopedNat, 'Cut'));
+    setPolishNat(uniq(scopedNat, 'Polish'));
+    setSymmNat(uniq(scopedNat, 'Symm'));
+    setFluorNat(uniq(scopedNat, 'Fluorescence'));
 
-  const uniq = (arr: Diamond[], key: keyof Diamond) =>
-    Array.from(new Set(arr.map(d => d[key]).filter(Boolean) as string[])).sort();
+    setClarityLab(uniq(scopedLab, 'Clarity'));
+    setColorLab(uniq(scopedLab, 'Color'));
+    setCutLab(uniq(scopedLab, 'Cut'));
+    setPolishLab(uniq(scopedLab, 'Polish'));
+    setSymmLab(uniq(scopedLab, 'Symm'));
+    setFluorLab(uniq(scopedLab, 'Fluorescence'));
 
-  setClarityNat(uniq(scopedNat, 'Clarity'));
-  setColorNat(uniq(scopedNat, 'Color'));
-  setCutNat(uniq(scopedNat, 'Cut'));
-  setPolishNat(uniq(scopedNat, 'Polish'));
-  setSymmNat(uniq(scopedNat, 'Symm'));
-  setFluorNat(uniq(scopedNat, 'Fluorescence'));
+    // ensure currently chosen common filters are valid for the ACTIVE pool
+    const pools = (activeTab === 'NAT' || sourceChoice === 'NAT')
+      ? {
+          Clarity: uniq(scopedNat, 'Clarity'),
+          Color:   uniq(scopedNat, 'Color'),
+          Cut:     uniq(scopedNat, 'Cut'),
+          Polish:  uniq(scopedNat, 'Polish'),
+          Symm:    uniq(scopedNat, 'Symm'),
+          Fluorescence: uniq(scopedNat, 'Fluorescence'),
+        }
+      : {
+          Clarity: uniq(scopedLab, 'Clarity'),
+          Color:   uniq(scopedLab, 'Color'),
+          Cut:     uniq(scopedLab, 'Cut'),
+          Polish:  uniq(scopedLab, 'Polish'),
+          Symm:    uniq(scopedLab, 'Symm'),
+          Fluorescence: uniq(scopedLab, 'Fluorescence'),
+        };
 
-  setClarityLab(uniq(scopedLab, 'Clarity'));
-  setColorLab(uniq(scopedLab, 'Color'));
-  setCutLab(uniq(scopedLab, 'Cut'));
-  setPolishLab(uniq(scopedLab, 'Polish'));
-  setSymmLab(uniq(scopedLab, 'Symm'));
-  setFluorLab(uniq(scopedLab, 'Fluorescence'));
+    setCommon(prev => ({
+      ...prev,
+      Clarity: pools.Clarity.includes(prev.Clarity) ? prev.Clarity : '',
+      Color: pools.Color.includes(prev.Color) ? prev.Color : '',
+      Cut: pools.Cut.includes(prev.Cut) ? prev.Cut : '',
+      Polish: pools.Polish.includes(prev.Polish) ? prev.Polish : '',
+      Symm: pools.Symm.includes(prev.Symm) ? prev.Symm : '',
+      Fluorescence: pools.Fluorescence.includes(prev.Fluorescence) ? prev.Fluorescence : '',
+    }));
+  }, [common.Shape, natAll, labAll, activeTab, sourceChoice]);
 
-  // ensure currently chosen common filters are valid for the ACTIVE TAB pool
-  const pools = activeTab === 'NAT'
-    ? {
-        Clarity: uniq(scopedNat, 'Clarity'),
-        Color:   uniq(scopedNat, 'Color'),
-        Cut:     uniq(scopedNat, 'Cut'),
-        Polish:  uniq(scopedNat, 'Polish'),
-        Symm:    uniq(scopedNat, 'Symm'),
-        Fluorescence: uniq(scopedNat, 'Fluorescence'),
+  /* Sync sourceChoice with tabs & selections */
+  useEffect(() => {
+    if (sourceChoice === 'NAT') {
+      setActiveTab('NAT');
+      setSelectedLab(null);   // hide/clear lab when NAT only
+    } else if (sourceChoice === 'LAB') {
+      setActiveTab('LAB');
+      setSelectedNatural(null); // hide/clear natural when LAB only
+    }
+    // BOTH => keep current tab
+  }, [sourceChoice]);
+
+  /* Ring change setup */
+  useEffect(() => {
+    const ring = rings.find(r => r.id === selectedRingId);
+    const ct = ring?.stone2Ct ?? null;
+    setSelectedRingCt(ct);
+
+    // clear selections (fresh start)
+    setSelectedNatural(null);
+    setSelectedLab(null);
+    setUserPickedNat(false);
+    setUserPickedLab(false);
+
+    // start NAT tab after ring choose
+    setActiveTab('NAT');
+
+    // cache mount price
+    setRingPrice(typeof ring?.price === 'number' ? ring.price : 0);
+
+    if (selectedRingId) {
+      setCommon(prev => ({ ...prev, Shape: 'ROUND' }));
+      setCollapseRings(true);
+      setTimeout(() => {
+        step2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 60);
+    } else {
+      setCollapseRings(false);
+    }
+    setLockNat(true);
+    setLockLab(true);
+  }, [selectedRingId, rings]);
+
+  /* Filter diamonds strictly by chosen size range (if any) */
+  useEffect(() => {
+    const applyCommon = (list: Diamond[]) => {
+      let result = list.filter(d => (!common.Shape || d.Shape === common.Shape));
+      if (common.Clarity)   result = result.filter(d => d.Clarity === common.Clarity);
+      if (common.Color)     result = result.filter(d => d.Color === common.Color);
+      if (common.Cut)       result = result.filter(d => d.Cut === common.Cut);
+      if (common.Polish)    result = result.filter(d => d.Polish === common.Polish);
+      if (common.Symm)      result = result.filter(d => d.Symm === common.Symm);
+      if (common.Fluorescence) result = result.filter(d => d.Fluorescence === common.Fluorescence);
+      return result;
+    };
+
+    // NATURAL
+    let nat = applyCommon(natAll);
+    if (selectedRingId) {
+      if (natSizeRange) {
+        nat = nat.filter(d => keepInChosenRange(d, natSizeRange));
+      } else {
+        nat = nat.filter(d => sizeNum(d.Size) >= BASE_CT);
       }
-    : {
-        Clarity: uniq(scopedLab, 'Clarity'),
-        Color:   uniq(scopedLab, 'Color'),
-        Cut:     uniq(scopedLab, 'Cut'),
-        Polish:  uniq(scopedLab, 'Polish'),
-        Symm:    uniq(scopedLab, 'Symm'),
-        Fluorescence: uniq(scopedLab, 'Fluorescence'),
-      };
+    }
+    nat = nat.sort((a, b) => {
+      if (natSort === 'price-asc') return (a.OfferPrice ?? a.MRP ?? 0) - (b.OfferPrice ?? b.MRP ?? 0);
+      if (natSort === 'price-desc') return (b.OfferPrice ?? b.MRP ?? 0) - (a.OfferPrice ?? a.MRP ?? 0);
+      if (natSort === 'size-asc')   return sizeNum(a.Size) - sizeNum(b.Size);
+      return sizeNum(b.Size) - sizeNum(a.Size);
+    });
+    setNatFiltered(nat);
 
-  setCommon(prev => ({
-    ...prev,
-    Clarity: pools.Clarity.includes(prev.Clarity) ? prev.Clarity : '',
-    Color: pools.Color.includes(prev.Color) ? prev.Color : '',
-    Cut: pools.Cut.includes(prev.Cut) ? prev.Cut : '',
-    Polish: pools.Polish.includes(prev.Polish) ? prev.Polish : '',
-    Symm: pools.Symm.includes(prev.Symm) ? prev.Symm : '',
-    Fluorescence: pools.Fluorescence.includes(prev.Fluorescence) ? prev.Fluorescence : '',
-  }));
-}, [common.Shape, natAll, labAll, activeTab]);
+    // LAB
+    let lab = applyCommon(labAll);
+    if (selectedRingId) {
+      if (labSizeRange) {
+        lab = lab.filter(d => keepInChosenRange(d, labSizeRange));
+      } else {
+        lab = lab.filter(d => sizeNum(d.Size) >= BASE_CT);
+      }
+    }
+    lab = lab.sort((a, b) => {
+      if (labSort === 'price-asc') return (a.OfferPrice ?? a.MRP ?? 0) - (b.OfferPrice ?? b.MRP ?? 0);
+      if (labSort === 'price-desc') return (b.OfferPrice ?? b.MRP ?? 0) - (a.OfferPrice ?? a.MRP ?? 0);
+      if (labSort === 'size-asc')   return sizeNum(a.Size) - sizeNum(b.Size);
+      return sizeNum(b.Size) - sizeNum(a.Size);
+    });
+    setLabFiltered(lab);
+  }, [common, natAll, labAll, natSort, labSort, selectedRingId, natSizeRange, labSizeRange]);
 
-
-  /* Ring change: cache ring price, collapse list, scroll to diamonds */
+  /* Auto-pick cheapest within filtered lists, respecting source choice */
 useEffect(() => {
-  const ring = rings.find(r => r.id === selectedRingId);
-  const ct = ring?.stone2Ct ?? null;
-  setSelectedRingCt(ct);
+  if (!selectedRingId) return;
+  const price = (d: Diamond) => d.OfferPrice ?? d.MRP ?? Infinity;
 
-  // clear current selections first
-  setSelectedNatural(null);
-  setSelectedLab(null);
+  // Extra safety: if size range not yet applied, enforce BASE_CT here too
+  const natPool = (sourceChoice !== 'LAB')
+    ? (natSizeRange
+        ? natFiltered
+        : natFiltered.filter(d => sizeNum(d.Size) >= BASE_CT))
+    : [];
+  const labPool = (sourceChoice !== 'NAT')
+    ? (labSizeRange
+        ? labFiltered
+        : labFiltered.filter(d => sizeNum(d.Size) >= BASE_CT))
+    : [];
 
-  // we always start from NAT tab after ring choose
-  setActiveTab('NAT');
-
-  // cache mount price
-  setRingPrice(typeof ring?.price === 'number' ? ring.price : 0);
-
-  if (selectedRingId) {
-    // force ROUND (requirement) and arm one-time auto-selection
-    setCommon(prev => ({ ...prev, Shape: 'ROUND' }));
-    setAutoSeedKey(selectedRingId); // <- this tells the filter effect to pick first items
-
-    setCollapseRings(true);
-    setTimeout(() => {
-      step2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 60);
-  } else {
-    setCollapseRings(false);
+  if (!userPickedNat && !selectedNatural && natPool.length) {
+    const cheapestNat = [...natPool].sort((a, b) => price(a) - price(b))[0];
+    if (cheapestNat) setSelectedNatural(cheapestNat);
   }
-setLockNat(true);
-setLockLab(true);
-}, [selectedRingId, rings]);
-
-
-  /* Filter diamonds; band around 1.00ct when a ring is selected */
-useEffect(() => {
-  const applyCommon = (list: Diamond[]) => {
-    let result = list.filter(d => (!common.Shape || d.Shape === common.Shape));
-    if (common.Clarity)   result = result.filter(d => d.Clarity === common.Clarity);
-    if (common.Color)     result = result.filter(d => d.Color === common.Color);
-    if (common.Cut)       result = result.filter(d => d.Cut === common.Cut);
-    if (common.Polish)    result = result.filter(d => d.Polish === common.Polish);
-    if (common.Symm)      result = result.filter(d => d.Symm === common.Symm);
-    if (common.Fluorescence) result = result.filter(d => d.Fluorescence === common.Fluorescence);
-    return result;
-  };
-
-// NATURAL
-let nat = applyCommon(natAll);
-if (natSizeRange) {
-  nat = nat.filter(d => keepInChosenRange(d, natSizeRange));
-} else {
-  const natTargetMin = selectedRingId ? 1.0 : (selectedRingCt ?? null);
-  if (natTargetMin != null) nat = nat.filter(d => sizeNum(d.Size) >= natTargetMin);
-}
-
-  nat = nat.sort((a, b) => {
-    if (natSort === 'price-asc') return (a.OfferPrice ?? 0) - (b.OfferPrice ?? 0);
-    if (natSort === 'price-desc') return (b.OfferPrice ?? 0) - (a.OfferPrice ?? 0);
-    if (natSort === 'size-asc')   return parseFloat(a.Size ?? '0') - parseFloat(b.Size ?? '0');
-    return parseFloat(b.Size ?? '0') - parseFloat(a.Size ?? '0');
-  });
-  setNatFiltered(nat);
-
-
-// LAB
-let lab = applyCommon(labAll);
-if (labSizeRange) {
-  lab = lab.filter(d => keepInChosenRange(d, labSizeRange));
-} else {
-  const labTargetMin = selectedRingId ? 1.0 : (selectedRingCt ?? null);
-  if (labTargetMin != null) lab = lab.filter(d => sizeNum(d.Size) >= labTargetMin);
-}
-
-  lab = lab.sort((a, b) => {
-    if (labSort === 'price-asc') return (a.OfferPrice ?? 0) - (b.OfferPrice ?? 0);
-    if (labSort === 'price-desc') return (b.OfferPrice ?? 0) - (a.OfferPrice ?? 0);
-    if (labSort === 'size-asc')   return parseFloat(a.Size ?? '0') - parseFloat(b.Size ?? '0');
-    return parseFloat(b.Size ?? '0') - parseFloat(a.Size ?? '0');
-  });
-  setLabFiltered(lab);
-}, [common, natAll, labAll, natSort, labSort, selectedRingId, selectedRingCt, natSizeRange, labSizeRange]);
-
-useEffect(() => {
-  if (!autoSeedKey || autoSeedKey !== selectedRingId) return;
-
-  const byOffer = (a: Diamond, b: Diamond) =>
-    (a.OfferPrice ?? a.MRP ?? Infinity) - (b.OfferPrice ?? b.MRP ?? Infinity);
-
-  if (!selectedNatural && natFiltered.length) {
-    setSelectedNatural([...natFiltered].sort(byOffer)[0]);
+  if (!userPickedLab && !selectedLab && labPool.length) {
+    const cheapestLab = [...labPool].sort((a, b) => price(a) - price(b))[0];
+    if (cheapestLab) setSelectedLab(cheapestLab);
   }
-  if (!selectedLab && labFiltered.length) {
-    setSelectedLab([...labFiltered].sort(byOffer)[0]);
-  }
-
-  setAutoSeedKey(null); // do it once per ring pick
-}, [autoSeedKey, selectedRingId, natFiltered, labFiltered, selectedNatural, selectedLab]);
+}, [
+  selectedRingId,
+  natFiltered, labFiltered,
+  natSizeRange, labSizeRange,   // <-- add these
+  selectedNatural, selectedLab,
+  userPickedNat, userPickedLab,
+  sourceChoice
+]);
 
 
   /* CTA */
-const handleEnquire = () => {
-  if (!selectedRingId) {
-    alert('Please select a ring design first.');
-    return;
-  }
-  if (!selectedNatural && !selectedLab) {
-    alert('Please select at least one diamond (Natural or Lab-Grown).');
-    return;
-  }
+  const handleEnquire = () => {
+    if (!selectedRingId) {
+      alert('Please select a ring design first.');
+      return;
+    }
+    const needNat = (sourceChoice === 'BOTH' || sourceChoice === 'NAT');
+    const needLab = (sourceChoice === 'BOTH' || sourceChoice === 'LAB');
+    if ((needNat && !selectedNatural) && (needLab && !selectedLab)) {
+      alert('Please select at least one diamond.');
+      return;
+    }
 
-  const natPrice = selectedNatural ? (selectedNatural.OfferPrice ?? selectedNatural.MRP ?? 0) : 0;
-  const labPrice = selectedLab ? (selectedLab.OfferPrice ?? selectedLab.MRP ?? 0) : 0;
-  const totalNat = ringPrice + (natPrice || 0);
-  const totalLab = ringPrice + (labPrice || 0);
+    const natPrice = selectedNatural ? (selectedNatural.OfferPrice ?? selectedNatural.MRP ?? 0) : 0;
+    const labPrice = selectedLab ? (selectedLab.OfferPrice ?? selectedLab.MRP ?? 0) : 0;
+    const totalNat = ringPrice + (natPrice || 0);
+    const totalLab = ringPrice + (labPrice || 0);
 
-  const parts = [
-    `Ring SKU: ${selectedRingId} (Mount: ${money(ringPrice)})`,
-    selectedNatural ? `Natural: ${selectedNatural.StoneId} (${money(natPrice)})` : '',
-    selectedLab ? `LabGrown: ${selectedLab.StoneId} (${money(labPrice)})` : '',
-    selectedNatural ? `Total with Natural: ${money(totalNat)}` : '',
-    selectedLab ? `Total with Lab-Grown: ${money(totalLab)}` : '',
-  ].filter(Boolean);
+    const parts = [
+      `Ring SKU: ${selectedRingId} (Mount: ${money(ringPrice)})`,
+      (needNat && selectedNatural) ? `Natural: ${selectedNatural.StoneId} (${money(natPrice)})` : '',
+      (needLab && selectedLab) ? `LabGrown: ${selectedLab.StoneId} (${money(labPrice)})` : '',
+      (needNat && selectedNatural) ? `Total with Natural: ${money(totalNat)}` : '',
+      (needLab && selectedLab) ? `Total with Lab-Grown: ${money(totalLab)}` : '',
+    ].filter(Boolean);
 
-  // One sentence, then a period.
-  const summary = `Hello CityJeweller, I want to enquire about: ${parts.join(' ')}.`;
+    const summary = `Hello CityJeweller, I want to enquire about: ${parts.join(' ')}.`;
+    const adminLines = buildAdminProductLines(selectedRingId, selectedNatural, selectedLab);
+    const text = `${summary}\n\n${adminLines}`;
 
-  // Admin lines in separate paragraphs.
-  const adminLines = buildAdminProductLines(selectedRingId, selectedNatural, selectedLab);
+    const url = `https://wa.me/919023130944?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
 
-  const text = `${summary}\n\n${adminLines}`;
-
-  const url = `https://wa.me/919023130944?text=${encodeURIComponent(text)}`;
-  window.open(url, '_blank');
-};
-
-
-const handleChangeRing = () => {
-  setSelectedRingId(null);
-  setSelectedRingCt(null);
-  setCollapseRings(false);
-  setSelectedNatural(null);
-  setSelectedLab(null);
-  setNatSizeRange('');
-  setLabSizeRange('');
-  setLockNat(true);   // reset locks
-  setLockLab(true);
-  setTimeout(() => step1Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
-};
+  const handleChangeRing = () => {
+    setSelectedRingId(null);
+    setSelectedRingCt(null);
+    setCollapseRings(false);
+    setSelectedNatural(null);
+    setSelectedLab(null);
+    setUserPickedNat(false);
+    setUserPickedLab(false);
+    setNatSizeRange('');
+    setLabSizeRange('');
+    setLockNat(true);
+    setLockLab(true);
+    setTimeout(() => step1Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  };
 
   const StepBadge = ({ n, active }: { n: number; active: boolean }) => (
     <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${active ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}>{n}</span>
   );
 
-
-function DiamondCard({
-  d, active, onSelect, enquirePrefix, isLab
-}: {
-  d: Diamond; active?: boolean; onSelect: () => void; enquirePrefix: string; isLab?: boolean;
-}) {
-  return (
-    <div className={`rounded-xl border p-2 hover:shadow ${active ? (isLab ? 'border-blue-600 ring-2 ring-blue-200' : 'border-emerald-600 ring-2 ring-emerald-200') : 'border-neutral-200'}`}>
-      <div className="text-center">
-        <Image src={shapeIcon[d.Shape ?? ''] || '/default.png'} alt={d.Shape || 'shape'} width={120} height={120} className="mx-auto" />
-      </div>
-      <div className="text-center">
-        <p className="font-medium">{(sizeNum(d.Size)).toFixed(2)}ct ({d.Shape})</p>
-        <p className="text-[13px] font-semibold mt-1">
-          <InfoPopup text={d.Color} label="Color" valueMap={colorMap} /> · <InfoPopup text={d.Clarity} label="Clarity" valueMap={clarityMap} />
-        </p>
-        <p className="text-[12px] text-neutral-600 mt-1">{isLab ? 'CVD · ' : ''}{d.Measurement ?? ''} mm</p>
-        <p className="text-[12px] text-neutral-600">
-          D {((parseFloat(d.Depth ?? '0')) || 0).toFixed(2)}% , T {((parseFloat(d.Table ?? '0')) || 0).toFixed(2)}%
-        </p>
-        <p className="text-[12px] text-neutral-700">
-          <InfoPopup text={d.Cut} label="Cut" valueMap={gradeMap} />, <InfoPopup text={d.Polish} label="Polish" valueMap={gradeMap} />, <InfoPopup text={d.Symm} label="Symmetry" valueMap={gradeMap} />, <InfoPopup text={d.Fluorescence} label="Fluorescence" valueMap={fluorescenceMap} />
-        </p>
-        {(d.MRP || d.OfferPrice) && (
-          <p className="mt-1">
-            {d.MRP ? <span className="line-through text-neutral-400 mr-2">{money(d.MRP)}</span> : null}
-            {d.OfferPrice ? <span className="text-red-600 font-bold">{money(d.OfferPrice)}</span> : null}
+  function DiamondCard({
+    d, active, onSelect, enquirePrefix, isLab
+  }: {
+    d: Diamond; active?: boolean; onSelect: () => void; enquirePrefix: string; isLab?: boolean;
+  }) {
+    return (
+      <div className={`rounded-xl border p-2 hover:shadow ${active ? (isLab ? 'border-blue-600 ring-2 ring-blue-200' : 'border-emerald-600 ring-2 ring-emerald-200') : 'border-neutral-200'}`}>
+        <div className="text-center">
+          <Image src={shapeIcon[d.Shape ?? ''] || '/default.png'} alt={d.Shape || 'shape'} width={120} height={120} className="mx-auto" />
+        </div>
+        <div className="text-center">
+          <p className="font-medium">{(sizeNum(d.Size)).toFixed(2)}ct ({d.Shape})</p>
+          <p className="text-[13px] font-semibold mt-1">
+            <InfoPopup text={d.Color} label="Color" valueMap={colorMap} /> · <InfoPopup text={d.Clarity} label="Clarity" valueMap={clarityMap} />
           </p>
-        )}
-      </div>
+          <p className="text-[12px] text-neutral-600 mt-1">{isLab ? 'CVD · ' : ''}{d.Measurement ?? ''} mm</p>
+          <p className="text-[12px] text-neutral-600">
+            D {((parseFloat(d.Depth ?? '0')) || 0).toFixed(2)}% , T {((parseFloat(d.Table ?? '0')) || 0).toFixed(2)}%
+          </p>
+          <p className="text-[12px] text-neutral-700">
+            <InfoPopup text={d.Cut} label="Cut" valueMap={gradeMap} />, <InfoPopup text={d.Polish} label="Polish" valueMap={gradeMap} />, <InfoPopup text={d.Symm} label="Symmetry" valueMap={gradeMap} />, <InfoPopup text={d.Fluorescence} label="Fluorescence" valueMap={fluorescenceMap} />
+          </p>
+          {(d.MRP || d.OfferPrice) && (
+            <p className="mt-1">
+              {d.MRP ? <span className="line-through text-neutral-400 mr-2">{money(d.MRP)}</span> : null}
+              {d.OfferPrice ? <span className="text-red-600 font-bold">{money(d.OfferPrice)}</span> : null}
+            </p>
+          )}
+        </div>
 
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <span className="text-[0.8rem] font-semibold">{d.StoneId}</span>
-        <div className="flex items-center gap-2">
-          <button
-            className="text-xs px-2 py-1 rounded bg-neutral-100 hover:bg-neutral-200"
-            onClick={onSelect}
-          >
-            {active ? 'Unselect' : 'Select'}
-          </button>
-          <a
-            className="text-xs px-2 py-1 rounded bg-green-500 text-white"
-            href={`https://wa.me/919023130944?text=${encodeURIComponent(
-              `I am interested in ${enquirePrefix} ${d.StoneId}.`
-            )}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Enquire
-          </a>
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <span className="text-[0.8rem] font-semibold">{d.StoneId}</span>
+          <div className="flex items-center gap-2">
+            <button
+              className="text-xs px-2 py-1 rounded bg-neutral-100 hover:bg-neutral-200"
+              onClick={onSelect}
+            >
+              {active ? 'Unselect' : 'Select'}
+            </button>
+            <a
+              className="text-xs px-2 py-1 rounded bg-green-500 text-white"
+              href={`https://wa.me/919023130944?text=${encodeURIComponent(
+                `I am interested in ${enquirePrefix} ${d.StoneId}.`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Enquire
+            </a>
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-
-
+  const isAutoNat = !!selectedNatural && !userPickedNat;
+  const isAutoLab = !!selectedLab && !userPickedLab;
 
   /* UI */
   return (
@@ -722,7 +894,7 @@ function DiamondCard({
       <OfferBar goldRate={goldRate} rateDate={rateDate} />
 
       <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm text-center py-2 rounded mb-4">
-        Mount prices exclude solitaire. <b>Totals update once you select a diamond.</b>
+        Mount prices exclude solitaire. <b>We show a starting total using ~{BASE_CT.toFixed(2)}ct auto-picked diamonds.</b> Replace or clear anytime.
       </div>
 
       <h1 className="text-xl md:text-2xl font-bold">{heading}</h1>
@@ -759,7 +931,7 @@ function DiamondCard({
               return (
                 <div key={r.id} className={`rounded-xl overflow-hidden border text-left transition ${active ? 'border-emerald-600 ring-2 ring-emerald-200' : 'border-neutral-200'}`}>
                   <button
-                    onClick={() => setSelectedRingId(r.id)}
+                    onClick={() => setRingCandidateId(r.id)} // confirm modal first
                     className="w-full text-left"
                     title={`Stone2 ~ ${r.stone2Ct ? r.stone2Ct.toFixed(2) + 'ct' : '—'}`}
                   >
@@ -769,11 +941,12 @@ function DiamondCard({
                     </div>
                   </button>
 
-                  {collapseRings && (
+                  {collapseRings && active && (
                     <div className="px-2 pb-2 flex items-center gap-2">
                       <button
                         className="text-xs px-2 py-1 rounded bg-neutral-100 hover:bg-neutral-200"
-                        onClick={(e) => { e.stopPropagation(); setRingPreview(r.id); }}
+                        onClick={(e) => { e.stopPropagation(); /* optional quick view */ }}
+                        title="Open quick view"
                       >
                         Quick view
                       </button>
@@ -799,281 +972,384 @@ function DiamondCard({
       >
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h2 className="text-lg font-semibold">Step 2 · Select Diamond</h2>
+
+          {/* Source choice: NAT only / LAB only / BOTH */}
+          {selectedRingId && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-neutral-600">Choose type:</span>
+              <label className="inline-flex items-center gap-1">
+                <input
+                  type="radio"
+                  name="source"
+                  checked={sourceChoice === 'NAT'}
+                  onChange={() => { setSourceChoice('NAT'); setActiveTab('NAT'); }}
+                />
+                <span>Natural only</span>
+              </label>
+              <label className="inline-flex items-center gap-1">
+                <input
+                  type="radio"
+                  name="source"
+                  checked={sourceChoice === 'LAB'}
+                  onChange={() => { setSourceChoice('LAB'); setActiveTab('LAB'); }}
+                />
+                <span>Lab-Grown only</span>
+              </label>
+              <label className="inline-flex items-center gap-1">
+                <input
+                  type="radio"
+                  name="source"
+                  checked={sourceChoice === 'BOTH'}
+                  onChange={() => setSourceChoice('BOTH')}
+                />
+                <span>Both</span>
+              </label>
+            </div>
+          )}
+
           <div className="text-xs text-neutral-500">
-  {activeTab === 'NAT'
-    ? (natSizeRange ? `Size: ${natSizeRange}` : selectedRingId ? 'Auto size set to ~1.00ct · ±0.10ct' : 'Pick a ring to auto-set size')
-    : (labSizeRange ? `Size: ${labSizeRange}` : selectedRingId ? 'Auto size set to ~1.00ct · ±0.10ct' : 'Pick a ring to auto-set size')}
-</div>
-
+            {(() => {
+              const rng = activeTab === 'NAT' ? natSizeRange : labSizeRange;
+              return rng
+                ? `Size: ${rng}`
+                : selectedRingId
+                  ? `Auto size set near ~${BASE_CT.toFixed(2)}ct`
+                  : 'Pick a ring to auto-set size';
+            })()}
+          </div>
         </div>
 
-        {/* Tabs */}
-        <div className="mt-3 inline-flex rounded-lg border border-neutral-200 overflow-hidden">
-          <button className={`px-4 py-2 text-sm ${activeTab === 'NAT' ? 'bg-emerald-600 text-white' : 'bg-white'}`} onClick={() => setActiveTab('NAT')}>Natural Diamonds</button>
-          <button className={`px-4 py-2 text-sm border-l ${activeTab === 'LAB' ? 'bg-emerald-600 text-white' : 'bg-white'}`} onClick={() => setActiveTab('LAB')}>Lab-Grown Diamonds</button>
-        </div>
+        {/* Tabs (hide entirely if one source chosen) */}
+        {sourceChoice === 'BOTH' && (
+          <div className="mt-3 inline-flex rounded-lg border border-neutral-200 overflow-hidden">
+            <button className={`px-4 py-2 text-sm ${activeTab === 'NAT' ? 'bg-emerald-600 text-white' : 'bg-white'}`} onClick={() => setActiveTab('NAT')}>Natural Diamonds</button>
+            <button className={`px-4 py-2 text-sm border-l ${activeTab === 'LAB' ? 'bg-emerald-600 text-white' : 'bg-white'}`} onClick={() => setActiveTab('LAB')}>Lab-Grown Diamonds</button>
+          </div>
+        )}
+
+        {/* Banners */}
+        {selectedRingId && (sourceChoice !== 'LAB') && (activeTab === 'NAT' || sourceChoice === 'NAT') && (
+          <div className="mt-3 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">
+            We auto-picked a <b>{BASE_CT.toFixed(2)} ct</b> Natural diamond to show the <b>starting price</b>. Use <b>Replace</b> to change.
+          </div>
+        )}
+        {selectedRingId && (sourceChoice !== 'NAT') && (activeTab === 'LAB' || sourceChoice === 'LAB') && (
+          <div className="mt-3 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-[12px] text-blue-900">
+            We auto-picked a <b>{BASE_CT.toFixed(2)} ct</b> Lab-Grown diamond to show the <b>starting price</b>. Use <b>Replace</b> to change.
+          </div>
+        )}
 
         {/* Filters */}
         <div className={styles.stickyFilterContainer}
              style={{ justifyContent: 'center', display: 'flex', flexWrap: 'wrap', gap: '0.6rem', margin: '0.8rem 0' }}>
+
           <label className={styles.filterLabel}>Shape:{' '}
-  <select
-    value={common.Shape}
-    onChange={(e) => setCommon(prev => ({ ...prev, Shape: e.target.value }))}
-  >
-    {shapeUnion.map(s => <option key={s} value={s}>{s}</option>)}
-  </select>
-</label>
+            <select
+              value={common.Shape}
+              onChange={(e) => setCommon(prev => ({ ...prev, Shape: e.target.value }))}
+            >
+              {shapeUnion.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
 
-{/* Size (dataset-specific) */}
-{activeTab === 'NAT' ? (
-  <label className={styles.filterLabel}>Size:{' '}
-    <select
-      value={natSizeRange}
-      onChange={(e) => setNatSizeRange(e.target.value)}
-    >
-      <option value="">All Size</option>
-      {rangeUnionNat.map(r => <option key={r} value={r}>{r}</option>)}
-    </select>
-  </label>
-) : (
-  <label className={styles.filterLabel}>Size:{' '}
-    <select
-      value={labSizeRange}
-      onChange={(e) => setLabSizeRange(e.target.value)}
-    >
-      <option value="">All Size</option>
-      {rangeUnionLab.map(r => <option key={r} value={r}>{r}</option>)}
-    </select>
-  </label>
-)}
+          {/* Size (dataset-specific) */}
+          {(sourceChoice !== 'LAB') && (activeTab === 'NAT' || sourceChoice === 'NAT') && (
+            <label className={styles.filterLabel}>Size:{' '}
+              <select
+                value={natSizeRange}
+                onChange={(e) => setNatSizeRange(normalizeRangeStr(e.target.value))}
+              >
+                <option value="">All Size (≥ {BASE_CT.toFixed(2)}ct)</option>
+                {rangeUnionNat.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </label>
+          )}
+          {(sourceChoice !== 'NAT') && (activeTab === 'LAB' || sourceChoice === 'LAB') && (
+            <label className={styles.filterLabel}>Size:{' '}
+              <select
+                value={labSizeRange}
+                onChange={(e) => setLabSizeRange(normalizeRangeStr(e.target.value))}
+              >
+                <option value="">All Size (≥ {BASE_CT.toFixed(2)}ct)</option>
+                {rangeUnionLab.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </label>
+          )}
 
-{/* Attribute filters now use dataset-specific options */}
-<label className={styles.filterLabel}>Clarity:{' '}
-  <select
-    value={common.Clarity}
-    onChange={(e) => setCommon(prev => ({ ...prev, Clarity: e.target.value }))}
-  >
-    <option value="">All</option>
-    {(activeTab === 'NAT' ? clarityNat : clarityLab).map(v => <option key={v} value={v}>{v}</option>)}
-  </select>
-</label>
+          {/* Attribute filters (apply to whichever list is visible) */}
+          <label className={styles.filterLabel}>Clarity:{' '}
+            <select
+              value={common.Clarity}
+              onChange={(e) => setCommon(prev => ({ ...prev, Clarity: e.target.value }))}
+            >
+              <option value="">All</option>
+              {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
+                ? clarityNat
+                : clarityLab).map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </label>
 
-<label className={styles.filterLabel}>Color:{' '}
-  <select
-    value={common.Color}
-    onChange={(e) => setCommon(prev => ({ ...prev, Color: e.target.value }))}
-  >
-    <option value="">All</option>
-    {(activeTab === 'NAT' ? colorNat : colorLab).map(v => <option key={v} value={v}>{v}</option>)}
-  </select>
-</label>
+          <label className={styles.filterLabel}>Color:{' '}
+            <select
+              value={common.Color}
+              onChange={(e) => setCommon(prev => ({ ...prev, Color: e.target.value }))}
+            >
+              <option value="">All</option>
+              {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
+                ? colorNat
+                : colorLab).map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </label>
 
-<label className={styles.filterLabel}>Cut:{' '}
-  <select
-    value={common.Cut}
-    onChange={(e) => setCommon(prev => ({ ...prev, Cut: e.target.value }))}
-  >
-    <option value="">All</option>
-    {(activeTab === 'NAT' ? cutNat : cutLab).map(v => <option key={v} value={v}>{v}</option>)}
-  </select>
-</label>
+          <label className={styles.filterLabel}>Cut:{' '}
+            <select
+              value={common.Cut}
+              onChange={(e) => setCommon(prev => ({ ...prev, Cut: e.target.value }))}
+            >
+              <option value="">All</option>
+              {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
+                ? cutNat
+                : cutLab).map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </label>
 
-<label className={styles.filterLabel}>Polish:{' '}
-  <select
-    value={common.Polish}
-    onChange={(e) => setCommon(prev => ({ ...prev, Polish: e.target.value }))}
-  >
-    <option value="">All</option>
-    {(activeTab === 'NAT' ? polishNat : polishLab).map(v => <option key={v} value={v}>{v}</option>)}
-  </select>
-</label>
+          <label className={styles.filterLabel}>Polish:{' '}
+            <select
+              value={common.Polish}
+              onChange={(e) => setCommon(prev => ({ ...prev, Polish: e.target.value }))}
+            >
+              <option value="">All</option>
+              {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
+                ? polishNat
+                : polishLab).map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </label>
 
-<label className={styles.filterLabel}>Symm:{' '}
-  <select
-    value={common.Symm}
-    onChange={(e) => setCommon(prev => ({ ...prev, Symm: e.target.value }))}
-  >
-    <option value="">All</option>
-    {(activeTab === 'NAT' ? symmNat : symmLab).map(v => <option key={v} value={v}>{v}</option>)}
-  </select>
-</label>
+          <label className={styles.filterLabel}>Symm:{' '}
+            <select
+              value={common.Symm}
+              onChange={(e) => setCommon(prev => ({ ...prev, Symm: e.target.value }))}
+            >
+              <option value="">All</option>
+              {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
+                ? symmNat
+                : symmLab).map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </label>
 
-<label className={styles.filterLabel}>Fluor:{' '}
-  <select
-    value={common.Fluorescence}
-    onChange={(e) => setCommon(prev => ({ ...prev, Fluorescence: e.target.value }))}
-  >
-    <option value="">All</option>
-    {(activeTab === 'NAT' ? fluorNat : fluorLab).map(v => <option key={v} value={v}>{v}</option>)}
-  </select>
-</label>
+          <label className={styles.filterLabel}>Fluor:{' '}
+            <select
+              value={common.Fluorescence}
+              onChange={(e) => setCommon(prev => ({ ...prev, Fluorescence: e.target.value }))}
+            >
+              <option value="">All</option>
+              {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
+                ? fluorNat
+                : fluorLab).map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </label>
         </div>
 
         {/* Sorting */}
-        <div className="flex items-center justify-end gap-3 text-sm">
-          {activeTab === 'NAT' ? (
-            <>
-              <label htmlFor="natSort">Sort (Natural): </label>
-              <select
-  id="natSort"
-  value={natSort}
-  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNatSort(e.target.value as SortKey)}
->
-
-                <option value="price-asc">Price: Low → High</option>
-                <option value="price-desc">Price: High → Low</option>
-                <option value="size-asc">Size: Small → Large</option>
-                <option value="size-desc">Size: Large → Small</option>
-              </select>
-            </>
-          ) : (
-            <>
-              <label htmlFor="labSort">Sort (Lab): </label>
-              <select
-  id="labSort"
-  value={labSort}
-  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setLabSort(e.target.value as SortKey)}
->
-
-                <option value="price-asc">Price: Low → High</option>
-                <option value="price-desc">Price: High → Low</option>
-                <option value="size-asc">Size: Small → Large</option>
-                <option value="size-desc">Size: Large → Small</option>
-              </select>
-            </>
-          )}
-        </div>
+        {(sourceChoice !== 'LAB') && (activeTab === 'NAT' || sourceChoice === 'NAT') && (
+          <div className="flex items-center justify-end gap-3 text-sm">
+            <label htmlFor="natSort">Sort (Natural): </label>
+            <select
+              id="natSort"
+              value={natSort}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNatSort(e.target.value as SortKey)}
+            >
+              <option value="price-asc">Price: Low → High</option>
+              <option value="price-desc">Price: High → Low</option>
+              <option value="size-asc">Size: Small → Large</option>
+              <option value="size-desc">Size: Large → Small</option>
+            </select>
+          </div>
+        )}
+        {(sourceChoice !== 'NAT') && (activeTab === 'LAB' || sourceChoice === 'LAB') && (
+          <div className="mt-2 flex items-center justify-end gap-3 text-sm">
+            <label htmlFor="labSort">Sort (Lab): </label>
+            <select
+              id="labSort"
+              value={labSort}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setLabSort(e.target.value as SortKey)}
+            >
+              <option value="price-asc">Price: Low → High</option>
+              <option value="price-desc">Price: High → Low</option>
+              <option value="size-asc">Size: Small → Large</option>
+              <option value="size-desc">Size: Large → Small</option>
+            </select>
+          </div>
+        )}
 
         {/* Grids */}
         <div className="mt-2">
-          {activeTab === 'NAT' && (
-  <>
-    <p className={styles.itemCount}>
-      {lockNat && selectedNatural ? 'Auto-selected one natural diamond' : `Showing ${natFiltered.length} natural diamonds`}
-    </p>
+          {(sourceChoice !== 'LAB') && (activeTab === 'NAT' || sourceChoice === 'NAT') && (
+            <>
+              <p className={styles.itemCount}>
+                {lockNat && selectedNatural ? 'Auto-picked one natural diamond for starting total' : `Showing ${natFiltered.length} natural diamonds`}
+              </p>
 
-    {lockNat && selectedNatural ? (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-        {/* render ONLY the selected card */}
-        <DiamondCard
-          d={selectedNatural}
-          active
-          onSelect={() => {}}
-          enquirePrefix="Product ID"
-          isLab={false}
-        />
-      </div>
-    ) : (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-2">
-        {natFiltered.map(d => (
-          <DiamondCard
-            key={d.StoneId}
-            d={d}
-            active={selectedNatural?.StoneId === d.StoneId}
-            onSelect={() => setSelectedNatural(selectedNatural?.StoneId === d.StoneId ? null : d)}
-            enquirePrefix="Product ID"
-            isLab={false}
-          />
-        ))}
-      </div>
-    )}
-  </>
-)}
+              {lockNat && selectedNatural ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
+                  <DiamondCard
+  d={selectedNatural}
+  active
+  onSelect={() => {
+    setSelectedNatural(null);
+    setUserPickedNat(false);
+    setLockNat(false); // show full list (i.e., Replace)
+  }}
+  enquirePrefix="Product ID"
+  isLab={false}
+/>
 
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-2">
+                  {natFiltered.map(d => (
+                    <DiamondCard
+                      key={d.StoneId}
+                      d={d}
+                      active={selectedNatural?.StoneId === d.StoneId}
+                      onSelect={() => {
+  if (selectedNatural?.StoneId === d.StoneId) {
+    // Unselect → act like Replace
+    setSelectedNatural(null);
+    setUserPickedNat(false);
+    setLockNat(false);
+  } else {
+    chooseNat(d);
+  }
+}}
 
-{activeTab === 'LAB' && (
-  <>
-    <p className={styles.itemCount}>
-      {lockLab && selectedLab ? 'Auto-selected one lab-grown diamond' : `Showing ${labFiltered.length} lab-grown diamonds`}
-    </p>
+                      enquirePrefix="Product ID"
+                      isLab={false}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
 
-    {lockLab && selectedLab ? (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-        <DiamondCard
-          d={selectedLab}
-          active
-          onSelect={() => {}}
-          enquirePrefix="your Product ID"
-          isLab
-        />
-      </div>
-    ) : (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-2">
-        {labFiltered.map(d => (
-          <DiamondCard
-            key={d.StoneId}
-            d={d}
-            active={selectedLab?.StoneId === d.StoneId}
-            onSelect={() => setSelectedLab(selectedLab?.StoneId === d.StoneId ? null : d)}
-            enquirePrefix="your Product ID"
-            isLab
-          />
-        ))}
-      </div>
-    )}
-  </>
-)}
+          {(sourceChoice !== 'NAT') && (activeTab === 'LAB' || sourceChoice === 'LAB') && (
+            <>
+              <p className={styles.itemCount}>
+                {lockLab && selectedLab ? 'Auto-picked one lab-grown diamond for starting total' : `Showing ${labFiltered.length} lab-grown diamonds`}
+              </p>
 
+              {lockLab && selectedLab ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
+                  <DiamondCard
+  d={selectedLab}
+  active
+  onSelect={() => {
+    setSelectedLab(null);
+    setUserPickedLab(false);
+    setLockLab(false); // show full list (i.e., Replace)
+  }}
+  enquirePrefix="your Product ID"
+  isLab
+/>
 
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-2">
+                  {labFiltered.map(d => (
+                    <DiamondCard
+                      key={d.StoneId}
+                      d={d}
+                      active={selectedLab?.StoneId === d.StoneId}
+                      onSelect={() => {
+  if (selectedLab?.StoneId === d.StoneId) {
+    // Unselect → act like Replace
+    setSelectedLab(null);
+    setUserPickedLab(false);
+    setLockLab(false);
+  } else {
+    chooseLab(d);
+  }
+}}
+                      enquirePrefix="your Product ID"
+                      isLab
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </section>
 
       {/* Sticky compare bar */}
       <div className="sticky bottom-2 z-10 mt-5 rounded-2xl border bg-white p-3 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="text-xs md:text-sm grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-6">
+          <div className={`text-xs md:text-sm grid ${sourceChoice === 'BOTH' ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'} gap-2 md:gap-6`}>
             <div><b>Ring:</b> {selectedRingId || '—'}</div>
             <div><b>Mount:</b> {money(ringPrice)}</div>
 
-            <div className="flex items-center gap-2">
-              <span>
-                <b>Natural:</b>{' '}
-                {selectedNatural
-                  ? `${sizeNum(selectedNatural.Size).toFixed(2)}ct · ${selectedNatural.Color}-${selectedNatural.Clarity} · ${money(selectedNatural.OfferPrice ?? selectedNatural.MRP ?? 0)}`
-                  : '—'}
-              </span>
-              <button
-                className="text-xs px-2 py-1 rounded bg-neutral-100 hover:bg-neutral-200"
-                onClick={handleChangeNatural}
-              >
-                Change
-              </button>
-            </div>
+            {(sourceChoice !== 'LAB') && (
+              <div className="flex items-center gap-2">
+                <span>
+                  <b>Natural:</b>{' '}
+                  {selectedNatural
+                    ? `${sizeNum(selectedNatural.Size).toFixed(2)}ct · ${selectedNatural.Color}-${selectedNatural.Clarity} · ${money(selectedNatural.OfferPrice ?? selectedNatural.MRP ?? 0)}`
+                    : '—'}
+                </span>
+                <button
+                  className="text-xs px-2 py-1 rounded bg-neutral-100 hover:bg-neutral-200"
+                  onClick={() => { setSourceChoice('NAT'); setActiveTab('NAT'); setLockNat(false); step2Ref.current?.scrollIntoView({ behavior:'smooth' }); }}
+                >
+                  {selectedNatural ? 'Replace' : 'Choose'}
+                </button>
+              </div>
+            )}
 
-            <div className="flex items-center gap-2">
-              <span>
-                <b>Lab-Grown:</b>{' '}
-                {selectedLab
-                  ? `${sizeNum(selectedLab.Size).toFixed(2)}ct · ${selectedLab.Color}-${selectedLab.Clarity} · ${money(selectedLab.OfferPrice ?? selectedLab.MRP ?? 0)}`
-                  : '—'}
-              </span>
-              <button
-                className="text-xs px-2 py-1 rounded bg-neutral-100 hover:bg-neutral-200"
-                onClick={handleChangeLab}
-              >
-                Change
-              </button>
-            </div>
+            {(sourceChoice !== 'NAT') && (
+              <div className="flex items-center gap-2">
+                <span>
+                  <b>Lab-Grown:</b>{' '}
+                  {selectedLab
+                    ? `${sizeNum(selectedLab.Size).toFixed(2)}ct · ${selectedLab.Color}-${selectedLab.Clarity} · ${money(selectedLab.OfferPrice ?? selectedLab.MRP ?? 0)}`
+                    : '—'}
+                </span>
+                <button
+                  className="text-xs px-2 py-1 rounded bg-neutral-100 hover:bg-neutral-200"
+                  onClick={() => { setSourceChoice('LAB'); setActiveTab('LAB'); setLockLab(false); step2Ref.current?.scrollIntoView({ behavior:'smooth' }); }}
+                >
+                  {selectedLab ? 'Replace' : 'Choose'}
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 md:gap-4">
-            <div className="rounded-lg border p-2 text-center">
-              <div className="text-[11px] text-neutral-500">Total with Natural</div>
-              <div className="text-base font-semibold">
-                {selectedNatural
-                  ? money(ringPrice + (selectedNatural.OfferPrice ?? selectedNatural.MRP ?? 0))
-                  : '—'}
+          {/* Totals (show only chosen sources) */}
+          <div className={`grid ${sourceChoice === 'BOTH' ? 'grid-cols-2' : 'grid-cols-1'} gap-2 md:gap-4`}>
+            {(sourceChoice !== 'LAB') && (
+              <div className="rounded-lg border p-2 text-center">
+                <div className="text-[11px] text-neutral-500">
+                  {isAutoNat ? 'Starting total (auto-picked)' : 'Total with Natural'}
+                </div>
+                <div className="text-base font-semibold">
+                  {selectedNatural
+                    ? money(ringPrice + (selectedNatural.OfferPrice ?? selectedNatural.MRP ?? 0))
+                    : '—'}
+                </div>
               </div>
-            </div>
-            <div className="rounded-lg border p-2 text-center">
-              <div className="text-[11px] text-neutral-500">Total with Lab-Grown</div>
-              <div className="text-base font-semibold">
-                {selectedLab
-                  ? money(ringPrice + (selectedLab.OfferPrice ?? selectedLab.MRP ?? 0))
-                  : '—'}
+            )}
+
+            {(sourceChoice !== 'NAT') && (
+              <div className="rounded-lg border p-2 text-center">
+                <div className="text-[11px] text-neutral-500">
+                  {isAutoLab ? 'Starting total (auto-picked)' : 'Total with Lab-Grown'}
+                </div>
+                <div className="text-base font-semibold">
+                  {selectedLab
+                    ? money(ringPrice + (selectedLab.OfferPrice ?? selectedLab.MRP ?? 0))
+                    : '—'}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <button
@@ -1085,10 +1361,39 @@ function DiamondCard({
         </div>
       </div>
 
-      {/* Quick view */}
-      {ringPreview && (
-        <SkuSummaryModal skuId={ringPreview} onClose={() => setRingPreview(null)} />
+      {/* Ring confirm modal */}
+      {ringCandidateId && (
+        <RingConfirmModal
+          ring={rings.find(r => r.id === ringCandidateId) || null}
+          sourceChoice={sourceChoice}
+          onChangeSourceChoice={setSourceChoice}
+          onClose={() => setRingCandidateId(null)}
+onContinue={() => {
+  setSelectedRingId(ringCandidateId);
+  setRingCandidateId(null);
+
+  // lock in the choice and tab
+  if (sourceChoice === 'NAT') {
+    setSourceChoice('NAT');
+    setActiveTab('NAT');
+    setSelectedLab(null);
+  } else if (sourceChoice === 'LAB') {
+    setSourceChoice('LAB');
+    setActiveTab('LAB');
+    setSelectedNatural(null);
+  } else {
+    setSourceChoice('BOTH');
+    setActiveTab('NAT'); // default start tab when both
+  }
+
+  step2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}}
+
+        />
       )}
+
+      {/* If you still want the SKU quick view elsewhere */}
+      {/* <SkuSummaryModal skuId={...} onClose={() => ...} /> */}
     </PageLayout>
   );
 }
