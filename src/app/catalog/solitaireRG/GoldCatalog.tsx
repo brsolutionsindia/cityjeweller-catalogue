@@ -449,11 +449,6 @@ export default function SolitaireRingConfigurator() {
     return 'Build Your Solitaire Ring';
   }, [searchParam]);
 
-  const jumpToDiamonds = (tab: 'NAT' | 'LAB') => {
-    setActiveTab(tab);
-    step2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
   const chooseNat = (d: Diamond | null) => {
     setSelectedNatural(d);
     setUserPickedNat(true);
@@ -685,7 +680,6 @@ useEffect(() => {
   /* Ring change setup */
   useEffect(() => {
     const ring = rings.find(r => r.id === selectedRingId);
-    const ct = ring?.stone2Ct ?? null;
 
     // clear selections (fresh start)
     setSelectedNatural(null);
