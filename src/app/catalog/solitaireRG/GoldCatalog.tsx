@@ -351,7 +351,7 @@ function RingConfirmModal({
                 className="px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
                 onClick={onContinue}
               >
-                Continue to diamonds
+                Continue
               </button>
             </div>
           </div>
@@ -436,6 +436,9 @@ export default function SolitaireRingConfigurator() {
   const [symmLab, setSymmLab] = useState<string[]>([]);
   const [fluorLab, setFluorLab] = useState<string[]>([]);
 
+  // Whether to show Step 2 section
+  const [showDiamonds, setShowDiamonds] = useState(false);
+
   // Search param
   const searchParams = useSearchParams();
   const searchParam = (searchParams?.get?.('search') ?? '').toLowerCase();
@@ -519,151 +522,147 @@ export default function SolitaireRingConfigurator() {
     return () => unsub();
   }, [searchParam]);
 
-/* Diamonds data — load ONLY after a ring is chosen */
-useEffect(() => {
-  // when no ring is selected, make sure lists are empty and no listeners are active
-  if (!selectedRingId) {
-    setNatAll([]);
-    setLabAll([]);
-    return;
-  }
+  /* Diamonds data — load ONLY after a ring is chosen */
+  useEffect(() => {
+    // when no ring is selected, make sure lists are empty and no listeners are active
+    if (!selectedRingId) {
+      setNatAll([]);
+      setLabAll([]);
+      return;
+    }
 
-  const natRef = ref(db, 'Global SKU/NaturalDiamonds');
-  const labRef = ref(db, 'Global SKU/CVD');
+    const natRef = ref(db, 'Global SKU/NaturalDiamonds');
+    const labRef = ref(db, 'Global SKU/CVD');
 
-  const unNat = onValue(natRef, (snapshot) => {
-    const val = snapshot.val() || {};
-    const arr: Diamond[] = Object.values(val)
-      .map(d => d as Diamond)
-      .filter(d => d.Status === 'AVAILABLE');
-    setNatAll(arr);
-  });
+    const unNat = onValue(natRef, (snapshot) => {
+      const val = snapshot.val() || {};
+      const arr: Diamond[] = Object.values(val)
+        .map(d => d as Diamond)
+        .filter(d => d.Status === 'AVAILABLE');
+      setNatAll(arr);
+    });
 
-  const unLab = onValue(labRef, (snapshot) => {
-    const val = snapshot.val() || {};
-    const arr: Diamond[] = Object.values(val)
-      .map(d => d as Diamond)
-      .filter(d => d.Status === 'AVAILABLE');
-    setLabAll(arr);
-  });
+    const unLab = onValue(labRef, (snapshot) => {
+      const val = snapshot.val() || {};
+      const arr: Diamond[] = Object.values(val)
+        .map(d => d as Diamond)
+        .filter(d => d.Status === 'AVAILABLE');
+      setLabAll(arr);
+    });
 
-  return () => { unNat(); unLab(); };
-}, [selectedRingId]);
+    return () => { unNat(); unLab(); };
+  }, [selectedRingId]);
 
+  /* Unions (shapes across datasets) */
+  useEffect(() => {
+    if (!selectedRingId) {
+      // reset unions when no ring is chosen
+      setShapeUnion(['ROUND']);
+      return;
+    }
+    const shapes = Array.from(new Set([
+      ...natAll.map(d => d.Shape).filter(Boolean) as string[],
+      ...labAll.map(d => d.Shape).filter(Boolean) as string[],
+    ])).sort();
 
-/* Unions (shapes across datasets) */
-useEffect(() => {
-  if (!selectedRingId) {
-    // reset unions when no ring is chosen
-    setShapeUnion(['ROUND']);
-    return;
-  }
-  const shapes = Array.from(new Set([
-    ...natAll.map(d => d.Shape).filter(Boolean) as string[],
-    ...labAll.map(d => d.Shape).filter(Boolean) as string[],
-  ])).sort();
+    setShapeUnion(shapes.length ? shapes : ['ROUND']);
+    if (!shapes.includes(common.Shape)) {
+      setCommon(prev => ({ ...prev, Shape: shapes[0] || 'ROUND' }));
+    }
+  }, [natAll, labAll, selectedRingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  setShapeUnion(shapes.length ? shapes : ['ROUND']);
-  if (!shapes.includes(common.Shape)) {
-    setCommon(prev => ({ ...prev, Shape: shapes[0] || 'ROUND' }));
-  }
-}, [natAll, labAll, selectedRingId]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* Size unions + set DEFAULT ranges (~0.50ct bands) AFTER ring select */
+  useEffect(() => {
+    if (!selectedRingId) {
+      setRangeUnionNat([]);
+      setRangeUnionLab([]);
+      setNatSizeRange('');
+      setLabSizeRange('');
+      return;
+    }
 
+    const natRanges = rangesFromRaw(natAll, common.Shape);
+    const labRanges = rangesFromRaw(labAll, common.Shape);
+    setRangeUnionNat(natRanges);
+    setRangeUnionLab(labRanges);
 
-/* Size unions + set DEFAULT ranges (~0.50ct bands) AFTER ring select */
-useEffect(() => {
-  if (!selectedRingId) {
-    setRangeUnionNat([]);
-    setRangeUnionLab([]);
-    setNatSizeRange('');
-    setLabSizeRange('');
-    return;
-  }
+    // validate current selected ranges against unions (normalize both sides)
+    setNatSizeRange(prev => {
+      const p = normalizeRangeStr(prev);
+      return p && !natRanges.map(normalizeRangeStr).includes(p) ? '' : p;
+    });
+    setLabSizeRange(prev => {
+      const p = normalizeRangeStr(prev);
+      return p && !labRanges.map(normalizeRangeStr).includes(p) ? '' : p;
+    });
 
-  const natRanges = rangesFromRaw(natAll, common.Shape);
-  const labRanges = rangesFromRaw(labAll, common.Shape);
-  setRangeUnionNat(natRanges);
-  setRangeUnionLab(labRanges);
+    // On ring select, set to our DEFAULT bands
+    const natPick = resolveInitialRange(natRanges, DEFAULT_RANGE_NAT);
+    const labPick = resolveInitialRange(labRanges, DEFAULT_RANGE_LAB);
+    setNatSizeRange(natPick);
+    setLabSizeRange(labPick);
+  }, [natAll, labAll, common.Shape, selectedRingId]);
 
-  // validate current selected ranges against unions (normalize both sides)
-  setNatSizeRange(prev => {
-    const p = normalizeRangeStr(prev);
-    return p && !natRanges.map(normalizeRangeStr).includes(p) ? '' : p;
-  });
-  setLabSizeRange(prev => {
-    const p = normalizeRangeStr(prev);
-    return p && !labRanges.map(normalizeRangeStr).includes(p) ? '' : p;
-  });
+  /* Dataset-specific attribute unions & validate current filters per active tab */
+  useEffect(() => {
+    if (!selectedRingId) {
+      // clear option lists when not in step 2 yet
+      setClarityNat([]); setColorNat([]); setCutNat([]); setPolishNat([]); setSymmNat([]); setFluorNat([]);
+      setClarityLab([]); setColorLab([]); setCutLab([]); setPolishLab([]); setSymmLab([]); setFluorLab([]);
+      // also clear common attribute selections so step 1 stays light
+      setCommon(prev => ({ ...prev, Clarity: '', Color: '', Cut: '', Polish: '', Symm: '', Fluorescence: '' }));
+      return;
+    }
 
-  // On ring select, set to our DEFAULT bands
-  const natPick = resolveInitialRange(natRanges, DEFAULT_RANGE_NAT);
-  const labPick = resolveInitialRange(labRanges, DEFAULT_RANGE_LAB);
-  setNatSizeRange(natPick);
-  setLabSizeRange(labPick);
-}, [natAll, labAll, common.Shape, selectedRingId]);
+    const scopedNat = natAll.filter(d => d.Shape === common.Shape);
+    const scopedLab = labAll.filter(d => d.Shape === common.Shape);
 
+    const uniq = (arr: Diamond[], key: keyof Diamond) =>
+      Array.from(new Set(arr.map(d => d[key]).filter(Boolean) as string[])).sort();
 
-/* Dataset-specific attribute unions & validate current filters per active tab */
-useEffect(() => {
-  if (!selectedRingId) {
-    // clear option lists when not in step 2 yet
-    setClarityNat([]); setColorNat([]); setCutNat([]); setPolishNat([]); setSymmNat([]); setFluorNat([]);
-    setClarityLab([]); setColorLab([]); setCutLab([]); setPolishLab([]); setSymmLab([]); setFluorLab([]);
-    // also clear common attribute selections so step 1 stays light
-    setCommon(prev => ({ ...prev, Clarity: '', Color: '', Cut: '', Polish: '', Symm: '', Fluorescence: '' }));
-    return;
-  }
+    setClarityNat(uniq(scopedNat, 'Clarity'));
+    setColorNat(uniq(scopedNat, 'Color'));
+    setCutNat(uniq(scopedNat, 'Cut'));
+    setPolishNat(uniq(scopedNat, 'Polish'));
+    setSymmNat(uniq(scopedNat, 'Symm'));
+    setFluorNat(uniq(scopedNat, 'Fluorescence'));
 
-  const scopedNat = natAll.filter(d => d.Shape === common.Shape);
-  const scopedLab = labAll.filter(d => d.Shape === common.Shape);
+    setClarityLab(uniq(scopedLab, 'Clarity'));
+    setColorLab(uniq(scopedLab, 'Color'));
+    setCutLab(uniq(scopedLab, 'Cut'));
+    setPolishLab(uniq(scopedLab, 'Polish'));
+    setSymmLab(uniq(scopedLab, 'Symm'));
+    setFluorLab(uniq(scopedLab, 'Fluorescence'));
 
-  const uniq = (arr: Diamond[], key: keyof Diamond) =>
-    Array.from(new Set(arr.map(d => d[key]).filter(Boolean) as string[])).sort();
+    // ensure common filters valid for the ACTIVE pool
+    const pools = (activeTab === 'NAT' || sourceChoice === 'NAT')
+      ? {
+          Clarity: uniq(scopedNat, 'Clarity'),
+          Color:   uniq(scopedNat, 'Color'),
+          Cut:     uniq(scopedNat, 'Cut'),
+          Polish:  uniq(scopedNat, 'Polish'),
+          Symm:    uniq(scopedNat, 'Symm'),
+          Fluorescence: uniq(scopedNat, 'Fluorescence'),
+        }
+      : {
+          Clarity: uniq(scopedLab, 'Clarity'),
+          Color:   uniq(scopedLab, 'Color'),
+          Cut:     uniq(scopedLab, 'Cut'),
+          Polish:  uniq(scopedLab, 'Polish'),
+          Symm:    uniq(scopedLab, 'Symm'),
+          Fluorescence: uniq(scopedLab, 'Fluorescence'),
+        };
 
-  setClarityNat(uniq(scopedNat, 'Clarity'));
-  setColorNat(uniq(scopedNat, 'Color'));
-  setCutNat(uniq(scopedNat, 'Cut'));
-  setPolishNat(uniq(scopedNat, 'Polish'));
-  setSymmNat(uniq(scopedNat, 'Symm'));
-  setFluorNat(uniq(scopedNat, 'Fluorescence'));
-
-  setClarityLab(uniq(scopedLab, 'Clarity'));
-  setColorLab(uniq(scopedLab, 'Color'));
-  setCutLab(uniq(scopedLab, 'Cut'));
-  setPolishLab(uniq(scopedLab, 'Polish'));
-  setSymmLab(uniq(scopedLab, 'Symm'));
-  setFluorLab(uniq(scopedLab, 'Fluorescence'));
-
-  // ensure common filters valid for the ACTIVE pool
-  const pools = (activeTab === 'NAT' || sourceChoice === 'NAT')
-    ? {
-        Clarity: uniq(scopedNat, 'Clarity'),
-        Color:   uniq(scopedNat, 'Color'),
-        Cut:     uniq(scopedNat, 'Cut'),
-        Polish:  uniq(scopedNat, 'Polish'),
-        Symm:    uniq(scopedNat, 'Symm'),
-        Fluorescence: uniq(scopedNat, 'Fluorescence'),
-      }
-    : {
-        Clarity: uniq(scopedLab, 'Clarity'),
-        Color:   uniq(scopedLab, 'Color'),
-        Cut:     uniq(scopedLab, 'Cut'),
-        Polish:  uniq(scopedLab, 'Polish'),
-        Symm:    uniq(scopedLab, 'Symm'),
-        Fluorescence: uniq(scopedLab, 'Fluorescence'),
-      };
-
-  setCommon(prev => ({
-    ...prev,
-    Clarity: pools.Clarity.includes(prev.Clarity) ? prev.Clarity : '',
-    Color: pools.Color.includes(prev.Color) ? prev.Color : '',
-    Cut: pools.Cut.includes(prev.Cut) ? prev.Cut : '',
-    Polish: pools.Polish.includes(prev.Polish) ? prev.Polish : '',
-    Symm: pools.Symm.includes(prev.Symm) ? prev.Symm : '',
-    Fluorescence: pools.Fluorescence.includes(prev.Fluorescence) ? prev.Fluorescence : '',
-  }));
-}, [common.Shape, natAll, labAll, activeTab, sourceChoice, selectedRingId]);
-
+    setCommon(prev => ({
+      ...prev,
+      Clarity: pools.Clarity.includes(prev.Clarity) ? prev.Clarity : '',
+      Color: pools.Color.includes(prev.Color) ? prev.Color : '',
+      Cut: pools.Cut.includes(prev.Cut) ? prev.Cut : '',
+      Polish: pools.Polish.includes(prev.Polish) ? prev.Polish : '',
+      Symm: pools.Symm.includes(prev.Symm) ? prev.Symm : '',
+      Fluorescence: pools.Fluorescence.includes(prev.Fluorescence) ? prev.Fluorescence : '',
+    }));
+  }, [common.Shape, natAll, labAll, activeTab, sourceChoice, selectedRingId]);
 
   /* Sync sourceChoice with tabs & selections */
   useEffect(() => {
@@ -696,94 +695,95 @@ useEffect(() => {
     if (selectedRingId) {
       setCommon(prev => ({ ...prev, Shape: 'ROUND' }));
       setCollapseRings(true);
-      setTimeout(() => {
-        step2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 60);
+      setShowDiamonds(false); // hide diamond section until user explicitly opens it
     } else {
       setCollapseRings(false);
+      setShowDiamonds(false);
     }
     setLockNat(true);
     setLockLab(true);
   }, [selectedRingId, rings]);
 
-/* Filter diamonds strictly by chosen size range (if any) */
-useEffect(() => {
-  if (!selectedRingId) {  // <- do nothing until a ring is chosen
-    setNatFiltered([]); setLabFiltered([]);
-    return;
-  }
+  /* Filter diamonds strictly by chosen size range (if any) */
+  useEffect(() => {
+    if (!selectedRingId) {  // <- do nothing until a ring is chosen
+      setNatFiltered([]); setLabFiltered([]);
+      return;
+    }
 
-  const applyCommon = (list: Diamond[]) => {
-    let result = list.filter(d => (!common.Shape || d.Shape === common.Shape));
-    if (common.Clarity)   result = result.filter(d => d.Clarity === common.Clarity);
-    if (common.Color)     result = result.filter(d => d.Color === common.Color);
-    if (common.Cut)       result = result.filter(d => d.Cut === common.Cut);
-    if (common.Polish)    result = result.filter(d => d.Polish === common.Polish);
-    if (common.Symm)      result = result.filter(d => d.Symm === common.Symm);
-    if (common.Fluorescence) result = result.filter(d => d.Fluorescence === common.Fluorescence);
-    return result;
-  };
+    const applyCommon = (list: Diamond[]) => {
+      let result = list.filter(d => (!common.Shape || d.Shape === common.Shape));
+      if (common.Clarity)   result = result.filter(d => d.Clarity === common.Clarity);
+      if (common.Color)     result = result.filter(d => d.Color === common.Color);
+      if (common.Cut)       result = result.filter(d => d.Cut === common.Cut);
+      if (common.Polish)    result = result.filter(d => d.Polish === common.Polish);
+      if (common.Symm)      result = result.filter(d => d.Symm === common.Symm);
+      if (common.Fluorescence) result = result.filter(d => d.Fluorescence === common.Fluorescence);
+      return result;
+    };
 
-  // NATURAL
-  let nat = applyCommon(natAll);
-  if (natSizeRange) nat = nat.filter(d => keepInChosenRange(d, natSizeRange));
-  else nat = nat.filter(d => sizeNum(d.Size) >= BASE_CT);
-  nat = nat.sort((a, b) => {
-    if (natSort === 'price-asc') return (a.OfferPrice ?? a.MRP ?? 0) - (b.OfferPrice ?? b.MRP ?? 0);
-    if (natSort === 'price-desc') return (b.OfferPrice ?? b.MRP ?? 0) - (a.OfferPrice ?? a.MRP ?? 0);
-    if (natSort === 'size-asc')   return sizeNum(a.Size) - sizeNum(b.Size);
-    return sizeNum(b.Size) - sizeNum(a.Size);
-  });
-  setNatFiltered(nat);
+    // NATURAL
+    let nat = applyCommon(natAll);
+    if (natSizeRange) nat = nat.filter(d => keepInChosenRange(d, natSizeRange));
+    else nat = nat.filter(d => sizeNum(d.Size) >= BASE_CT);
+    nat = nat.sort((a, b) => {
+      if (natSort === 'price-asc') return (a.OfferPrice ?? a.MRP ?? 0) - (b.OfferPrice ?? b.MRP ?? 0);
+      if (natSort === 'price-desc') return (b.OfferPrice ?? b.MRP ?? 0) - (a.OfferPrice ?? a.MRP ?? 0);
+      if (natSort === 'size-asc')   return sizeNum(a.Size) - sizeNum(b.Size);
+      return sizeNum(b.Size) - sizeNum(a.Size);
+    });
+    setNatFiltered(nat);
 
-  // LAB
-  let lab = applyCommon(labAll);
-  if (labSizeRange) lab = lab.filter(d => keepInChosenRange(d, labSizeRange));
-  else lab = lab.filter(d => sizeNum(d.Size) >= BASE_CT);
-  lab = lab.sort((a, b) => {
-    if (labSort === 'price-asc') return (a.OfferPrice ?? a.MRP ?? 0) - (b.OfferPrice ?? b.MRP ?? 0);
-    if (labSort === 'price-desc') return (b.OfferPrice ?? b.MRP ?? 0) - (a.OfferPrice ?? a.MRP ?? 0);
-    if (labSort === 'size-asc')   return sizeNum(a.Size) - sizeNum(b.Size);
-    return sizeNum(b.Size) - sizeNum(a.Size);
-  });
-  setLabFiltered(lab);
-}, [common, natAll, labAll, natSort, labSort, selectedRingId, natSizeRange, labSizeRange]);
+    // LAB
+    let lab = applyCommon(labAll);
+    if (labSizeRange) lab = lab.filter(d => keepInChosenRange(d, labSizeRange));
+    else lab = lab.filter(d => sizeNum(d.Size) >= BASE_CT);
+    lab = lab.sort((a, b) => {
+      if (labSort === 'price-asc') return (a.OfferPrice ?? a.MRP ?? 0) - (b.OfferPrice ?? b.MRP ?? 0);
+      if (labSort === 'price-desc') return (b.OfferPrice ?? b.MRP ?? 0) - (a.OfferPrice ?? a.MRP ?? 0);
+      if (labSort === 'size-asc')   return sizeNum(a.Size) - sizeNum(b.Size);
+      return sizeNum(b.Size) - sizeNum(a.Size);
+    });
+    setLabFiltered(lab);
+  }, [common, natAll, labAll, natSort, labSort, selectedRingId, natSizeRange, labSizeRange]);
 
+  /* Auto-pick cheapest within filtered lists, respecting source choice and ignoring price = 0 */
+  useEffect(() => {
+    if (!selectedRingId) return;
+    const price = (d: Diamond) => d.OfferPrice ?? d.MRP ?? Infinity;
 
-  /* Auto-pick cheapest within filtered lists, respecting source choice */
-useEffect(() => {
-  if (!selectedRingId) return;
-  const price = (d: Diamond) => d.OfferPrice ?? d.MRP ?? Infinity;
+    // Base pools with size condition
+    const baseNatPool = (sourceChoice !== 'LAB')
+      ? (natSizeRange
+          ? natFiltered
+          : natFiltered.filter(d => sizeNum(d.Size) >= BASE_CT))
+      : [];
+    const baseLabPool = (sourceChoice !== 'NAT')
+      ? (labSizeRange
+          ? labFiltered
+          : labFiltered.filter(d => sizeNum(d.Size) >= BASE_CT))
+      : [];
 
-  // Extra safety: if size range not yet applied, enforce BASE_CT here too
-  const natPool = (sourceChoice !== 'LAB')
-    ? (natSizeRange
-        ? natFiltered
-        : natFiltered.filter(d => sizeNum(d.Size) >= BASE_CT))
-    : [];
-  const labPool = (sourceChoice !== 'NAT')
-    ? (labSizeRange
-        ? labFiltered
-        : labFiltered.filter(d => sizeNum(d.Size) >= BASE_CT))
-    : [];
+    // Filter out diamonds where OfferPrice/MRP is 0 or missing
+    const natPool = baseNatPool.filter(d => (d.OfferPrice ?? d.MRP ?? 0) > 0);
+    const labPool = baseLabPool.filter(d => (d.OfferPrice ?? d.MRP ?? 0) > 0);
 
-  if (!userPickedNat && !selectedNatural && natPool.length) {
-    const cheapestNat = [...natPool].sort((a, b) => price(a) - price(b))[0];
-    if (cheapestNat) setSelectedNatural(cheapestNat);
-  }
-  if (!userPickedLab && !selectedLab && labPool.length) {
-    const cheapestLab = [...labPool].sort((a, b) => price(a) - price(b))[0];
-    if (cheapestLab) setSelectedLab(cheapestLab);
-  }
-}, [
-  selectedRingId,
-  natFiltered, labFiltered,
-  natSizeRange, labSizeRange,   // <-- add these
-  selectedNatural, selectedLab,
-  userPickedNat, userPickedLab,
-  sourceChoice
-]);
-
+    if (!userPickedNat && !selectedNatural && natPool.length) {
+      const cheapestNat = [...natPool].sort((a, b) => price(a) - price(b))[0];
+      if (cheapestNat) setSelectedNatural(cheapestNat);
+    }
+    if (!userPickedLab && !selectedLab && labPool.length) {
+      const cheapestLab = [...labPool].sort((a, b) => price(a) - price(b))[0];
+      if (cheapestLab) setSelectedLab(cheapestLab);
+    }
+  }, [
+    selectedRingId,
+    natFiltered, labFiltered,
+    natSizeRange, labSizeRange,
+    selectedNatural, selectedLab,
+    userPickedNat, userPickedLab,
+    sourceChoice
+  ]);
 
   /* CTA */
   const handleEnquire = () => {
@@ -830,6 +830,7 @@ useEffect(() => {
     setLabSizeRange('');
     setLockNat(true);
     setLockLab(true);
+    setShowDiamonds(false);
     setTimeout(() => step1Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
   };
 
@@ -914,7 +915,7 @@ useEffect(() => {
         </div>
         <span className="text-neutral-300">—</span>
         <div className="flex items-center gap-2">
-          <StepBadge n={2} active={!!selectedRingId} />
+          <StepBadge n={2} active={!!selectedRingId && showDiamonds} />
           <span>Select Diamond</span>
         </div>
       </div>
@@ -972,321 +973,320 @@ useEffect(() => {
         )}
       </section>
 
-      {/* STEP 2: DIAMONDS */}
-      <section
-        ref={step2Ref}
-        className={`mt-5 rounded-2xl border bg-white/70 p-3 ${selectedRingId ? 'border-neutral-200' : 'border-neutral-100 opacity-60 pointer-events-none'}`}
-      >
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <h2 className="text-lg font-semibold">Step 2 · Select Diamond</h2>
+      {/* STEP 2: DIAMONDS - only when user explicitly opens it */}
+      {selectedRingId && showDiamonds && (
+        <section
+          ref={step2Ref}
+          className="mt-5 rounded-2xl border border-neutral-200 bg-white/70 p-3"
+        >
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <h2 className="text-lg font-semibold">Step 2 · Select Diamond</h2>
 
-          {/* Source choice: NAT only / LAB only / BOTH */}
-          {selectedRingId && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-neutral-600">Choose type:</span>
-              <label className="inline-flex items-center gap-1">
-                <input
-                  type="radio"
-                  name="source"
-                  checked={sourceChoice === 'NAT'}
-                  onChange={() => { setSourceChoice('NAT'); setActiveTab('NAT'); }}
-                />
-                <span>Natural only</span>
-              </label>
-              <label className="inline-flex items-center gap-1">
-                <input
-                  type="radio"
-                  name="source"
-                  checked={sourceChoice === 'LAB'}
-                  onChange={() => { setSourceChoice('LAB'); setActiveTab('LAB'); }}
-                />
-                <span>Lab-Grown only</span>
-              </label>
-              <label className="inline-flex items-center gap-1">
-                <input
-                  type="radio"
-                  name="source"
-                  checked={sourceChoice === 'BOTH'}
-                  onChange={() => setSourceChoice('BOTH')}
-                />
-                <span>Both</span>
-              </label>
+            {/* Source choice: NAT only / LAB only / BOTH */}
+            {selectedRingId && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-neutral-600">Choose type:</span>
+                <label className="inline-flex items-center gap-1">
+                  <input
+                    type="radio"
+                    name="source"
+                    checked={sourceChoice === 'NAT'}
+                    onChange={() => { setSourceChoice('NAT'); setActiveTab('NAT'); }}
+                  />
+                  <span>Natural only</span>
+                </label>
+                <label className="inline-flex items-center gap-1">
+                  <input
+                    type="radio"
+                    name="source"
+                    checked={sourceChoice === 'LAB'}
+                    onChange={() => { setSourceChoice('LAB'); setActiveTab('LAB'); }}
+                  />
+                  <span>Lab-Grown only</span>
+                </label>
+                <label className="inline-flex items-center gap-1">
+                  <input
+                    type="radio"
+                    name="source"
+                    checked={sourceChoice === 'BOTH'}
+                    onChange={() => setSourceChoice('BOTH')}
+                  />
+                  <span>Both</span>
+                </label>
+              </div>
+            )}
+
+            <div className="text-xs text-neutral-500">
+              {(() => {
+                const rng = activeTab === 'NAT' ? natSizeRange : labSizeRange;
+                return rng
+                  ? `Size: ${rng}`
+                  : selectedRingId
+                    ? `Auto size set near ~${BASE_CT.toFixed(2)}ct`
+                    : 'Pick a ring to auto-set size';
+              })()}
+            </div>
+          </div>
+
+          {/* Tabs (hide entirely if one source chosen) */}
+          {sourceChoice === 'BOTH' && (
+            <div className="mt-3 inline-flex rounded-lg border border-neutral-200 overflow-hidden">
+              <button className={`px-4 py-2 text-sm ${activeTab === 'NAT' ? 'bg-emerald-600 text-white' : 'bg-white'}`} onClick={() => setActiveTab('NAT')}>Natural Diamonds</button>
+              <button className={`px-4 py-2 text-sm border-l ${activeTab === 'LAB' ? 'bg-emerald-600 text-white' : 'bg-white'}`} onClick={() => setActiveTab('LAB')}>Lab-Grown Diamonds</button>
             </div>
           )}
 
-          <div className="text-xs text-neutral-500">
-            {(() => {
-              const rng = activeTab === 'NAT' ? natSizeRange : labSizeRange;
-              return rng
-                ? `Size: ${rng}`
-                : selectedRingId
-                  ? `Auto size set near ~${BASE_CT.toFixed(2)}ct`
-                  : 'Pick a ring to auto-set size';
-            })()}
-          </div>
-        </div>
+          {/* Banners */}
+          {selectedRingId && (sourceChoice !== 'LAB') && (activeTab === 'NAT' || sourceChoice === 'NAT') && (
+            <div className="mt-3 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">
+              We auto-picked a <b>{BASE_CT.toFixed(2)} ct</b> Natural diamond to show the <b>starting price</b>. Use <b>Replace</b> to change.
+            </div>
+          )}
+          {selectedRingId && (sourceChoice !== 'NAT') && (activeTab === 'LAB' || sourceChoice === 'LAB') && (
+            <div className="mt-3 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-[12px] text-blue-900">
+              We auto-picked a <b>{BASE_CT.toFixed(2)} ct</b> Lab-Grown diamond to show the <b>starting price</b>. Use <b>Replace</b> to change.
+            </div>
+          )}
 
-        {/* Tabs (hide entirely if one source chosen) */}
-        {sourceChoice === 'BOTH' && (
-          <div className="mt-3 inline-flex rounded-lg border border-neutral-200 overflow-hidden">
-            <button className={`px-4 py-2 text-sm ${activeTab === 'NAT' ? 'bg-emerald-600 text-white' : 'bg-white'}`} onClick={() => setActiveTab('NAT')}>Natural Diamonds</button>
-            <button className={`px-4 py-2 text-sm border-l ${activeTab === 'LAB' ? 'bg-emerald-600 text-white' : 'bg-white'}`} onClick={() => setActiveTab('LAB')}>Lab-Grown Diamonds</button>
-          </div>
-        )}
+          {/* Filters */}
+          <div className={styles.stickyFilterContainer}
+               style={{ justifyContent: 'center', display: 'flex', flexWrap: 'wrap', gap: '0.6rem', margin: '0.8rem 0' }}>
 
-        {/* Banners */}
-        {selectedRingId && (sourceChoice !== 'LAB') && (activeTab === 'NAT' || sourceChoice === 'NAT') && (
-          <div className="mt-3 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">
-            We auto-picked a <b>{BASE_CT.toFixed(2)} ct</b> Natural diamond to show the <b>starting price</b>. Use <b>Replace</b> to change.
-          </div>
-        )}
-        {selectedRingId && (sourceChoice !== 'NAT') && (activeTab === 'LAB' || sourceChoice === 'LAB') && (
-          <div className="mt-3 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-[12px] text-blue-900">
-            We auto-picked a <b>{BASE_CT.toFixed(2)} ct</b> Lab-Grown diamond to show the <b>starting price</b>. Use <b>Replace</b> to change.
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className={styles.stickyFilterContainer}
-             style={{ justifyContent: 'center', display: 'flex', flexWrap: 'wrap', gap: '0.6rem', margin: '0.8rem 0' }}>
-
-          <label className={styles.filterLabel}>Shape:{' '}
-            <select
-              value={common.Shape}
-              onChange={(e) => setCommon(prev => ({ ...prev, Shape: e.target.value }))}
-            >
-              {shapeUnion.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </label>
-
-          {/* Size (dataset-specific) */}
-          {(sourceChoice !== 'LAB') && (activeTab === 'NAT' || sourceChoice === 'NAT') && (
-            <label className={styles.filterLabel}>Size:{' '}
+            <label className={styles.filterLabel}>Shape:{' '}
               <select
-                value={natSizeRange}
-                onChange={(e) => setNatSizeRange(normalizeRangeStr(e.target.value))}
+                value={common.Shape}
+                onChange={(e) => setCommon(prev => ({ ...prev, Shape: e.target.value }))}
               >
-                <option value="">All Size (≥ {BASE_CT.toFixed(2)}ct)</option>
-                {rangeUnionNat.map(r => <option key={r} value={r}>{r}</option>)}
+                {shapeUnion.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </label>
+
+            {/* Size (dataset-specific) */}
+            {(sourceChoice !== 'LAB') && (activeTab === 'NAT' || sourceChoice === 'NAT') && (
+              <label className={styles.filterLabel}>Size:{' '}
+                <select
+                  value={natSizeRange}
+                  onChange={(e) => setNatSizeRange(normalizeRangeStr(e.target.value))}
+                >
+                  <option value="">All Size (≥ {BASE_CT.toFixed(2)}ct)</option>
+                  {rangeUnionNat.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </label>
+            )}
+            {(sourceChoice !== 'NAT') && (activeTab === 'LAB' || sourceChoice === 'LAB') && (
+              <label className={styles.filterLabel}>Size:{' '}
+                <select
+                  value={labSizeRange}
+                  onChange={(e) => setLabSizeRange(normalizeRangeStr(e.target.value))}
+                >
+                  <option value="">All Size (≥ {BASE_CT.toFixed(2)}ct)</option>
+                  {rangeUnionLab.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </label>
+            )}
+
+            {/* Attribute filters (apply to whichever list is visible) */}
+            <label className={styles.filterLabel}>Clarity:{' '}
+              <select
+                value={common.Clarity}
+                onChange={(e) => setCommon(prev => ({ ...prev, Clarity: e.target.value }))}
+              >
+                <option value="">All</option>
+                {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
+                  ? clarityNat
+                  : clarityLab).map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </label>
+
+            <label className={styles.filterLabel}>Color:{' '}
+              <select
+                value={common.Color}
+                onChange={(e) => setCommon(prev => ({ ...prev, Color: e.target.value }))}
+              >
+                <option value="">All</option>
+                {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
+                  ? colorNat
+                  : colorLab).map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </label>
+
+            <label className={styles.filterLabel}>Cut:{' '}
+              <select
+                value={common.Cut}
+                onChange={(e) => setCommon(prev => ({ ...prev, Cut: e.target.value }))}
+              >
+                <option value="">All</option>
+                {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
+                  ? cutNat
+                  : cutLab).map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </label>
+
+            <label className={styles.filterLabel}>Polish:{' '}
+              <select
+                value={common.Polish}
+                onChange={(e) => setCommon(prev => ({ ...prev, Polish: e.target.value }))}
+              >
+                <option value="">All</option>
+                {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
+                  ? polishNat
+                  : polishLab).map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </label>
+
+            <label className={styles.filterLabel}>Symm:{' '}
+              <select
+                value={common.Symm}
+                onChange={(e) => setCommon(prev => ({ ...prev, Symm: e.target.value }))}
+              >
+                <option value="">All</option>
+                {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
+                  ? symmNat
+                  : symmLab).map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </label>
+
+            <label className={styles.filterLabel}>Fluor:{' '}
+              <select
+                value={common.Fluorescence}
+                onChange={(e) => setCommon(prev => ({ ...prev, Fluorescence: e.target.value }))}
+              >
+                <option value="">All</option>
+                {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
+                  ? fluorNat
+                  : fluorLab).map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </label>
+          </div>
+
+          {/* Sorting */}
+          {(sourceChoice !== 'LAB') && (activeTab === 'NAT' || sourceChoice === 'NAT') && (
+            <div className="flex items-center justify-end gap-3 text-sm">
+              <label htmlFor="natSort">Sort (Natural): </label>
+              <select
+                id="natSort"
+                value={natSort}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNatSort(e.target.value as SortKey)}
+              >
+                <option value="price-asc">Price: Low → High</option>
+                <option value="price-desc">Price: High → Low</option>
+                <option value="size-asc">Size: Small → Large</option>
+                <option value="size-desc">Size: Large → Small</option>
+              </select>
+            </div>
           )}
           {(sourceChoice !== 'NAT') && (activeTab === 'LAB' || sourceChoice === 'LAB') && (
-            <label className={styles.filterLabel}>Size:{' '}
+            <div className="mt-2 flex items-center justify-end gap-3 text-sm">
+              <label htmlFor="labSort">Sort (Lab): </label>
               <select
-                value={labSizeRange}
-                onChange={(e) => setLabSizeRange(normalizeRangeStr(e.target.value))}
+                id="labSort"
+                value={labSort}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setLabSort(e.target.value as SortKey)}
               >
-                <option value="">All Size (≥ {BASE_CT.toFixed(2)}ct)</option>
-                {rangeUnionLab.map(r => <option key={r} value={r}>{r}</option>)}
+                <option value="price-asc">Price: Low → High</option>
+                <option value="price-desc">Price: High → Low</option>
+                <option value="size-asc">Size: Small → Large</option>
+                <option value="size-desc">Size: Large → Small</option>
               </select>
-            </label>
+            </div>
           )}
 
-          {/* Attribute filters (apply to whichever list is visible) */}
-          <label className={styles.filterLabel}>Clarity:{' '}
-            <select
-              value={common.Clarity}
-              onChange={(e) => setCommon(prev => ({ ...prev, Clarity: e.target.value }))}
-            >
-              <option value="">All</option>
-              {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
-                ? clarityNat
-                : clarityLab).map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </label>
+          {/* Grids */}
+          <div className="mt-2">
+            {(sourceChoice !== 'LAB') && (activeTab === 'NAT' || sourceChoice === 'NAT') && (
+              <>
+                <p className={styles.itemCount}>
+                  {lockNat && selectedNatural ? 'Auto-picked one natural diamond for starting total' : `Showing ${natFiltered.length} natural diamonds`}
+                </p>
 
-          <label className={styles.filterLabel}>Color:{' '}
-            <select
-              value={common.Color}
-              onChange={(e) => setCommon(prev => ({ ...prev, Color: e.target.value }))}
-            >
-              <option value="">All</option>
-              {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
-                ? colorNat
-                : colorLab).map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </label>
-
-          <label className={styles.filterLabel}>Cut:{' '}
-            <select
-              value={common.Cut}
-              onChange={(e) => setCommon(prev => ({ ...prev, Cut: e.target.value }))}
-            >
-              <option value="">All</option>
-              {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
-                ? cutNat
-                : cutLab).map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </label>
-
-          <label className={styles.filterLabel}>Polish:{' '}
-            <select
-              value={common.Polish}
-              onChange={(e) => setCommon(prev => ({ ...prev, Polish: e.target.value }))}
-            >
-              <option value="">All</option>
-              {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
-                ? polishNat
-                : polishLab).map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </label>
-
-          <label className={styles.filterLabel}>Symm:{' '}
-            <select
-              value={common.Symm}
-              onChange={(e) => setCommon(prev => ({ ...prev, Symm: e.target.value }))}
-            >
-              <option value="">All</option>
-              {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
-                ? symmNat
-                : symmLab).map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </label>
-
-          <label className={styles.filterLabel}>Fluor:{' '}
-            <select
-              value={common.Fluorescence}
-              onChange={(e) => setCommon(prev => ({ ...prev, Fluorescence: e.target.value }))}
-            >
-              <option value="">All</option>
-              {((activeTab === 'NAT' || sourceChoice === 'NAT') && sourceChoice !== 'LAB'
-                ? fluorNat
-                : fluorLab).map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </label>
-        </div>
-
-        {/* Sorting */}
-        {(sourceChoice !== 'LAB') && (activeTab === 'NAT' || sourceChoice === 'NAT') && (
-          <div className="flex items-center justify-end gap-3 text-sm">
-            <label htmlFor="natSort">Sort (Natural): </label>
-            <select
-              id="natSort"
-              value={natSort}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNatSort(e.target.value as SortKey)}
-            >
-              <option value="price-asc">Price: Low → High</option>
-              <option value="price-desc">Price: High → Low</option>
-              <option value="size-asc">Size: Small → Large</option>
-              <option value="size-desc">Size: Large → Small</option>
-            </select>
-          </div>
-        )}
-        {(sourceChoice !== 'NAT') && (activeTab === 'LAB' || sourceChoice === 'LAB') && (
-          <div className="mt-2 flex items-center justify-end gap-3 text-sm">
-            <label htmlFor="labSort">Sort (Lab): </label>
-            <select
-              id="labSort"
-              value={labSort}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setLabSort(e.target.value as SortKey)}
-            >
-              <option value="price-asc">Price: Low → High</option>
-              <option value="price-desc">Price: High → Low</option>
-              <option value="size-asc">Size: Small → Large</option>
-              <option value="size-desc">Size: Large → Small</option>
-            </select>
-          </div>
-        )}
-
-        {/* Grids */}
-        <div className="mt-2">
-          {(sourceChoice !== 'LAB') && (activeTab === 'NAT' || sourceChoice === 'NAT') && (
-            <>
-              <p className={styles.itemCount}>
-                {lockNat && selectedNatural ? 'Auto-picked one natural diamond for starting total' : `Showing ${natFiltered.length} natural diamonds`}
-              </p>
-
-              {lockNat && selectedNatural ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-                  <DiamondCard
-  d={selectedNatural}
-  active
-  onSelect={() => {
-    setSelectedNatural(null);
-    setUserPickedNat(false);
-    setLockNat(false); // show full list (i.e., Replace)
-  }}
-  enquirePrefix="Product ID"
-  isLab={false}
-/>
-
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-2">
-                  {natFiltered.map(d => (
+                {lockNat && selectedNatural ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
                     <DiamondCard
-                      key={d.StoneId}
-                      d={d}
-                      active={selectedNatural?.StoneId === d.StoneId}
+                      d={selectedNatural}
+                      active
                       onSelect={() => {
-  if (selectedNatural?.StoneId === d.StoneId) {
-    // Unselect → act like Replace
-    setSelectedNatural(null);
-    setUserPickedNat(false);
-    setLockNat(false);
-  } else {
-    chooseNat(d);
-  }
-}}
-
+                        setSelectedNatural(null);
+                        setUserPickedNat(false);
+                        setLockNat(false); // show full list (i.e., Replace)
+                      }}
                       enquirePrefix="Product ID"
                       isLab={false}
                     />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-2">
+                    {natFiltered.map(d => (
+                      <DiamondCard
+                        key={d.StoneId}
+                        d={d}
+                        active={selectedNatural?.StoneId === d.StoneId}
+                        onSelect={() => {
+                          if (selectedNatural?.StoneId === d.StoneId) {
+                            // Unselect → act like Replace
+                            setSelectedNatural(null);
+                            setUserPickedNat(false);
+                            setLockNat(false);
+                          } else {
+                            chooseNat(d);
+                          }
+                        }}
+                        enquirePrefix="Product ID"
+                        isLab={false}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
 
-          {(sourceChoice !== 'NAT') && (activeTab === 'LAB' || sourceChoice === 'LAB') && (
-            <>
-              <p className={styles.itemCount}>
-                {lockLab && selectedLab ? 'Auto-picked one lab-grown diamond for starting total' : `Showing ${labFiltered.length} lab-grown diamonds`}
-              </p>
+            {(sourceChoice !== 'NAT') && (activeTab === 'LAB' || sourceChoice === 'LAB') && (
+              <>
+                <p className={styles.itemCount}>
+                  {lockLab && selectedLab ? 'Auto-picked one lab-grown diamond for starting total' : `Showing ${labFiltered.length} lab-grown diamonds`}
+                </p>
 
-              {lockLab && selectedLab ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-                  <DiamondCard
-  d={selectedLab}
-  active
-  onSelect={() => {
-    setSelectedLab(null);
-    setUserPickedLab(false);
-    setLockLab(false); // show full list (i.e., Replace)
-  }}
-  enquirePrefix="your Product ID"
-  isLab
-/>
-
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-2">
-                  {labFiltered.map(d => (
+                {lockLab && selectedLab ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
                     <DiamondCard
-                      key={d.StoneId}
-                      d={d}
-                      active={selectedLab?.StoneId === d.StoneId}
+                      d={selectedLab}
+                      active
                       onSelect={() => {
-  if (selectedLab?.StoneId === d.StoneId) {
-    // Unselect → act like Replace
-    setSelectedLab(null);
-    setUserPickedLab(false);
-    setLockLab(false);
-  } else {
-    chooseLab(d);
-  }
-}}
+                        setSelectedLab(null);
+                        setUserPickedLab(false);
+                        setLockLab(false); // show full list (i.e., Replace)
+                      }}
                       enquirePrefix="your Product ID"
                       isLab
                     />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </section>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-2">
+                    {labFiltered.map(d => (
+                      <DiamondCard
+                        key={d.StoneId}
+                        d={d}
+                        active={selectedLab?.StoneId === d.StoneId}
+                        onSelect={() => {
+                          if (selectedLab?.StoneId === d.StoneId) {
+                            // Unselect → act like Replace
+                            setSelectedLab(null);
+                            setUserPickedLab(false);
+                            setLockLab(false);
+                          } else {
+                            chooseLab(d);
+                          }
+                        }}
+                        enquirePrefix="your Product ID"
+                        isLab
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Sticky compare bar */}
       <div className="sticky bottom-2 z-10 mt-5 rounded-2xl border bg-white p-3 shadow-sm">
@@ -1305,7 +1305,15 @@ useEffect(() => {
                 </span>
                 <button
                   className="text-xs px-2 py-1 rounded bg-neutral-100 hover:bg-neutral-200"
-                  onClick={() => { setSourceChoice('NAT'); setActiveTab('NAT'); setLockNat(false); step2Ref.current?.scrollIntoView({ behavior:'smooth' }); }}
+                  onClick={() => {
+                    setShowDiamonds(true);
+                    setSourceChoice('NAT');
+                    setActiveTab('NAT');
+                    setLockNat(false);
+                    setTimeout(() => {
+                      step2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 50);
+                  }}
                 >
                   {selectedNatural ? 'Replace' : 'Choose'}
                 </button>
@@ -1322,7 +1330,15 @@ useEffect(() => {
                 </span>
                 <button
                   className="text-xs px-2 py-1 rounded bg-neutral-100 hover:bg-neutral-200"
-                  onClick={() => { setSourceChoice('LAB'); setActiveTab('LAB'); setLockLab(false); step2Ref.current?.scrollIntoView({ behavior:'smooth' }); }}
+                  onClick={() => {
+                    setShowDiamonds(true);
+                    setSourceChoice('LAB');
+                    setActiveTab('LAB');
+                    setLockLab(false);
+                    setTimeout(() => {
+                      step2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 50);
+                  }}
                 >
                   {selectedLab ? 'Replace' : 'Choose'}
                 </button>
@@ -1375,27 +1391,25 @@ useEffect(() => {
           sourceChoice={sourceChoice}
           onChangeSourceChoice={setSourceChoice}
           onClose={() => setRingCandidateId(null)}
-onContinue={() => {
-  setSelectedRingId(ringCandidateId);
-  setRingCandidateId(null);
+          onContinue={() => {
+            setSelectedRingId(ringCandidateId);
+            setRingCandidateId(null);
 
-  // lock in the choice and tab
-  if (sourceChoice === 'NAT') {
-    setSourceChoice('NAT');
-    setActiveTab('NAT');
-    setSelectedLab(null);
-  } else if (sourceChoice === 'LAB') {
-    setSourceChoice('LAB');
-    setActiveTab('LAB');
-    setSelectedNatural(null);
-  } else {
-    setSourceChoice('BOTH');
-    setActiveTab('NAT'); // default start tab when both
-  }
-
-  step2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}}
-
+            // lock in the choice and tab
+            if (sourceChoice === 'NAT') {
+              setSourceChoice('NAT');
+              setActiveTab('NAT');
+              setSelectedLab(null);
+            } else if (sourceChoice === 'LAB') {
+              setSourceChoice('LAB');
+              setActiveTab('LAB');
+              setSelectedNatural(null);
+            } else {
+              setSourceChoice('BOTH');
+              setActiveTab('NAT'); // default start tab when both
+            }
+            // Do NOT show diamond section yet; user will open via Replace/Choose
+          }}
         />
       )}
     </PageLayout>
