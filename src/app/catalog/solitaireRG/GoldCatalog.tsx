@@ -68,6 +68,16 @@ type Diamond = {
   OfferPrice?: number;
 };
 
+type NumericLike = string | number | null | undefined;
+
+type RingDetails = {
+  goldPurety?: NumericLike;
+  goldPurity?: NumericLike;
+  GoldPurity?: NumericLike;
+  [key: string]: unknown;
+};
+
+
 /* =========================
    Helpers
 ========================= */
@@ -201,18 +211,33 @@ const money = (n?: number | string | null) => {
 };
 
 // NEW: loose numeric parser + field pickers for mount detail
-const parseLooseNumber = (v: any): number | null => {
-  if (v == null) return null;
-  const n = parseFloat(String(v).replace(/[^\d.]/g, ''));
-  return isFinite(n) ? n : null;
+const parseLooseNumber = (v: NumericLike): number | null => {
+  if (v === null || v === undefined) return null;
+
+  if (typeof v === 'number') {
+    return Number.isFinite(v) ? v : null;
+  }
+
+  if (typeof v === 'string') {
+    const n = parseFloat(v.replace(/[^\d.]/g, ''));
+    return Number.isFinite(n) ? n : null;
+  }
+
+  return null;
 };
 
-const pickFirstNumber = (obj: any, keys: string[]): number | null => {
+const pickFirstNumber = (
+  obj: Record<string, unknown> | null | undefined,
+  keys: string[]
+): number | null => {
   if (!obj) return null;
+
   for (const key of keys) {
-    const n = parseLooseNumber(obj[key]);
-    if (n != null && n > 0) return n;
+    const value = obj[key];
+    const n = parseLooseNumber(value as NumericLike);
+    if (n !== null && n > 0) return n;
   }
+
   return null;
 };
 
@@ -300,7 +325,7 @@ export default function SolitaireRingConfigurator() {
   const [ringsLoading, setRingsLoading] = useState(true);
   const [selectedRingId, setSelectedRingId] = useState<string | null>(null);
   const [ringPrice, setRingPrice] = useState<number>(0);
-  const [ringDetails, setRingDetails] = useState<any | null>(null); // NEW – full mount detail
+  const [ringDetails, setRingDetails] = useState<RingDetails | null>(null); // NEW – full mount detail
 
   // Diamonds
   const [natAll, setNatAll] = useState<Diamond[]>([]);
@@ -368,15 +393,16 @@ export default function SolitaireRingConfigurator() {
     [rings, selectedRingId]
   );
 
-  const chooseNat = (d: Diamond | null) => {
-    setSelectedNatural(d);
-    setUserPickedNat(!!d);
-  };
+const chooseNat = (d: Diamond | null) => {
+  setSelectedNatural(d);
+  setUserPickedNat(!!d);
+};
 
-  const chooseLab = (d: Diamond | null) => {
-    setSelectedLab(d);
-    setUserPickedLab(!!d);
-  };
+const chooseLab = (d: Diamond | null) => {
+  setSelectedLab(d);
+  setUserPickedLab(!!d);
+};
+
 
   /* Step navigation – clickable stepper */
   const goToStep = (step: StepNumber) => {
@@ -645,7 +671,7 @@ export default function SolitaireRingConfigurator() {
     const skuRef = ref(db, `Global SKU/SKU/${selectedRingId}`);
     get(skuRef)
       .then((snap) => {
-        setRingDetails(snap.exists() ? snap.val() : null);
+        setRingDetails(snap.exists() ? (snap.val() as RingDetails) : null);
       })
       .catch((err) => {
         console.error('Error loading selected ring details:', err);
@@ -846,42 +872,47 @@ export default function SolitaireRingConfigurator() {
 
   /* Selected diamond summary at top of Step 2 */
   function SelectedDiamondSummary({
-    label,
-    diamond,
-    isLab,
-    auto,
-  }: {
-    label: string;
-    diamond: Diamond;
-    isLab?: boolean;
-    auto?: boolean;
-  }) {
-    if (!diamond) return null;
-    const price = diamond.OfferPrice ?? diamond.MRP ?? 0;
-    return (
-      <div className="mb-3 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-col">
-          <span className="font-semibold text-[11px] uppercase tracking-wide text-neutral-700">
-            {label}
+  label,
+  diamond,
+  isLab,
+  auto,
+  showProceed,
+  onProceed,
+}: {
+  label: string;
+  diamond: Diamond;
+  isLab?: boolean;
+  auto?: boolean;
+  showProceed?: boolean;
+  onProceed?: () => void;
+}) {
+  if (!diamond) return null;
+  const price = diamond.OfferPrice ?? diamond.MRP ?? 0;
+  return (
+    <div className="mb-3 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col">
+        <span className="font-semibold text-[11px] uppercase tracking-wide text-neutral-700">
+          {label}
+        </span>
+        <span className="mt-0.5 font-semibold">
+          {sizeNum(diamond.Size).toFixed(2)}ct {diamond.Shape} · {diamond.Color}-{diamond.Clarity}
+        </span>
+        <span className="text-[11px] text-neutral-600">
+          ID: {diamond.StoneId}
+        </span>
+        {isLab && (
+          <span className="mt-0.5 inline-flex w-fit rounded-full bg-blue-50 px-2 py-[1px] text-[10px] text-blue-700">
+            Lab-Grown (CVD)
           </span>
-          <span className="mt-0.5 font-semibold">
-            {sizeNum(diamond.Size).toFixed(2)}ct {diamond.Shape} · {diamond.Color}-{diamond.Clarity}
+        )}
+        {!isLab && (
+          <span className="mt-0.5 inline-flex w-fit rounded-full bg-emerald-50 px-2 py-[1px] text-[10px] text-emerald-700">
+            Natural Diamond
           </span>
-          <span className="text-[11px] text-neutral-600">
-            ID: {diamond.StoneId}
-          </span>
-          {isLab && (
-            <span className="mt-0.5 inline-flex w-fit rounded-full bg-blue-50 px-2 py-[1px] text-[10px] text-blue-700">
-              Lab-Grown (CVD)
-            </span>
-          )}
-          {!isLab && (
-            <span className="mt-0.5 inline-flex w-fit rounded-full bg-emerald-50 px-2 py-[1px] text-[10px] text-emerald-700">
-              Natural Diamond
-            </span>
-          )}
-        </div>
-        <div className="text-right">
+        )}
+      </div>
+      <div className="text-right flex flex-col items-end gap-2">
+        <div>
           <div className="text-sm font-bold">{price ? money(price) : '—'}</div>
           {auto && (
             <div className="mt-1 inline-flex items-center rounded-full bg-amber-100 px-2 py-[2px] text-[10px] font-semibold text-amber-800">
@@ -889,9 +920,20 @@ export default function SolitaireRingConfigurator() {
             </div>
           )}
         </div>
+
+        {showProceed && onProceed && (
+          <button
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700"
+            onClick={onProceed}
+          >
+            Review Cart &amp; Enquiry
+          </button>
+        )}
       </div>
-    );
-  }
+    </div>
+  );
+}
+
 
   const isAutoNat = !!selectedNatural && !userPickedNat;
   const isAutoLab = !!selectedLab && !userPickedLab;
@@ -907,33 +949,30 @@ export default function SolitaireRingConfigurator() {
     'labourPrice', 'LabourAmt', 'LabourAmount', 'Making', 'MakingAmount', 'making'
   ]);
 
-  const natCt = selectedNatural ? sizeNum(selectedNatural.Size) : 0;
-  const natAmt = selectedNatural ? (selectedNatural.OfferPrice ?? selectedNatural.MRP ?? 0) : 0;
-  const natRatePerCt = natCt ? natAmt / natCt : 0;
+const natCt = selectedNatural ? sizeNum(selectedNatural.Size) : 0;
+const natAmt = selectedNatural ? (selectedNatural.OfferPrice ?? selectedNatural.MRP ?? 0) : 0;
 
-  const labCt = selectedLab ? sizeNum(selectedLab.Size) : 0;
-  const labAmt = selectedLab ? (selectedLab.OfferPrice ?? selectedLab.MRP ?? 0) : 0;
-  const labRatePerCt = labCt ? labAmt / labCt : 0;
+const labCt = selectedLab ? sizeNum(selectedLab.Size) : 0;
+const labAmt = selectedLab ? (selectedLab.OfferPrice ?? selectedLab.MRP ?? 0) : 0;
 
-  // NEW: purity + gold value approximation for mapping line
-  const goldPurityRaw =
-    (ringDetails && (ringDetails.goldPurety || ringDetails.goldPurity || ringDetails.GoldPurity)) || '';
-  const goldPurity =
-    typeof goldPurityRaw === 'string' ? goldPurityRaw : String(goldPurityRaw || '');
+// NEW: purity + gold value approximation for mapping line
+const goldPurityRaw =
+  (ringDetails && (ringDetails.goldPurety || ringDetails.goldPurity || ringDetails.GoldPurity)) || '';
+const goldPurity =
+  typeof goldPurityRaw === 'string' ? goldPurityRaw : String(goldPurityRaw || '');
 
-  const goldRateNum = parseLooseNumber(goldRate);
-  const goldValueApprox =
-    goldWt != null && goldRateNum != null ? goldWt * goldRateNum : null;
+const goldRateNum = parseLooseNumber(goldRate);
 
-  // NEW: use selected solitaire as "Solitaire Weight"
-  const solitaireCt =
-    diamondMode === 'LAB'
-      ? labCt
-      : diamondMode === 'NAT'
-      ? natCt
-      : natCt || labCt; // in COMPARE, prefer natural if present
+// NEW: use selected solitaire as "Solitaire Weight"
+const solitaireCt =
+  diamondMode === 'LAB'
+    ? labCt
+    : diamondMode === 'NAT'
+    ? natCt
+    : natCt || labCt; // in COMPARE, prefer natural if present
 
-  const displaySolitaireCt = solitaireCt || mountDiaWt || null;
+const displaySolitaireCt = solitaireCt || mountDiaWt || null;
+
 
 
   /* UI */
@@ -1072,21 +1111,27 @@ export default function SolitaireRingConfigurator() {
             <>
               {/* Selected diamond summary at top */}
               {(diamondMode === 'NAT' || diamondMode === 'COMPARE') && selectedNatural && (
-                <SelectedDiamondSummary
-                  label={diamondMode === 'COMPARE' ? 'Selected Natural Diamond' : 'Selected Diamond'}
-                  diamond={selectedNatural}
-                  isLab={false}
-                  auto={isAutoNat}
-                />
-              )}
+  <SelectedDiamondSummary
+    label={diamondMode === 'COMPARE' ? 'Selected Natural Diamond' : 'Selected Diamond'}
+    diamond={selectedNatural}
+    isLab={false}
+    auto={isAutoNat}
+    showProceed={!!selectedRingId}
+    onProceed={() => setCurrentStep(3)}
+  />
+)}
+
               {(diamondMode === 'LAB' || diamondMode === 'COMPARE') && selectedLab && (
-                <SelectedDiamondSummary
-                  label={diamondMode === 'COMPARE' ? 'Selected Lab-grown Diamond' : 'Selected Diamond'}
-                  diamond={selectedLab}
-                  isLab
-                  auto={isAutoLab}
-                />
-              )}
+  <SelectedDiamondSummary
+    label={diamondMode === 'COMPARE' ? 'Selected Lab-grown Diamond' : 'Selected Diamond'}
+    diamond={selectedLab}
+    isLab
+    auto={isAutoLab}
+    showProceed={!!selectedRingId}
+    onProceed={() => setCurrentStep(3)}
+  />
+)}
+
 
               {/* When in COMPARE, allow switching visible list */}
               {diamondMode === 'COMPARE' && (
@@ -1303,15 +1348,6 @@ export default function SolitaireRingConfigurator() {
                     </div>
                   </>
                 )}
-              </div>
-
-              <div className="mt-4 flex justify-end">
-                <button
-                  className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700"
-                  onClick={() => setCurrentStep(3)}
-                >
-                  Go to Review &amp; Enquiry
-                </button>
               </div>
             </>
           )}
