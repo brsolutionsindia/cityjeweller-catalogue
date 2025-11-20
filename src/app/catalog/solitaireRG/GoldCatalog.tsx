@@ -946,10 +946,8 @@ const chooseLab = (d: Diamond | null) => {
     'labourPrice', 'LabourAmt', 'LabourAmount', 'Making', 'MakingAmount', 'making'
   ]);
 
-const natCt = selectedNatural ? sizeNum(selectedNatural.Size) : 0;
 const natAmt = selectedNatural ? (selectedNatural.OfferPrice ?? selectedNatural.MRP ?? 0) : 0;
 
-const labCt = selectedLab ? sizeNum(selectedLab.Size) : 0;
 const labAmt = selectedLab ? (selectedLab.OfferPrice ?? selectedLab.MRP ?? 0) : 0;
 
 // NEW: purity + gold value approximation for mapping line
