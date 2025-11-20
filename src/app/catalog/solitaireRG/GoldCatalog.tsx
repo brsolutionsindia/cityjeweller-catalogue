@@ -961,8 +961,6 @@ const goldPurityRaw =
 const goldPurity =
   typeof goldPurityRaw === 'string' ? goldPurityRaw : String(goldPurityRaw || '');
 
-const goldRateNum = parseLooseNumber(goldRate);
-
 // NEW: use selected solitaire as "Solitaire Weight"
 const solitaireCt =
   diamondMode === 'LAB'
@@ -970,10 +968,6 @@ const solitaireCt =
     : diamondMode === 'NAT'
     ? natCt
     : natCt || labCt; // in COMPARE, prefer natural if present
-
-const displaySolitaireCt = solitaireCt || mountDiaWt || null;
-
-
 
   /* UI */
   return (
