@@ -942,9 +942,6 @@ const chooseLab = (d: Diamond | null) => {
   const goldWt = pickFirstNumber(ringDetails, [
     'net', 'goldWt', 'Gold_Wt', 'NetWt', 'netWt', 'GoldWt21'
   ]);
-  const mountDiaWt = pickFirstNumber(ringDetails, [
-    'stone1', 'DiaWt', 'diaWt', 'Stone2_wt', 'stone2Weight', 'Stone2Weight'
-  ]);
   const labourAmt = pickFirstNumber(ringDetails, [
     'labourPrice', 'LabourAmt', 'LabourAmount', 'Making', 'MakingAmount', 'making'
   ]);
@@ -960,14 +957,6 @@ const goldPurityRaw =
   (ringDetails && (ringDetails.goldPurety || ringDetails.goldPurity || ringDetails.GoldPurity)) || '';
 const goldPurity =
   typeof goldPurityRaw === 'string' ? goldPurityRaw : String(goldPurityRaw || '');
-
-// NEW: use selected solitaire as "Solitaire Weight"
-const solitaireCt =
-  diamondMode === 'LAB'
-    ? labCt
-    : diamondMode === 'NAT'
-    ? natCt
-    : natCt || labCt; // in COMPARE, prefer natural if present
 
   /* UI */
   return (
