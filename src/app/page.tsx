@@ -5,6 +5,7 @@ import { ref, onValue } from 'firebase/database';
 import { db } from '../firebaseConfig';
 import Image from 'next/image';
 import Link from 'next/link';
+import TrustInfoStrip from './components/TrustInfoStrip';
 
 import {
   diamondItems,
@@ -130,6 +131,9 @@ export default function Home() {
         <h2 className={productStyles.sectionHeading}>Miscellaneous Items</h2>
         {renderRow(miscItems)}
       </section>
+{/* Global trust / info section (reusable across pages) */}
+      <TrustInfoStrip />
+
     </PageLayout>
   );
 }
