@@ -9,10 +9,14 @@ import { useSearchParams } from 'next/navigation';
 
 import PageLayout from '../../components/PageLayout';
 import OfferBar from '../../components/OfferBar';
+import SkuSummaryModal from '../../components/SkuSummaryModal'; // NEW
 
 import styles from '../../page.module.css';
 import shapeIcon from '../../../../assets/shapeIcons';
 import { filterSolitaireRings } from './filters';
+
+import TrustInfoStrip from '../../components/TrustInfoStrip';
+
 
 /* =========================
    Config
@@ -35,6 +39,8 @@ type RawSkuData = {
   remarks?: string;
   jwelleryCategoryOther?: string;
   goldPurety?: string;
+  goldPurity?: string;
+  GoldPurity?: string;
   Stone2_wt?: string | number;
   Stone2Weight?: string | number;
   stone2Weight?: string | number;
@@ -319,13 +325,15 @@ export default function SolitaireRingConfigurator() {
 
   // Steps (for showing only one section at a time)
   const [currentStep, setCurrentStep] = useState<StepNumber>(1);
+  const [hoveredStep, setHoveredStep] = useState<StepNumber | null>(null); // NEW
 
   // Rings
   const [rings, setRings] = useState<ProductCard[]>([]);
   const [ringsLoading, setRingsLoading] = useState(true);
   const [selectedRingId, setSelectedRingId] = useState<string | null>(null);
   const [ringPrice, setRingPrice] = useState<number>(0);
-  const [ringDetails, setRingDetails] = useState<RingDetails | null>(null); // NEW – full mount detail
+  const [ringDetails, setRingDetails] = useState<RingDetails | null>(null);
+  const [mountInfoSkuId, setMountInfoSkuId] = useState<string | null>(null); // NEW – for (i) modal
 
   // Diamonds
   const [natAll, setNatAll] = useState<Diamond[]>([]);
@@ -393,16 +401,15 @@ export default function SolitaireRingConfigurator() {
     [rings, selectedRingId]
   );
 
-const chooseNat = (d: Diamond | null) => {
-  setSelectedNatural(d);
-  setUserPickedNat(!!d);
-};
+  const chooseNat = (d: Diamond | null) => {
+    setSelectedNatural(d);
+    setUserPickedNat(!!d);
+  };
 
-const chooseLab = (d: Diamond | null) => {
-  setSelectedLab(d);
-  setUserPickedLab(!!d);
-};
-
+  const chooseLab = (d: Diamond | null) => {
+    setSelectedLab(d);
+    setUserPickedLab(!!d);
+  };
 
   /* Step navigation – clickable stepper */
   const goToStep = (step: StepNumber) => {
@@ -479,7 +486,6 @@ const chooseLab = (d: Diamond | null) => {
 
   /* Diamonds data — load ONLY after a ring is chosen */
   useEffect(() => {
-    // when no ring is selected, make sure lists are empty and no listeners are active
     if (!selectedRingId) {
       setNatAll([]);
       setLabAll([]);
@@ -511,7 +517,6 @@ const chooseLab = (d: Diamond | null) => {
   /* Unions (shapes across datasets) */
   useEffect(() => {
     if (!selectedRingId) {
-      // reset unions when no ring is chosen
       setShapeUnion(['ROUND']);
       return;
     }
@@ -541,7 +546,6 @@ const chooseLab = (d: Diamond | null) => {
     setRangeUnionNat(natRanges);
     setRangeUnionLab(labRanges);
 
-    // validate current selected ranges against unions (normalize both sides)
     setNatSizeRange(prev => {
       const p = normalizeRangeStr(prev);
       return p && !natRanges.map(normalizeRangeStr).includes(p) ? '' : p;
@@ -551,7 +555,6 @@ const chooseLab = (d: Diamond | null) => {
       return p && !labRanges.map(normalizeRangeStr).includes(p) ? '' : p;
     });
 
-    // On ring select, set to our DEFAULT bands
     const natPick = resolveInitialRange(natRanges, DEFAULT_RANGE_NAT);
     const labPick = resolveInitialRange(labRanges, DEFAULT_RANGE_LAB);
     setNatSizeRange(natPick);
@@ -561,10 +564,8 @@ const chooseLab = (d: Diamond | null) => {
   /* Dataset-specific attribute unions & validate current filters per active tab */
   useEffect(() => {
     if (!selectedRingId) {
-      // clear option lists when not in step 2 yet
       setClarityNat([]); setColorNat([]); setCutNat([]); setPolishNat([]); setSymmNat([]); setFluorNat([]);
       setClarityLab([]); setColorLab([]); setCutLab([]); setPolishLab([]); setSymmLab([]); setFluorLab([]);
-      // also clear common attribute selections so step 1 stays light
       setCommon(prev => ({ ...prev, Clarity: '', Color: '', Cut: '', Polish: '', Symm: '', Fluorescence: '' }));
       return;
     }
@@ -623,30 +624,25 @@ const chooseLab = (d: Diamond | null) => {
   useEffect(() => {
     if (diamondMode === 'NAT') setActiveTab('NAT');
     else if (diamondMode === 'LAB') setActiveTab('LAB');
-    // COMPARE => keep current activeTab (user can flip)
   }, [diamondMode]);
 
   /* When ring changes, reset selections & filters and fetch mount details */
   useEffect(() => {
     const ring = rings.find(r => r.id === selectedRingId);
 
-    // clear selections (fresh start for diamonds)
     setSelectedNatural(null);
     setSelectedLab(null);
     setUserPickedNat(false);
     setUserPickedLab(false);
 
-    // start NAT tab after ring choose
     setActiveTab('NAT');
     setDiamondMode('NAT');
 
-    // cache mount price
     setRingPrice(typeof ring?.price === 'number' ? ring.price : 0);
 
     if (selectedRingId) {
       setCommon(prev => ({ ...prev, Shape: 'ROUND' }));
     } else {
-      // reset filters when unselecting ring
       setCommon({
         Shape: 'ROUND',
         Clarity: '',
@@ -662,7 +658,7 @@ const chooseLab = (d: Diamond | null) => {
     }
   }, [selectedRingId, rings]);
 
-  // NEW: load full SKU record for selected mount to show gold wt / dia wt / labour in review
+  // load full SKU record for selected mount
   useEffect(() => {
     if (!selectedRingId) {
       setRingDetails(null);
@@ -681,7 +677,7 @@ const chooseLab = (d: Diamond | null) => {
 
   /* Filter diamonds strictly by chosen size range (if any) */
   useEffect(() => {
-    if (!selectedRingId) {  // <- do nothing until a ring is chosen
+    if (!selectedRingId) {
       setNatFiltered([]); setLabFiltered([]);
       return;
     }
@@ -727,7 +723,6 @@ const chooseLab = (d: Diamond | null) => {
     if (!selectedRingId) return;
     const price = (d: Diamond) => d.OfferPrice ?? d.MRP ?? Infinity;
 
-    // Base pools with size condition
     const baseNatPool = (diamondMode !== 'LAB')
       ? (natSizeRange
           ? natFiltered
@@ -739,7 +734,6 @@ const chooseLab = (d: Diamond | null) => {
           : labFiltered.filter(d => sizeNum(d.Size) >= BASE_CT))
       : [];
 
-    // Filter out diamonds where OfferPrice/MRP is 0 or missing
     const natPool = baseNatPool.filter(d => (d.OfferPrice ?? d.MRP ?? 0) > 0);
     const labPool = baseLabPool.filter(d => (d.OfferPrice ?? d.MRP ?? 0) > 0);
 
@@ -787,7 +781,11 @@ const chooseLab = (d: Diamond | null) => {
     ].filter(Boolean);
 
     const summary = `Hello CityJeweller, I want to enquire about: ${parts.join(' ')}.`;
-    const adminLines = buildAdminProductLines(selectedRingId, selectedNatural, selectedLab);
+const natArg = needNat ? selectedNatural : null;
+const labArg = needLab ? selectedLab : null;
+
+const adminLines = buildAdminProductLines(selectedRingId, natArg, labArg);
+
     const text = `${summary}\n\n${adminLines}`;
 
     const url = `https://wa.me/919023130944?text=${encodeURIComponent(text)}`;
@@ -870,75 +868,73 @@ const chooseLab = (d: Diamond | null) => {
     );
   }
 
-  /* Selected diamond summary at top of Step 2 */
   function SelectedDiamondSummary({
-  label,
-  diamond,
-  isLab,
-  auto,
-  showProceed,
-  onProceed,
-}: {
-  label: string;
-  diamond: Diamond;
-  isLab?: boolean;
-  auto?: boolean;
-  showProceed?: boolean;
-  onProceed?: () => void;
-}) {
-  if (!diamond) return null;
-  const price = diamond.OfferPrice ?? diamond.MRP ?? 0;
-  return (
-    <div className="mb-3 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-3">
-      <div className="flex flex-col">
-        <span className="font-semibold text-[11px] uppercase tracking-wide text-neutral-700">
-          {label}
-        </span>
-        <span className="mt-0.5 font-semibold">
-          {sizeNum(diamond.Size).toFixed(2)}ct {diamond.Shape} · {diamond.Color}-{diamond.Clarity}
-        </span>
-        <span className="text-[11px] text-neutral-600">
-          ID: {diamond.StoneId}
-        </span>
-        {isLab && (
-          <span className="mt-0.5 inline-flex w-fit rounded-full bg-blue-50 px-2 py-[1px] text-[10px] text-blue-700">
-            Lab-Grown (CVD)
+    label,
+    diamond,
+    isLab,
+    auto,
+    showProceed,
+    onProceed,
+  }: {
+    label: string;
+    diamond: Diamond;
+    isLab?: boolean;
+    auto?: boolean;
+    showProceed?: boolean;
+    onProceed?: () => void;
+  }) {
+    if (!diamond) return null;
+    const price = diamond.OfferPrice ?? diamond.MRP ?? 0;
+    return (
+      <div className="mb-3 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col">
+          <span className="font-semibold text-[11px] uppercase tracking-wide text-neutral-700">
+            {label}
           </span>
-        )}
-        {!isLab && (
-          <span className="mt-0.5 inline-flex w-fit rounded-full bg-emerald-50 px-2 py-[1px] text-[10px] text-emerald-700">
-            Natural Diamond
+          <span className="mt-0.5 font-semibold">
+            {sizeNum(diamond.Size).toFixed(2)}ct {diamond.Shape} · {diamond.Color}-{diamond.Clarity}
           </span>
-        )}
-      </div>
-      <div className="text-right flex flex-col items-end gap-2">
-        <div>
-          <div className="text-sm font-bold">{price ? money(price) : '—'}</div>
-          {auto && (
-            <div className="mt-1 inline-flex items-center rounded-full bg-amber-100 px-2 py-[2px] text-[10px] font-semibold text-amber-800">
-              Auto-picked starting option
-            </div>
+          <span className="text-[11px] text-neutral-600">
+            ID: {diamond.StoneId}
+          </span>
+          {isLab && (
+            <span className="mt-0.5 inline-flex w-fit rounded-full bg-blue-50 px-2 py-[1px] text-[10px] text-blue-700">
+              Lab-Grown (CVD)
+            </span>
+          )}
+          {!isLab && (
+            <span className="mt-0.5 inline-flex w-fit rounded-full bg-emerald-50 px-2 py-[1px] text-[10px] text-emerald-700">
+              Natural Diamond
+            </span>
           )}
         </div>
+        <div className="text-right flex flex-col items-end gap-2">
+          <div>
+            <div className="text-sm font-bold">{price ? money(price) : '—'}</div>
+            {auto && (
+              <div className="mt-1 inline-flex items-center rounded-full bg-amber-100 px-2 py-[2px] text-[10px] font-semibold text-amber-800">
+                Auto-picked starting option
+              </div>
+            )}
+          </div>
 
-        {showProceed && onProceed && (
-          <button
-            className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700"
-            onClick={onProceed}
-          >
-            Review Cart &amp; Enquiry
-          </button>
-        )}
+          {showProceed && onProceed && (
+            <button
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700"
+              onClick={onProceed}
+            >
+              Review Cart &amp; Enquiry
+            </button>
+          )}
+        </div>
       </div>
-    </div>
-  );
-}
-
+    );
+  }
 
   const isAutoNat = !!selectedNatural && !userPickedNat;
   const isAutoLab = !!selectedLab && !userPickedLab;
 
-  // NEW: derived numbers for review card
+  // Derived numbers for review card
   const goldWt = pickFirstNumber(ringDetails, [
     'net', 'goldWt', 'Gold_Wt', 'NetWt', 'netWt', 'GoldWt21'
   ]);
@@ -946,15 +942,72 @@ const chooseLab = (d: Diamond | null) => {
     'labourPrice', 'LabourAmt', 'LabourAmount', 'Making', 'MakingAmount', 'making'
   ]);
 
-const natAmt = selectedNatural ? (selectedNatural.OfferPrice ?? selectedNatural.MRP ?? 0) : 0;
+  const natAmt = selectedNatural ? (selectedNatural.OfferPrice ?? selectedNatural.MRP ?? 0) : 0;
+  const labAmt = selectedLab ? (selectedLab.OfferPrice ?? selectedLab.MRP ?? 0) : 0;
 
-const labAmt = selectedLab ? (selectedLab.OfferPrice ?? selectedLab.MRP ?? 0) : 0;
+  const goldPurityRaw =
+    (ringDetails && (ringDetails.goldPurety || ringDetails.goldPurity || ringDetails.GoldPurity)) || '';
+  const goldPurity =
+    typeof goldPurityRaw === 'string' ? goldPurityRaw : String(goldPurityRaw || '');
 
-// NEW: purity + gold value approximation for mapping line
-const goldPurityRaw =
-  (ringDetails && (ringDetails.goldPurety || ringDetails.goldPurity || ringDetails.GoldPurity)) || '';
-const goldPurity =
-  typeof goldPurityRaw === 'string' ? goldPurityRaw : String(goldPurityRaw || '');
+// Extra breakdown fields for Product Details in Review Cart
+const grossWt = pickFirstNumber(ringDetails as Record<string, unknown>, [
+  'GrossWt', 'grossWt', 'Gross_Weight', 'GrossWeight', 'gross'
+]);
+
+const netWtFull = pickFirstNumber(ringDetails as Record<string, unknown>, [
+  'NetWt', 'netWt', 'Net_Weight', 'NetWeight', 'net', 'goldWt', 'Gold_Wt', 'GoldWt21'
+]);
+
+const goldRatePerGm = pickFirstNumber(ringDetails as Record<string, unknown>, [
+  'GoldRatePerGm', 'GoldRate', 'GoldRate18', 'GoldRatePerGram', 'rateGold', 'Rate_Gold'
+]);
+
+const sideDiamondCt = getStone2Ct((ringDetails || {}) as unknown as RawSkuData);
+
+const sideDiamondRateCt = pickFirstNumber(ringDetails as Record<string, unknown>, [
+  'Stone2RateCt', 'stone2RateCt', 'Stone2Rate', 'stone2Rate'
+]);
+
+const sideDiamondAmtFromRate =
+  sideDiamondCt && sideDiamondRateCt ? sideDiamondCt * sideDiamondRateCt : null;
+
+const sideDiamondAmt = pickFirstNumber(ringDetails as Record<string, unknown>, [
+  'Stone2Price', 'stone2Price', 'Stone2Amount', 'stone2Amount', 'Stone2Amt'
+]) ?? sideDiamondAmtFromRate;
+
+const goldAmtFromRate =
+  goldWt && goldRatePerGm ? goldWt * goldRatePerGm : null;
+
+const goldAmt = pickFirstNumber(ringDetails as Record<string, unknown>, [
+  'GoldAmount', 'goldAmount', 'GoldAmt', 'goldAmt', 'GoldPrice'
+]) ?? goldAmtFromRate;
+
+// Totals with solitaire
+const totalWithNat = selectedNatural ? ringPrice + natAmt : ringPrice;
+const totalWithLab = selectedLab ? ringPrice + labAmt : ringPrice;
+
+
+
+  // NEW: active diamond for step labels & hover
+  const activeDiamondForStep: Diamond | null = (() => {
+    if (diamondMode === 'LAB') return selectedLab;
+    if (diamondMode === 'NAT') return selectedNatural;
+    return selectedNatural || selectedLab || null;
+  })();
+
+  // NEW: labels with price in step text
+  const ringStepLabel = selectedRingId && ringPrice > 0
+    ? `Choose Ring Design — ${money(ringPrice)}`
+    : 'Choose Ring Design';
+
+  const diamondStepLabel = (() => {
+    const base = 'Select Diamond (Natural / Lab / Compare)';
+    if (!activeDiamondForStep) return base;
+    const amt = activeDiamondForStep.OfferPrice ?? activeDiamondForStep.MRP ?? 0;
+    if (!amt) return base;
+    return `${base} — ${money(amt)}`;
+  })();
 
   /* UI */
   return (
@@ -963,32 +1016,69 @@ const goldPurity =
 
       <h1 className="text-xl md:text-2xl font-bold">{heading}</h1>
 
-      {/* Stepper – now clickable & controls which section is visible */}
+      {/* Stepper – clickable & shows prices + hover quick glance */}
       <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
         <div
           className="flex items-center gap-2 cursor-pointer select-none"
           onClick={() => goToStep(1)}
+          onMouseEnter={() => setHoveredStep(1)}
+          onMouseLeave={() => setHoveredStep(null)}
         >
           <StepBadge n={1} active={currentStep === 1} />
-          <span>Choose Ring Design</span>
+          <span>{ringStepLabel}</span>
         </div>
         <span className="text-neutral-300">—</span>
         <div
           className="flex items-center gap-2 cursor-pointer select-none"
           onClick={() => goToStep(2)}
+          onMouseEnter={() => setHoveredStep(2)}
+          onMouseLeave={() => setHoveredStep(null)}
         >
           <StepBadge n={2} active={currentStep === 2} />
-          <span>Select Diamond (Natural / Lab / Compare)</span>
+          <span>{diamondStepLabel}</span>
         </div>
         <span className="text-neutral-300">—</span>
         <div
           className="flex items-center gap-2 cursor-pointer select-none"
           onClick={() => goToStep(3)}
+          onMouseEnter={() => setHoveredStep(3)}
+          onMouseLeave={() => setHoveredStep(null)}
         >
           <StepBadge n={3} active={currentStep === 3} />
           <span>Review Cart &amp; Enquire</span>
         </div>
       </div>
+
+      {/* Hover quick glance cards under stepper */}
+      {hoveredStep === 1 && selectedRing && (
+        <div className="mt-2 inline-flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 shadow-sm text-xs">
+          <div className="relative w-10 h-10 rounded-md overflow-hidden bg-neutral-100">
+            <Image src={selectedRing.image} alt={selectedRing.id} fill className="object-cover" />
+          </div>
+          <div>
+            <div className="font-semibold text-sm">{selectedRing.id}</div>
+            <div className="text-[11px] text-neutral-600">
+              Mount: {money(ringPrice)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hoveredStep === 2 && activeDiamondForStep && (
+        <div className="mt-2 inline-flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 shadow-sm text-xs">
+          <div>
+            <div className="font-semibold text-sm">
+              {sizeNum(activeDiamondForStep.Size).toFixed(2)}ct {activeDiamondForStep.Shape}
+            </div>
+            <div className="text-[11px] text-neutral-600">
+              {activeDiamondForStep.Color}-{activeDiamondForStep.Clarity} · ID: {activeDiamondForStep.StoneId}
+            </div>
+            <div className="text-[11px] text-neutral-800">
+              {money(activeDiamondForStep.OfferPrice ?? activeDiamondForStep.MRP ?? 0)}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* STEP 1 – RING SELECTION */}
       {currentStep === 1 && (
@@ -998,23 +1088,34 @@ const goldPurity =
             <span className="text-xs text-neutral-500">{rings.length} item(s)</span>
           </div>
 
-          {selectedRing && (
-            <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2">
-              <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-neutral-100">
-                <Image src={selectedRing.image} alt={selectedRing.id} fill className="object-cover" />
-              </div>
-              <div className="text-xs">
-                <div className="font-semibold text-sm">{selectedRing.id}</div>
-                <div className="text-neutral-600">Mount: {money(selectedRing.price)}</div>
-                <button
-                  className="mt-1 text-[11px] text-emerald-700 underline"
-                  onClick={handleChangeRing}
-                >
-                  Change ring
-                </button>
-              </div>
-            </div>
-          )}
+{selectedRing && (
+  <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2">
+    <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-neutral-100">
+      <Image src={selectedRing.image} alt={selectedRing.id} fill className="object-cover" />
+    </div>
+    <div className="text-xs">
+      <div className="font-semibold text-sm">{selectedRing.id}</div>
+      <div className="text-neutral-600">Mount: {money(selectedRing.price)}</div>
+
+      <div className="mt-1 flex flex-wrap gap-2">
+        <button
+          className="px-2 py-[3px] rounded-full border border-emerald-600 text-[11px] font-semibold text-emerald-700 bg-white"
+          onClick={handleChangeRing}
+        >
+          Change ring
+        </button>
+
+        <button
+          type="button"
+          className="px-2 py-[3px] rounded-full border border-neutral-300 text-[11px] font-semibold text-neutral-800 bg-white"
+          onClick={() => setMountInfoSkuId(selectedRing.id)}
+        >
+          View details
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
           {ringsLoading && <p className={styles.loadingBlink}>Loading rings…</p>}
 
@@ -1023,24 +1124,36 @@ const goldPurity =
               {rings.map((r) => {
                 const active = r.id === selectedRingId;
                 return (
-                  <button
+                  <div
                     key={r.id}
-                    type="button"
-                    className={`rounded-xl overflow-hidden border text-left transition hover:shadow-sm ${
+                    className={`relative rounded-xl overflow-hidden border text-left transition hover:shadow-sm cursor-pointer ${
                       active ? 'border-emerald-600 ring-2 ring-emerald-200' : 'border-neutral-200'
                     }`}
                     onClick={() => {
                       setSelectedRingId(r.id);
-                      setCurrentStep(2); // move to Step 2 automatically
+                      setCurrentStep(2);
                     }}
                     title={`Stone2 ~ ${r.stone2Ct ? r.stone2Ct.toFixed(2) + 'ct' : '—'}`}
                   >
+{/* Details button for mounting breakup + enlarged image */}
+<button
+  type="button"
+  className="absolute right-2 top-2 z-10 rounded-full bg-white px-3 py-[3px] text-[10px] font-semibold shadow border border-neutral-300"
+  onClick={(e) => {
+    e.stopPropagation();
+    setMountInfoSkuId(r.id);
+  }}
+>
+  Details
+</button>
+
+
                     <Image src={r.image} alt={r.id} width={600} height={600} className="w-full aspect-square object-cover" />
                     <div className="p-2">
                       <div className="font-semibold text-sm truncate">{r.id}</div>
                       <div className="text-xs text-neutral-600">Mount: {money(r.price)}</div>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -1090,29 +1203,28 @@ const goldPurity =
 
           {selectedRingId && (
             <>
-              {/* Selected diamond summary at top */}
+              {/* Selected diamond summaries */}
               {(diamondMode === 'NAT' || diamondMode === 'COMPARE') && selectedNatural && (
-  <SelectedDiamondSummary
-    label={diamondMode === 'COMPARE' ? 'Selected Natural Diamond' : 'Selected Diamond'}
-    diamond={selectedNatural}
-    isLab={false}
-    auto={isAutoNat}
-    showProceed={!!selectedRingId}
-    onProceed={() => setCurrentStep(3)}
-  />
-)}
+                <SelectedDiamondSummary
+                  label={diamondMode === 'COMPARE' ? 'Selected Natural Diamond' : 'Selected Diamond'}
+                  diamond={selectedNatural}
+                  isLab={false}
+                  auto={isAutoNat}
+                  showProceed={!!selectedRingId}
+                  onProceed={() => setCurrentStep(3)}
+                />
+              )}
 
               {(diamondMode === 'LAB' || diamondMode === 'COMPARE') && selectedLab && (
-  <SelectedDiamondSummary
-    label={diamondMode === 'COMPARE' ? 'Selected Lab-grown Diamond' : 'Selected Diamond'}
-    diamond={selectedLab}
-    isLab
-    auto={isAutoLab}
-    showProceed={!!selectedRingId}
-    onProceed={() => setCurrentStep(3)}
-  />
-)}
-
+                <SelectedDiamondSummary
+                  label={diamondMode === 'COMPARE' ? 'Selected Lab-grown Diamond' : 'Selected Diamond'}
+                  diamond={selectedLab}
+                  isLab
+                  auto={isAutoLab}
+                  showProceed={!!selectedRingId}
+                  onProceed={() => setCurrentStep(3)}
+                />
+              )}
 
               {/* When in COMPARE, allow switching visible list */}
               {diamondMode === 'COMPARE' && (
@@ -1182,7 +1294,7 @@ const goldPurity =
                   </label>
                 )}
 
-                {/* Attribute filters (apply to whichever list is visible) */}
+                {/* Attribute filters */}
                 <label className={styles.filterLabel}>Clarity:{' '}
                   <select
                     value={common.Clarity}
@@ -1343,13 +1455,13 @@ const goldPurity =
             <h2 className="text-lg font-semibold">Your Ring Summary</h2>
           </div>
 
-          {/* Product-style mount detail card (like other catalog summary) */}
+          {/* Product-style mount detail card */}
           <div className="mt-3 rounded-2xl border bg-white/90 p-3 md:p-4 space-y-2">
             {selectedRing ? (
               <div className="flex gap-3 md:gap-4">
-<div className="relative w-24 h-24 md:w-32 md:h-32 rounded-lg overflow-hidden bg-neutral-100 flex-shrink-0">
-  <Image src={selectedRing.image} alt={selectedRing.id} fill className="object-cover" />
-</div>
+                <div className="relative w-24 h-24 md:w-32 md:h-32 rounded-lg overflow-hidden bg-neutral-100 flex-shrink-0">
+                  <Image src={selectedRing.image} alt={selectedRing.id} fill className="object-cover" />
+                </div>
 
                 <div className="flex-1 text-xs space-y-2">
                   <div className="flex items-start justify-between gap-2">
@@ -1368,30 +1480,30 @@ const goldPurity =
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1">
-  <div>
-    <div className="text-[11px] text-neutral-500">Gold Weight (approx.)</div>
-    <div className="font-semibold">
-      {goldWt != null
-  ? `${goldWt.toFixed(3)} gm${goldPurity ? ` (${goldPurity}kt)` : ''}`
-  : '—'}
+                    <div>
+                      <div className="text-[11px] text-neutral-500">Gold Weight (approx.)</div>
+                      <div className="font-semibold">
+                        {goldWt != null
+                          ? `${goldWt.toFixed(3)} gm${goldPurity ? ` (${goldPurity}kt)` : ''}`
+                          : '—'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-neutral-500">Labour / Making</div>
+                      <div className="font-semibold">
+                        {labourAmt != null ? money(labourAmt) : 'Included in mount'}
+                      </div>
+                    </div>
 
-    </div>
-  </div>
-  <div>
-    <div className="text-[11px] text-neutral-500">Labour / Making</div>
-    <div className="font-semibold">
-      {labourAmt != null ? money(labourAmt) : 'Included in mount'}
-    </div>
-  </div>
-
-{/* Diamond detail in DESCRIPTION section (not in price table) */}
+{/* Diamond detail in description */}
 {(selectedNatural || selectedLab) && (
-  <div className="mt-2 border-t border-dashed border-neutral-200 pt-2 space-y-1">
+  <div className="mt-2 border-t border-dashed border-neutral-200 pt-2 space-y-1 col-span-2 md:col-span-3">
     <div className="text-[11px] font-semibold text-neutral-600 uppercase">
       Solitaire Detail
     </div>
 
-    {selectedNatural && (
+    {/* Show Natural line only if mode includes Natural */}
+    {(diamondMode === 'NAT' || diamondMode === 'COMPARE') && selectedNatural && (
       <div className="text-[11px] text-neutral-700">
         Natural Solitaire:{' '}
         <span className="font-semibold">
@@ -1405,7 +1517,8 @@ const goldPurity =
       </div>
     )}
 
-    {selectedLab && (
+    {/* Show Lab-grown line only if mode includes Lab */}
+    {(diamondMode === 'LAB' || diamondMode === 'COMPARE') && selectedLab && (
       <div className="text-[11px] text-neutral-700">
         Lab-grown Solitaire (CVD):{' '}
         <span className="font-semibold">
@@ -1421,10 +1534,8 @@ const goldPurity =
   </div>
 )}
 
-</div>
-
+                  </div>
                 </div>
-
               </div>
             ) : (
               <p className="text-xs text-neutral-500">
@@ -1433,7 +1544,104 @@ const goldPurity =
             )}
           </div>
 
-          {/* Price Summary / comparison using diamond section prices */}
+{/* NEW: Product Details breakup, similar to gold-article page */}
+{selectedRing && (
+  <div className="mt-4 rounded-2xl border bg-white/90 p-3 md:p-4 text-xs space-y-1">
+    <h3 className="text-sm font-semibold mb-2">Product Details</h3>
+
+    <div>Item Code: <span className="font-semibold">{selectedRing.id}</span></div>
+
+    {grossWt != null && (
+      <div>Gross Weight: {grossWt.toFixed(3)} gm</div>
+    )}
+
+    {netWtFull != null && (
+      <>
+        <div>
+          Net Weight: {netWtFull.toFixed(3)} gm
+          {goldPurity ? ` (${goldPurity}kt)` : ''}
+          {goldRatePerGm != null ? ` × ${money(goldRatePerGm)} /gm` : ''}
+        </div>
+        {goldAmt != null && (
+          <div>= {money(goldAmt)}</div>
+        )}
+      </>
+    )}
+
+    {sideDiamondCt != null && (
+      <>
+        <div>
+          Diamond: {sideDiamondCt.toFixed(2)} ct
+          {sideDiamondRateCt != null ? ` × ${money(sideDiamondRateCt)} /ct` : ''}
+        </div>
+        {sideDiamondAmt != null && (
+          <div>= {money(sideDiamondAmt)}</div>
+        )}
+      </>
+    )}
+
+    {/* Solitaire line(s) – respect current diamondMode */}
+    {(() => {
+      const showNatSolLine =
+        (diamondMode === 'NAT' || diamondMode === 'COMPARE') && !!selectedNatural;
+      const showLabSolLine =
+        (diamondMode === 'LAB' || diamondMode === 'COMPARE') && !!selectedLab;
+
+      if (!showNatSolLine && !showLabSolLine) return null;
+
+      return (
+        <>
+          {showNatSolLine && selectedNatural && (
+            <div>
+              Solitaire (Natural): {sizeNum(selectedNatural.Size).toFixed(2)}ct
+              {' '}= {money(natAmt)}
+            </div>
+          )}
+
+          {showLabSolLine && selectedLab && (
+            <div>
+              Solitaire (Lab-grown): {sizeNum(selectedLab.Size).toFixed(2)}ct
+              {' '}= {money(labAmt)}
+            </div>
+          )}
+        </>
+      );
+    })()}
+
+    {/* Making Charges */}
+    {labourAmt != null && (
+      <>
+        <div>Making Charges:</div>
+        <div>= {money(labourAmt)}</div>
+      </>
+    )}
+
+    {/* Total */}
+    <div className="mt-1 font-semibold">
+      {diamondMode === 'NAT' && selectedNatural && (
+        <>Total = {money(totalWithNat)}</>
+      )}
+      {diamondMode === 'LAB' && selectedLab && (
+        <>Total = {money(totalWithLab)}</>
+      )}
+      {diamondMode === 'COMPARE' && (selectedNatural || selectedLab) && (
+        <div className="space-y-1">
+          {selectedNatural && (
+            <div>Total (with Natural) = {money(totalWithNat)}</div>
+          )}
+          {selectedLab && (
+            <div>Total (with Lab-grown) = {money(totalWithLab)}</div>
+          )}
+        </div>
+      )}
+      {(!selectedNatural && !selectedLab) && (
+        <>Total (mount only) = {money(ringPrice)}</>
+      )}
+    </div>
+  </div>
+)}
+
+          {/* Price Summary */}
           {selectedRing && (
             <div className="mt-4">
               <h3 className="text-sm font-semibold mb-2">Price Summary</h3>
@@ -1445,12 +1653,12 @@ const goldPurity =
                       <td className="py-1 text-neutral-500">Mounting Price (including Labour)</td>
                       <td className="py-1 text-right">{money(ringPrice)}</td>
                     </tr>
-<tr>
-  <td className="py-1 text-neutral-500">Solitaire (Natural)</td>
-  <td className="py-1 text-right">
-    {selectedNatural ? money(natAmt) : 'Not selected'}
-  </td>
-</tr>
+                    <tr>
+                      <td className="py-1 text-neutral-500">Solitaire (Natural)</td>
+                      <td className="py-1 text-right">
+                        {selectedNatural ? money(natAmt) : 'Not selected'}
+                      </td>
+                    </tr>
                     <tr className="border-t">
                       <td className="py-2 font-semibold">Total (with Natural Diamond)</td>
                       <td className="py-2 text-right font-semibold">
@@ -1477,12 +1685,12 @@ const goldPurity =
                       <td className="py-1 text-neutral-500">Mount</td>
                       <td className="py-1 text-right">{money(ringPrice)}</td>
                     </tr>
-<tr>
-  <td className="py-1 text-neutral-500">Diamond (Lab-Grown)</td>
-  <td className="py-1 text-right">
-    {selectedLab ? money(labAmt) : 'Not selected'}
-  </td>
-</tr>
+                    <tr>
+                      <td className="py-1 text-neutral-500">Diamond (Lab-Grown)</td>
+                      <td className="py-1 text-right">
+                        {selectedLab ? money(labAmt) : 'Not selected'}
+                      </td>
+                    </tr>
                     <tr className="border-t">
                       <td className="py-2 font-semibold">Total (with Lab-Grown Diamond)</td>
                       <td className="py-2 text-right font-semibold">
@@ -1517,15 +1725,15 @@ const goldPurity =
                       <td className="py-1 text-right">{money(ringPrice)}</td>
                       <td className="py-1 text-right">{money(ringPrice)}</td>
                     </tr>
-<tr>
-  <td className="py-1 text-neutral-500">Diamond</td>
-  <td className="py-1 text-right">
-    {selectedNatural ? money(natAmt) : '—'}
-  </td>
-  <td className="py-1 text-right">
-    {selectedLab ? money(labAmt) : '—'}
-  </td>
-</tr>
+                    <tr>
+                      <td className="py-1 text-neutral-500">Diamond</td>
+                      <td className="py-1 text-right">
+                        {selectedNatural ? money(natAmt) : '—'}
+                      </td>
+                      <td className="py-1 text-right">
+                        {selectedLab ? money(labAmt) : '—'}
+                      </td>
+                    </tr>
                     <tr className="border-t">
                       <td className="py-2 font-semibold">Total</td>
                       <td className="py-2 text-right font-semibold">
@@ -1576,6 +1784,27 @@ const goldPurity =
           </div>
         </aside>
       )}
+
+      {/* NEW: Mounting breakup modal using same logic as Gold articles */}
+      {mountInfoSkuId && (
+        <SkuSummaryModal
+          skuId={mountInfoSkuId}
+          onClose={() => setMountInfoSkuId(null)}
+        />
+      )}
+
+
+{/* Global trust / info section (reusable across pages) */}
+      <TrustInfoStrip />
+
+      {/* Mounting breakup modal */}
+      {mountInfoSkuId && (
+        <SkuSummaryModal
+          skuId={mountInfoSkuId}
+          onClose={() => setMountInfoSkuId(null)}
+        />
+      )}
+
     </PageLayout>
   );
 }

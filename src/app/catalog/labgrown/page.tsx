@@ -8,6 +8,7 @@ import { db } from '../../../firebaseConfig';
 import PageLayout from '../../components/PageLayout';
 import styles from '../../page.module.css';
 import shapeIcon from '../../../../assets/shapeIcons';
+import TrustInfoStrip from '../../components/TrustInfoStrip';
 
 interface Diamond {
   StoneId: string;
@@ -394,6 +395,8 @@ export default function CvdCatalogPage() {
           ))}
         </div>
       </div>
+<TrustInfoStrip />
+
     </PageLayout>
   );
 }

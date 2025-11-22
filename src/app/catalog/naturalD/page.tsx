@@ -9,6 +9,8 @@ import styles from '../../page.module.css';
 import shapeIcon from '../../../../assets/shapeIcons';
 import Image from 'next/image';
 
+import TrustInfoStrip from '../../components/TrustInfoStrip';
+
 
 interface Diamond {
   StoneId?: string;
@@ -267,11 +269,12 @@ export default function NaturalCatalogPage() {
     </div>
   ))}
 </div>
-
-
-
-
       </div>
+
+
+{/* Global trust / info section (reusable across pages) */}
+      <TrustInfoStrip />
+
     </PageLayout>
   );
 }
