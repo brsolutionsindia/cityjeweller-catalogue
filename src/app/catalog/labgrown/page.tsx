@@ -56,9 +56,21 @@ const colorMap = {
   FVP: 'Fancy Vivid Pink',
 };
 const gradeMap = { EX: 'Excellent', VG: 'Very Good', GD: 'Good', ID: 'Ideal', FR: 'Fair' };
-const fluorescenceMap = { NON: 'None – No reaction to UV light', SLT: 'Slight – Very minimal fluorescence', VSL: 'Very Slight – Slightly visible under UV' };
+const fluorescenceMap = {
+  NON: 'None – No reaction to UV light',
+  SLT: 'Slight – Very minimal fluorescence',
+  VSL: 'Very Slight – Slightly visible under UV',
+};
 
-const InfoPopup = ({ text, label, valueMap }: { text: string; label?: string; valueMap: Record<string, string> }) => {
+const InfoPopup = ({
+  text,
+  label,
+  valueMap,
+}: {
+  text: string;
+  label?: string;
+  valueMap: Record<string, string>;
+}) => {
   const [show, setShow] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
 
@@ -70,6 +82,8 @@ const InfoPopup = ({ text, label, valueMap }: { text: string; label?: string; va
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [show]);
 
+  if (!text) return null;
+
   return (
     <span
       ref={ref}
@@ -77,7 +91,7 @@ const InfoPopup = ({ text, label, valueMap }: { text: string; label?: string; va
         cursor: 'pointer',
         color: '#0070f3',
         fontWeight: 'bold',
-        position: 'relative', // NOTE: fontSize removed so it inherits
+        position: 'relative',
       }}
       onClick={(e) => {
         e.stopPropagation();
@@ -108,7 +122,20 @@ const InfoPopup = ({ text, label, valueMap }: { text: string; label?: string; va
   );
 };
 
-const extractUrl = (val: string): string => val?.match(/HYPERLINK\("(.+?)"/)?.[1] || '';
+// More robust extractor: handles HYPERLINK("...") and plain URLs
+const extractUrl = (val: unknown): string => {
+  if (!val) return '';
+  const str = String(val).trim();
+
+  // Excel-style: HYPERLINK("https://...")
+  const match = str.match(/HYPERLINK\("(.+?)"/);
+  if (match?.[1]) return match[1];
+
+  // Plain URL
+  if (str.startsWith('http')) return str;
+
+  return '';
+};
 
 export default function CvdCatalogPage() {
   const [diamonds, setDiamonds] = useState<Diamond[]>([]);
@@ -128,6 +155,7 @@ export default function CvdCatalogPage() {
     Fluorescence: '',
   });
   const [selected, setSelected] = useState<string[]>([]);
+  const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null); // embedded viewer
   const router = useRouter();
 
   // Build available shapes (NO certification check)
@@ -161,10 +189,14 @@ export default function CvdCatalogPage() {
         return;
       }
       const parsed = Object.values(val)
-        .map((dRaw) => dRaw as Diamond)
-        .filter((d) => d.Status === 'AVAILABLE' && d.Shape === filters.Shape)
-        .map((d) => ({ ...d, VideoURL: extractUrl(d.VideoURL ?? '') }));
-      setDiamonds(parsed);
+        .map((dRaw) => dRaw as any)
+        .filter((d: Diamond) => d.Status === 'AVAILABLE' && d.Shape === filters.Shape)
+        .map((d: any) => ({
+          ...d,
+          // handle both "VideoURL" and "Video URL" keys
+          VideoURL: extractUrl(d.VideoURL ?? d['Video URL']),
+        }));
+      setDiamonds(parsed as Diamond[]);
       setIsLoading(false);
     });
   }, [filters.Shape]);
@@ -212,7 +244,9 @@ export default function CvdCatalogPage() {
             Shape:{' '}
             <select
               value={filters.Shape}
-              onChange={(e) => setFilters((prev) => ({ ...prev, Shape: e.target.value, SizeRange: '' }))}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, Shape: e.target.value, SizeRange: '' }))
+              }
             >
               {availableShapes.map((shape) => (
                 <option key={shape} value={shape}>
@@ -254,7 +288,9 @@ export default function CvdCatalogPage() {
             id="sortOption"
             value={sortOption}
             onChange={(e) =>
-              setSortOption(e.target.value as 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc')
+              setSortOption(
+                e.target.value as 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc'
+              )
             }
           >
             <option value="price-asc">Price: Low to High</option>
@@ -293,16 +329,34 @@ export default function CvdCatalogPage() {
         <div className={styles.catalogGrid}>
           {filtered.map((d) => (
             <div
-              className={`${styles.catalogCard} ${selected.includes(d.StoneId) ? styles.selectedCard : ''}`}
+              className={`${styles.catalogCard} ${
+                selected.includes(d.StoneId) ? styles.selectedCard : ''
+              }`}
               key={d.StoneId}
-              style={{ border: selected.includes(d.StoneId) ? '2px solid #0070f3' : '1px solid #ccc' }}
+              style={{
+                border: selected.includes(d.StoneId) ? '2px solid #0070f3' : '1px solid #ccc',
+              }}
+              onClick={() => {
+                if (d.VideoURL) {
+                  setActiveVideoUrl(d.VideoURL);
+                }
+              }}
             >
               {/* Select for comparison */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.7rem', fontWeight: 'bold' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold',
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={selected.includes(d.StoneId)}
                   disabled={!selected.includes(d.StoneId) && selected.length >= 4}
+                  onClick={(e) => e.stopPropagation()}
                   onChange={(e) => {
                     if (e.target.checked) setSelected((prev) => [...prev, d.StoneId]);
                     else setSelected((prev) => prev.filter((id) => id !== d.StoneId));
@@ -324,20 +378,38 @@ export default function CvdCatalogPage() {
 
               <div className="cardContent">
                 {/* Size & Shape */}
-                <p>{(parseFloat(d.Size ?? '0')).toFixed(2)}ct ({d.Shape})</p>
+                <p>
+                  {(parseFloat(d.Size ?? '0')).toFixed(2)}ct ({d.Shape})
+                </p>
 
                 {/* Color & Clarity (bigger line) */}
-                <p style={{ fontSize: '0.95rem', fontWeight: 600, margin: '4px 0', textAlign: 'center' }}>
+                <p
+                  style={{
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    margin: '4px 0',
+                    textAlign: 'center',
+                  }}
+                >
                   <InfoPopup text={d.Color ?? ''} label="Color" valueMap={colorMap} />
                   {' · '}
                   <InfoPopup text={d.Clarity ?? ''} label="Clarity" valueMap={clarityMap} />
                 </p>
 
                 {/* Details (small) */}
-                <div style={{ fontSize: '0.65rem', lineHeight: '1.3', textAlign: 'center' }}>
+                <div
+                  style={{
+                    fontSize: '0.65rem',
+                    lineHeight: '1.3',
+                    textAlign: 'center',
+                  }}
+                >
                   <p>
                     <span
-                      onClick={() => alert('Lab-grown diamond using Chemical Vapor Deposition (CVD).')}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        alert('Lab-grown diamond using Chemical Vapor Deposition (CVD).');
+                      }}
                       style={{ cursor: 'pointer', color: '#0070f3', fontWeight: 'bold' }}
                     >
                       CVD
@@ -348,36 +420,58 @@ export default function CvdCatalogPage() {
                     D
                     <InfoPopup
                       text={`${(parseFloat(d.Depth ?? '0')).toFixed(2)}%`}
-                      valueMap={{ [`D${d.Depth}%`]: 'Depth % – Ratio of depth to width. Affects brilliance.' }}
+                      valueMap={{
+                        [`${(parseFloat(d.Depth ?? '0')).toFixed(2)}%`]:
+                          'Depth % – Ratio of depth to width. Affects brilliance.',
+                      }}
                     />
                     , T
                     <InfoPopup
                       text={`${(parseFloat(d.Table ?? '0')).toFixed(2)}%`}
-                      valueMap={{ [`T${d.Table}%`]: 'Table % – Size of the flat top facet. Affects sparkle.' }}
+                      valueMap={{
+                        [`${(parseFloat(d.Table ?? '0')).toFixed(2)}%`]:
+                          'Table % – Size of the flat top facet. Affects sparkle.',
+                      }}
                     />
                   </p>
                   <p>
                     <InfoPopup text={d.Cut ?? ''} label="Cut" valueMap={gradeMap} />,{' '}
                     <InfoPopup text={d.Polish ?? ''} label="Polish" valueMap={gradeMap} />,{' '}
                     <InfoPopup text={d.Symm ?? ''} label="Symmetry" valueMap={gradeMap} />,{' '}
-                    <InfoPopup text={d.Fluorescence ?? ''} label="Fluorescence" valueMap={fluorescenceMap} />
+                    <InfoPopup
+                      text={d.Fluorescence ?? ''}
+                      label="Fluorescence"
+                      valueMap={fluorescenceMap}
+                    />
                   </p>
                 </div>
 
                 {d.MRP && d.OfferPrice && (
                   <p>
-                    <span style={{ textDecoration: 'line-through', color: '#888', marginRight: '0.5rem' }}>
+                    <span
+                      style={{
+                        textDecoration: 'line-through',
+                        color: '#888',
+                        marginRight: '0.5rem',
+                      }}
+                    >
                       ₹{Math.round(d.MRP)}
                     </span>
-                    <span style={{ color: '#c00', fontWeight: 'bold' }}>₹{Math.round(d.OfferPrice)}</span>
+                    <span style={{ color: '#c00', fontWeight: 'bold' }}>
+                      ₹{Math.round(d.OfferPrice)}
+                    </span>
                   </p>
                 )}
               </div>
 
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   const msg = `I am interested in your Product ID ${d.StoneId}.`;
-                  window.open(`https://wa.me/919023130944?text=${encodeURIComponent(msg)}`, '_blank');
+                  window.open(
+                    `https://wa.me/919023130944?text=${encodeURIComponent(msg)}`,
+                    '_blank'
+                  );
                 }}
                 style={{
                   marginTop: '0.5rem',
@@ -394,9 +488,69 @@ export default function CvdCatalogPage() {
             </div>
           ))}
         </div>
-      </div>
-<TrustInfoStrip />
 
+        {/* Embedded video/webpage viewer */}
+        {activeVideoUrl && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.6)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1rem',
+            }}
+            onClick={() => setActiveVideoUrl(null)}
+          >
+            <div
+              style={{
+                background: '#000',
+                borderRadius: '8px',
+                maxWidth: '900px',
+                width: '100%',
+                maxHeight: '80vh',
+                padding: '0.5rem',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ textAlign: 'right', marginBottom: '0.25rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveVideoUrl(null)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#fff',
+                    fontSize: '1rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ✕ Close
+                </button>
+              </div>
+              <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
+                <iframe
+                  src={activeVideoUrl}
+                  title="Diamond Video"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                  }}
+                  allowFullScreen
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <TrustInfoStrip />
     </PageLayout>
   );
 }
