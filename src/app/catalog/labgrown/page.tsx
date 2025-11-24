@@ -32,6 +32,9 @@ interface Diamond {
   OfferPrice?: number;
 }
 
+// Some rows may store "Video URL" instead of "VideoURL"
+type RawDiamond = Diamond & { 'Video URL'?: string };
+
 const clarityMap = {
   IF: 'Internally Flawless (best grade)',
   VVS1: 'Very Very Slightly Included 1',
@@ -164,11 +167,10 @@ export default function CvdCatalogPage() {
     onValue(
       dataRef,
       (snapshot) => {
-        const val = snapshot.val();
+        const val = snapshot.val() as Record<string, Diamond> | null;
         if (!val) return;
         const shapes = new Set<string>();
-        Object.values(val).forEach((dRaw) => {
-          const d = dRaw as Diamond;
+        Object.values(val).forEach((d) => {
           if (d.Shape && d.Status === 'AVAILABLE') shapes.add(d.Shape);
         });
         setAvailableShapes(Array.from(shapes).sort());
@@ -182,21 +184,26 @@ export default function CvdCatalogPage() {
     setIsLoading(true);
     const dataRef = ref(db, 'Global SKU/CVD');
     onValue(dataRef, (snapshot) => {
-      const val = snapshot.val();
+      const val = snapshot.val() as Record<string, RawDiamond> | null;
       if (!val) {
         setDiamonds([]);
         setIsLoading(false);
         return;
       }
-      const parsed = Object.values(val)
-        .map((dRaw) => dRaw as any)
-        .filter((d: Diamond) => d.Status === 'AVAILABLE' && d.Shape === filters.Shape)
-        .map((d: any) => ({
+
+      const parsed: Diamond[] = Object.values(val)
+        .filter(
+          (d) =>
+            d.Status === 'AVAILABLE' &&
+            d.Shape === filters.Shape
+        )
+        .map((d) => ({
           ...d,
           // handle both "VideoURL" and "Video URL" keys
           VideoURL: extractUrl(d.VideoURL ?? d['Video URL']),
         }));
-      setDiamonds(parsed as Diamond[]);
+
+      setDiamonds(parsed);
       setIsLoading(false);
     });
   }, [filters.Shape]);
@@ -334,8 +341,11 @@ export default function CvdCatalogPage() {
               }`}
               key={d.StoneId}
               style={{
-                border: selected.includes(d.StoneId) ? '2px solid #0070f3' : '1px solid #ccc',
-              }}
+  border: selected.includes(d.StoneId)
+    ? '2px solid #0070f3'
+    : '1px solid #ccc',
+}}
+
               onClick={() => {
                 if (d.VideoURL) {
                   setActiveVideoUrl(d.VideoURL);
