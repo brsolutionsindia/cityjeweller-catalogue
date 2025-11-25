@@ -35,12 +35,30 @@ function extractSkuType(id: string): string | null {
   return m ? m[1] : null;
 }
 
+// --- Helper: extract URL from plain string or Excel HYPERLINK("...") ---
+const extractUrl = (val: unknown): string => {
+  if (!val) return '';
+  const str = String(val).trim();
+
+  const match = str.match(/HYPERLINK\("(.+?)"/);
+  if (match?.[1]) return match[1];
+
+  if (str.startsWith('http')) return str;
+  return '';
+};
+
 export default function DiamondCatalog() {
   const [rate, setRate] = useState('Loading...');
   const [rateDate, setRateDate] = useState('');
   const [products, setProducts] = useState<ProductCard[]>([]);
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Video modal state
+  const [videoSkuId, setVideoSkuId] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoMessage, setVideoMessage] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
   const typeFilter = (searchParams?.get?.('type') ?? '').toUpperCase(); // e.g. RG, MG
@@ -108,7 +126,8 @@ export default function DiamondCatalog() {
         if (subFilter && !remarksLower.includes(subFilter)) continue;
 
         // search (in id or remarks)
-        if (searchParam && !idLower.includes(searchParam) && !remarksLower.includes(searchParam)) continue;
+        if (searchParam && !idLower.includes(searchParam) && !remarksLower.includes(searchParam))
+          continue;
 
         filtered.push({
           id,
@@ -147,13 +166,51 @@ export default function DiamondCatalog() {
     return { pendant, stringOnly, mangalsutraPure };
   })();
 
+  const handleCardClick = async (skuId: string) => {
+    // Keep existing summary modal behaviour
+    setSelectedSku(skuId);
+
+    // Open video modal & load video from NaturalDiamonds node
+    setVideoSkuId(skuId);
+    setVideoLoading(true);
+    setVideoUrl(null);
+    setVideoMessage(null);
+
+    try {
+      const videoRef = ref(db, `Global SKU/NaturalDiamonds/${skuId}/Video`);
+      const snap = await get(videoRef);
+      if (!snap.exists()) {
+        setVideoMessage('Enquire Now to get Video');
+      } else {
+        const url = extractUrl(snap.val());
+        if (url) {
+          setVideoUrl(url);
+        } else {
+          setVideoMessage('Enquire Now to get Video');
+        }
+      }
+    } catch (err) {
+      console.error('Error loading video URL for', skuId, err);
+      setVideoMessage('Enquire Now to get Video');
+    } finally {
+      setVideoLoading(false);
+    }
+  };
+
+  const closeVideoModal = () => {
+    setVideoSkuId(null);
+    setVideoUrl(null);
+    setVideoMessage(null);
+    setVideoLoading(false);
+  };
+
   const CatalogGrid = ({ list }: { list: ProductCard[] }) => (
     <section className={styles.catalogGrid}>
       {list.map((item) => (
         <div
           key={item.id}
           className={styles.catalogCard}
-          onClick={() => setSelectedSku(item.id)}
+          onClick={() => handleCardClick(item.id)}
         >
           <Image
             src={item.image}
@@ -211,6 +268,105 @@ export default function DiamondCatalog() {
 
       {selectedSku && (
         <SkuSummaryModal skuId={selectedSku} onClose={() => setSelectedSku(null)} />
+      )}
+
+      {/* Embedded video/webpage viewer for NaturalDiamonds/<SKU>/Video */}
+      {videoSkuId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={closeVideoModal}
+        >
+          <div
+            style={{
+              background: '#000',
+              borderRadius: '8px',
+              maxWidth: '900px',
+              width: '100%',
+              maxHeight: '80vh',
+              padding: '0.75rem',
+              color: '#fff',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '0.5rem',
+              }}
+            >
+              <span style={{ fontWeight: 'bold' }}>Product ID: {videoSkuId}</span>
+              <button
+                type="button"
+                onClick={closeVideoModal}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: '1.1rem',
+                  cursor: 'pointer',
+                }}
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {videoLoading ? (
+              <p style={{ textAlign: 'center', padding: '1rem' }}>Loading video...</p>
+            ) : videoUrl ? (
+              <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
+                <iframe
+                  src={videoUrl}
+                  title={`Diamond Video ${videoSkuId}`}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                  }}
+                  allowFullScreen
+                />
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '1.5rem 1rem' }}>
+                <p style={{ marginBottom: '0.75rem', fontSize: '0.95rem' }}>
+                  {videoMessage || 'Enquire Now to get Video'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const msg = `I am interested in your Product ID ${videoSkuId}. Please share the video link.`;
+                    window.open(`https://wa.me/919023130944?text=${encodeURIComponent(msg)}`, '_blank');
+                  }}
+                  style={{
+                    padding: '0.4rem 0.9rem',
+                    backgroundColor: '#25D366',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  Enquire on WhatsApp
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </PageLayout>
   );
