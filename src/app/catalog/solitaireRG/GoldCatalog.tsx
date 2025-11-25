@@ -76,6 +76,15 @@ type Diamond = {
   videoUrl?: string; // normalized usable URL for iframe
 };
 
+type VideoDiamond = Diamond & {
+  Video?: string;
+  VideoURL?: string;
+  VideoUrl?: string;
+  'Video URL'?: string;
+  'Video Url'?: string;
+};
+
+
 type NumericLike = string | number | null | undefined;
 
 type RingDetails = {
@@ -506,47 +515,55 @@ export default function SolitaireRingConfigurator() {
     const natRef = ref(db, 'Global SKU/NaturalDiamonds');
     const labRef = ref(db, 'Global SKU/CVD');
 
-    const unNat = onValue(natRef, (snapshot) => {
-      const val = snapshot.val() || {};
-      const arr: Diamond[] = Object.values(val)
-        .map(raw => {
-          const r = raw as any;
-          const vRaw =
-            r.Video ??
-            r.VideoURL ??
-            r.VideoUrl ??
-            r['Video URL'] ??
-            r['Video Url'];
-          const videoUrl = extractUrl(typeof vRaw === 'string' ? vRaw : undefined);
-          return {
-            ...(r as Diamond),
-            videoUrl,
-          };
-        })
-        .filter(d => d.Status === 'AVAILABLE');
-      setNatAll(arr);
-    });
+const unNat = onValue(natRef, (snapshot) => {
+  const val = snapshot.val() || {};
 
-    const unLab = onValue(labRef, (snapshot) => {
-      const val = snapshot.val() || {};
-      const arr: Diamond[] = Object.values(val)
-        .map(raw => {
-          const r = raw as any;
-          const vRaw =
-            r.Video ??
-            r.VideoURL ??
-            r.VideoUrl ??
-            r['Video URL'] ??
-            r['Video Url'];
-          const videoUrl = extractUrl(typeof vRaw === 'string' ? vRaw : undefined);
-          return {
-            ...(r as Diamond),
-            videoUrl,
-          };
-        })
-        .filter(d => d.Status === 'AVAILABLE');
-      setLabAll(arr);
-    });
+  const arr: Diamond[] = Object.values(val as Record<string, VideoDiamond>)
+    .map((r) => {
+      const vRaw =
+        r.Video ??
+        r.VideoURL ??
+        r.VideoUrl ??
+        r['Video URL'] ??
+        r['Video Url'];
+
+      const videoUrl = extractUrl(typeof vRaw === 'string' ? vRaw : undefined);
+
+      return {
+        ...r,
+        videoUrl,
+      };
+    })
+    .filter((d) => d.Status === 'AVAILABLE');
+
+  setNatAll(arr);
+});
+
+
+const unLab = onValue(labRef, (snapshot) => {
+  const val = snapshot.val() || {};
+
+  const arr: Diamond[] = Object.values(val as Record<string, VideoDiamond>)
+    .map((r) => {
+      const vRaw =
+        r.Video ??
+        r.VideoURL ??
+        r.VideoUrl ??
+        r['Video URL'] ??
+        r['Video Url'];
+
+      const videoUrl = extractUrl(typeof vRaw === 'string' ? vRaw : undefined);
+
+      return {
+        ...r,
+        videoUrl,
+      };
+    })
+    .filter((d) => d.Status === 'AVAILABLE');
+
+  setLabAll(arr);
+});
+
 
     return () => { unNat(); unLab(); };
   }, [selectedRingId]);
