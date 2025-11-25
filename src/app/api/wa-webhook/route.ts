@@ -3,7 +3,38 @@ import { firestore } from '@/lib/firebaseAdmin';
 
 const VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || 'mohit-wa-webhook-123';
 
-// GET stays same as earlier (verification)
+// --- Types for WhatsApp webhook payload ---
+
+interface WhatsAppMessage {
+  from: string;
+  id: string;
+  type: string; // "text", "button", etc.
+  text?: { body?: string };
+  button?: { text?: string };
+  timestamp: string; // epoch seconds as string
+}
+
+interface WhatsAppChangeValue {
+  metadata?: { display_phone_number?: string };
+  messages?: WhatsAppMessage[];
+  // statuses?: ... // you can extend later if needed
+}
+
+interface WhatsAppChange {
+  value: WhatsAppChangeValue;
+}
+
+interface WhatsAppEntry {
+  changes?: WhatsAppChange[];
+}
+
+interface WhatsAppWebhookBody {
+  object?: string;
+  entry?: WhatsAppEntry[];
+}
+
+// --- GET = verification (unchanged logic) ---
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const mode = searchParams.get('hub.mode');
@@ -19,8 +50,10 @@ export async function GET(req: NextRequest) {
   return new Response('Forbidden', { status: 403 });
 }
 
+// --- POST = incoming messages / status updates ---
+
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => null);
+  const body = (await req.json().catch(() => null)) as WhatsAppWebhookBody | null;
   console.log('📩 NEW WEBHOOK EVENT:', JSON.stringify(body, null, 2));
 
   try {
@@ -30,13 +63,13 @@ export async function POST(req: NextRequest) {
           const value = change.value;
 
           // Incoming messages from users
-          if (value?.messages) {
+          if (value.messages && Array.isArray(value.messages)) {
             for (const msg of value.messages) {
               await handleIncomingMessage(msg, value);
             }
           }
 
-          // TODO: handle value.statuses for delivery reports if needed
+          // TODO: handle value.statuses if you want delivery/read updates
         }
       }
     }
@@ -47,19 +80,25 @@ export async function POST(req: NextRequest) {
   return new Response('OK', { status: 200 });
 }
 
-async function handleIncomingMessage(msg: any, value: any) {
+// --- Helper: store 1 incoming message in Firestore ---
+
+async function handleIncomingMessage(
+  msg: WhatsAppMessage,
+  value: WhatsAppChangeValue,
+) {
   const fromNumber = msg.from; // user
-  const toNumber = value?.metadata?.display_phone_number || ''; // your number (if available)
+  const toNumber = value.metadata?.display_phone_number || ''; // your WA number (if present)
   const waMessageId = msg.id;
   const type = msg.type;
 
   const textBody =
-    type === 'text' ? msg.text?.body :
-    type === 'button' ? msg.button?.text :
-    '';
+    type === 'text'
+      ? msg.text?.body ?? ''
+      : type === 'button'
+      ? msg.button?.text ?? ''
+      : '';
 
   const timestampWa = new Date(parseInt(msg.timestamp, 10) * 1000);
-
   const now = new Date();
 
   // 1) Upsert contact
@@ -80,7 +119,7 @@ async function handleIncomingMessage(msg: any, value: any) {
     await contactRef.update({ updatedAt: now });
   }
 
-  // 2) Conversation doc (1:1 with contact)
+  // 2) Conversation doc (1:1 with contact for now)
   const convId = contactId;
   const convRef = firestore.collection('conversations').doc(convId);
   const convSnap = await convRef.get();
@@ -90,7 +129,7 @@ async function handleIncomingMessage(msg: any, value: any) {
       contactId,
       whatsappNumber: fromNumber,
       contactName: contactSnap.exists
-        ? contactSnap.data()?.name || null
+        ? ((contactSnap.data()?.name as string | null) ?? null)
         : null,
       lastMessageText: textBody,
       lastMessageAt: timestampWa,
@@ -100,7 +139,7 @@ async function handleIncomingMessage(msg: any, value: any) {
       updatedAt: now,
     });
   } else {
-    const prevUnread = convSnap.data()?.unreadCount || 0;
+    const prevUnread = (convSnap.data()?.unreadCount as number | undefined) ?? 0;
     await convRef.update({
       lastMessageText: textBody,
       lastMessageAt: timestampWa,
