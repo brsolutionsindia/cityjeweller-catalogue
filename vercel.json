@@ -1,0 +1,9 @@
+{
+  "redirects": [
+    {
+      "source": "/liteaura",
+      "destination": "/catalog/solitaireRG",
+      "permanent": true
+    }
+  ]
+}
