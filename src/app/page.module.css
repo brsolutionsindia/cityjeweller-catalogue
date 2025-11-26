@@ -1259,3 +1259,163 @@ position: relative;
 .bookGoldBtn:hover {
   background-color: #000;
 }
+
+
+
+/* ===============================
+   Solitaire Rings SEO Page
+=============================== */
+
+.solitairePage {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 4.5rem;
+  font-family: 'Georgia', serif;
+  background: #fdfaf6; /* matches catalogMain */
+  color: #222;
+}
+
+.solitairePage h1,
+.solitairePage h2,
+.solitairePage h3 {
+  font-family: 'Georgia', serif;
+  color: #221111;
+}
+
+.solitairePage h1 {
+  font-size: clamp(1.7rem, 2.6vw, 2.1rem);
+  font-weight: 800;
+  margin-bottom: 0.6rem;
+}
+
+.solitairePage h2 {
+  font-size: clamp(1.2rem, 2.1vw, 1.5rem);
+  font-weight: 700;
+  margin: 1.4rem 0 0.6rem;
+}
+
+.solitairePage h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1rem 0 0.3rem;
+}
+
+.solitairePage p {
+  line-height: 1.7;
+  margin: 0.3rem 0;
+  color: #333;
+}
+
+.solitairePage ul {
+  margin: 0.2rem 0 0.6rem 1.1rem;
+  padding: 0;
+}
+
+.solitairePage li {
+  margin-bottom: 0.2rem;
+}
+
+/* Hero / intro */
+.solitaireHero {
+  background: linear-gradient(135deg, #4a1a1f, #8a3b32);
+  color: #fff;
+  padding: 1.4rem 1.3rem;
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+  margin-bottom: 1.4rem;
+}
+
+.solitaireHero h1 {
+  color: #fff;
+  margin-bottom: 0.5rem;
+}
+
+.solitaireHero p {
+  color: #f8f3eb;
+}
+
+/* Content cards */
+.solitaireWhy,
+.solitaireSearches,
+.solitaireFaq {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.1rem 1.15rem 1rem;
+  margin-bottom: 1.1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Popular searches as two columns on desktop */
+.solitaireSearches ul {
+  columns: 2;
+  column-gap: 1.3rem;
+}
+
+/* Comparison table */
+.comparisonTableWrapper {
+  margin-top: 0.6rem;
+  overflow-x: auto;
+}
+
+.comparisonTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  min-width: 460px;
+}
+
+.comparisonTable th,
+.comparisonTable td {
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem 0.6rem;
+  text-align: center;
+}
+
+.comparisonTable thead th {
+  background: #fdf3dd;
+  font-weight: 700;
+  color: #4b1a1a;
+}
+
+.comparisonTable tbody tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+.comparisonTable tbody tr:hover {
+  background: #fff7e6;
+}
+
+.comparisonNote {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+/* Spacing with catalog & FAQ */
+.solitaireCatalog {
+  margin-top: 1.8rem;
+}
+
+.solitaireFaq h3 {
+  margin-top: 0.7rem;
+}
+
+.solitaireFaq p {
+  margin-bottom: 0.35rem;
+}
+
+/* Responsive tweaks */
+@media (max-width: 700px) {
+  .solitaireSearches ul {
+    columns: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .solitairePage {
+    padding: 1rem 0.75rem 4.3rem;
+  }
+  .solitaireHero {
+    padding: 1rem 0.9rem;
+  }
+}
