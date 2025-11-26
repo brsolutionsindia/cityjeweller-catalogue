@@ -3,7 +3,7 @@
     {
       "source": "/liteaura",
       "destination": "/catalog/solitaireRG",
-      "permanent": false
+      "permanent": true
     }
   ]
 }
