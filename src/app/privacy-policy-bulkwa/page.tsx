@@ -27,7 +27,7 @@ export default function PrivacyPolicyPage() {
         Chandigarh, India<br />
         Website: https://www.cityjeweller.in<br />
         Support: +91-9023130944<br />
-        Email: support@cityjeweller.in
+        Email: cityjewellers.india@gmail.com
       </p>
 
       <h2>2. What Information We Collect</h2>
@@ -57,14 +57,14 @@ export default function PrivacyPolicyPage() {
       <h2>6. Your Rights</h2>
       <p>
         You may request access, correction, deletion, or clarification of your data by writing to:
-        <br /><strong>support@cityjeweller.in</strong>
+        <br /><strong>cityjewellers.india@gmail.com</strong>
       </p>
 
       <h2>7. Contact Us</h2>
       <p>
         Rawat Gems & Jewellers, Chandigarh, India<br />
         Phone: +91-9023130944<br />
-        Email: support@cityjeweller.in
+        Email: cityjewellers.india@gmail.com
       </p>
 
       <p style={{ marginTop: "40px", opacity: 0.6 }}>

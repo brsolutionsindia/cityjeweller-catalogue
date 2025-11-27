@@ -74,7 +74,7 @@ export default function TermsPage() {
       <p>Terms may be updated anytime.</p>
 
       <h2>14. Contact Us</h2>
-      <p>Email: support@cityjeweller.in</p>
+      <p>Email: cityjewellers.india@gmail.com</p>
       <p>Phone: 9023130944</p>
     </div>
   );
