@@ -14,9 +14,19 @@ interface WhatsAppMessage {
   timestamp: string; // epoch seconds as string
 }
 
+// ✅ NEW: contact + profile name
+interface WhatsAppContact {
+  wa_id: string;
+  profile?: {
+    name?: string;
+  };
+}
+
 interface WhatsAppChangeValue {
   metadata?: { display_phone_number?: string };
   messages?: WhatsAppMessage[];
+  // ✅ NEW: contacts array from WA payload
+  contacts?: WhatsAppContact[];
   // statuses?: ... // you can extend later if needed
 }
 
@@ -101,25 +111,49 @@ async function handleIncomingMessage(
   const timestampWa = new Date(parseInt(msg.timestamp, 10) * 1000);
   const now = new Date();
 
-  // 1) Upsert contact
+  // ✅ 1) Extract contact name from payload, if present
+  let profileName: string | null = null;
+  if (value.contacts && Array.isArray(value.contacts) && value.contacts.length > 0) {
+    const matchedContact =
+      value.contacts.find((c) => c.wa_id === fromNumber) ?? value.contacts[0];
+    profileName = matchedContact?.profile?.name ?? null;
+  }
+
+  // 2) Upsert contact
   const contactId = fromNumber;
   const contactRef = firestore.collection('contacts').doc(contactId);
   const contactSnap = await contactRef.get();
 
   if (!contactSnap.exists) {
+    // ✅ use profileName when creating contact
     await contactRef.set({
       whatsappNumber: fromNumber,
-      name: null,
+      name: profileName ?? null,
       source: 'whatsapp_incoming',
       tags: [],
       createdAt: now,
       updatedAt: now,
     });
   } else {
-    await contactRef.update({ updatedAt: now });
+    const existingName = (contactSnap.data()?.name as string | null) ?? null;
+
+    const contactUpdate: Record<string, unknown> = {
+      updatedAt: now,
+    };
+
+    // ✅ if we didn't have a name earlier but now we do, update it
+    if (!existingName && profileName) {
+      contactUpdate.name = profileName;
+    }
+
+    await contactRef.update(contactUpdate);
   }
 
-  // 2) Conversation doc (1:1 with contact for now)
+  const latestContactSnap = await contactRef.get();
+  const finalContactName =
+    (latestContactSnap.data()?.name as string | null) ?? profileName ?? null;
+
+  // 3) Conversation doc (1:1 with contact for now)
   const convId = contactId;
   const convRef = firestore.collection('conversations').doc(convId);
   const convSnap = await convRef.get();
@@ -128,9 +162,7 @@ async function handleIncomingMessage(
     await convRef.set({
       contactId,
       whatsappNumber: fromNumber,
-      contactName: contactSnap.exists
-        ? ((contactSnap.data()?.name as string | null) ?? null)
-        : null,
+      contactName: finalContactName, // ✅ store name here
       lastMessageText: textBody,
       lastMessageAt: timestampWa,
       lastDirection: 'in',
@@ -140,16 +172,24 @@ async function handleIncomingMessage(
     });
   } else {
     const prevUnread = (convSnap.data()?.unreadCount as number | undefined) ?? 0;
-    await convRef.update({
+
+    const convUpdate: Record<string, unknown> = {
       lastMessageText: textBody,
       lastMessageAt: timestampWa,
       lastDirection: 'in',
       unreadCount: prevUnread + 1,
       updatedAt: now,
-    });
+    };
+
+    // ✅ keep conversation name in sync if we just learned it
+    if (finalContactName) {
+      convUpdate.contactName = finalContactName;
+    }
+
+    await convRef.update(convUpdate);
   }
 
-  // 3) Add message subdocument
+  // 4) Add message subdocument
   const msgRef = convRef.collection('messages').doc(waMessageId);
   await msgRef.set({
     whatsappId: waMessageId,
