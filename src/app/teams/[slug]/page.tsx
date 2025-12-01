@@ -28,7 +28,9 @@ function toDirectDriveUrl(url: string): string {
   return url;
 }
 
-export default function TeamPage({ params }: { params: { slug: string } }) {
+// ✅ let Next/TS chill about PageProps
+export default function TeamPage({ params }: any) {
+
   const { slug } = params;
   const [data, setData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
