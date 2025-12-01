@@ -108,22 +108,22 @@ export default function TeamPage({ params }: any) {
       <div
         className="w-[320px] sm:w-[360px] rounded-3xl shadow-2xl text-center overflow-hidden border"
         style={{
-          backgroundColor: '#020617', // very dark navy
+          backgroundColor: '#FFFFFF', // very dark navy	#020617
           borderColor: '#facc15',     // gold border
-          color: '#f9fafb',           // default light text
+          color: '#000000',           // default light text #f9fafb
         }}
       >
         {/* Top logo / brand area */}
         <div className="px-5 pt-4 pb-2 flex items-center justify-between text-xs tracking-wide">
           <span
             className="font-serif"
-            style={{ color: '#fef3c7' }} // light gold
+            style={{ color: '#000000' }} // light gold #fef3c7
           >
             CityJeweller.in
           </span>
           <span
             className="font-serif"
-            style={{ color: '#fef3c7' }}
+            style={{ color: '#000000' }} //#fef3c7
           >
             Authorized ID
           </span>
@@ -133,7 +133,7 @@ export default function TeamPage({ params }: any) {
         <div className="px-5 pb-4">
           <p
             className="text-[18px] sm:text-[20px] font-semibold tracking-[0.18em] leading-snug"
-            style={{ color: '#fde68a' }} // bright gold
+            style={{ color: '#000000' }} // bright gold #fde68a
           >
             AUTHORIZED
             <br />
@@ -167,7 +167,7 @@ export default function TeamPage({ params }: any) {
           {/* Name / phone / region */}
           <h1
             className="text-lg font-semibold mb-1"
-            style={{ color: '#111827' }} // slate-900
+            style={{ color: '#000000' }} // slate-900 #111827
           >
             {data.name || slug}
           </h1>
@@ -175,7 +175,7 @@ export default function TeamPage({ params }: any) {
           {data.phone && (
             <p
               className="text-sm font-medium mb-0.5"
-              style={{ color: '#1f2937' }} // slate-800
+              style={{ color: '#000000' }} // slate-800 #1f2937
             >
               {data.phone}
             </p>
@@ -184,7 +184,7 @@ export default function TeamPage({ params }: any) {
           {data.region && (
             <p
               className="text-sm"
-              style={{ color: '#1f2937' }}
+              style={{ color: '#000000' }} //#1f2937
             >
               Region: {data.region}
             </p>
@@ -210,13 +210,13 @@ export default function TeamPage({ params }: any) {
             <div
               className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium"
               style={{
-                backgroundColor: '#fecaca',
-                color: '#991b1b',
+                backgroundColor: '#000000',	// #fecaca
+                color: '#FFFFFF',	//#991b1b
               }}
             >
               <span
                 className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: '#ef4444' }}
+                style={{ backgroundColor: '#000000' }}	//#ef4444
               />
               ID Not Active
             </div>
@@ -226,7 +226,7 @@ export default function TeamPage({ params }: any) {
         {/* Footer line */}
         <div
           className="px-6 pb-4 pt-2 text-[11px] leading-relaxed"
-          style={{ color: '#fefce8' }} // almost white
+          style={{ color: '#000000' }} // almost white #fefce8'
         >
           This page is hosted on CityJeweller.in and confirms the identity
           of the consultant whose ID card you scanned. For any doubt, you
@@ -237,8 +237,8 @@ export default function TeamPage({ params }: any) {
         <div
           className="py-2 text-[12px] font-serif tracking-[0.18em] uppercase"
           style={{
-            backgroundColor: '#020617',
-            color: '#fde68a',
+            backgroundColor: '#fef3c7',	//#020617
+            color: '#000000',		//#fde68a
           }}
         >
           cityjeweller.in
