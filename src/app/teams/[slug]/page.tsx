@@ -28,8 +28,9 @@ function toDirectDriveUrl(url: string): string {
   return url;
 }
 
-// ✅ let Next/TS chill about PageProps
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function TeamPage({ params }: any) {
+
 
   const { slug } = params;
   const [data, setData] = useState<TeamData | null>(null);
