@@ -48,7 +48,7 @@ export default function TeamPage({ params }: any) {
           return;
         }
 
-        const allTeams = snap.val() as Record<string, any>;
+        const allTeams = snap.val() as Record<string, TeamData | string>;
 
         // Find key whose name matches slug ignoring case
         const matchingKey = Object.keys(allTeams).find(
