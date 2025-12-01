@@ -30,8 +30,6 @@ function toDirectDriveUrl(url: string): string {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function TeamPage({ params }: any) {
-
-
   const { slug } = params;
   const [data, setData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,7 +37,10 @@ export default function TeamPage({ params }: any) {
   useEffect(() => {
     const fetchTeam = async () => {
       try {
-        const snap = await get(ref(db, `/Teams/${slug}`));
+        const slugLower = String(slug).toLowerCase();
+
+        // Read all /Teams once
+        const snap = await get(ref(db, '/Teams'));
 
         if (!snap.exists()) {
           setData(null);
@@ -47,13 +48,26 @@ export default function TeamPage({ params }: any) {
           return;
         }
 
-        const value = snap.val();
+        const allTeams = snap.val() as Record<string, any>;
+
+        // Find key whose name matches slug ignoring case
+        const matchingKey = Object.keys(allTeams).find(
+          (key) => key.toLowerCase() === slugLower
+        );
+
+        if (!matchingKey) {
+          setData(null);
+          setLoading(false);
+          return;
+        }
+
+        const value = allTeams[matchingKey];
         let teamData: TeamData;
 
         if (typeof value === 'string') {
           const url = toDirectDriveUrl(value);
           teamData = {
-            name: slug,
+            name: matchingKey,
             photoUrl: url,
             title: 'Authorized Consultant',
             isAuthorized: true,
@@ -62,6 +76,7 @@ export default function TeamPage({ params }: any) {
           const rawUrl = value.photoUrl;
           const finalUrl = rawUrl ? toDirectDriveUrl(rawUrl) : undefined;
           teamData = {
+            name: value.name || matchingKey,
             ...value,
             photoUrl: finalUrl,
           };
@@ -108,23 +123,17 @@ export default function TeamPage({ params }: any) {
       <div
         className="w-[320px] sm:w-[360px] rounded-3xl shadow-2xl text-center overflow-hidden border"
         style={{
-          backgroundColor: '#FFFFFF', // very dark navy	#020617
-          borderColor: '#facc15',     // gold border
-          color: '#000000',           // default light text #f9fafb
+          backgroundColor: '#FFFFFF',
+          borderColor: '#facc15',
+          color: '#000000',
         }}
       >
         {/* Top logo / brand area */}
         <div className="px-5 pt-4 pb-2 flex items-center justify-between text-xs tracking-wide">
-          <span
-            className="font-serif"
-            style={{ color: '#000000' }} // light gold #fef3c7
-          >
+          <span className="font-serif" style={{ color: '#000000' }}>
             CityJeweller.in
           </span>
-          <span
-            className="font-serif"
-            style={{ color: '#000000' }} //#fef3c7
-          >
+          <span className="font-serif" style={{ color: '#000000' }}>
             Authorized ID
           </span>
         </div>
@@ -133,7 +142,7 @@ export default function TeamPage({ params }: any) {
         <div className="px-5 pb-4">
           <p
             className="text-[18px] sm:text-[20px] font-semibold tracking-[0.18em] leading-snug"
-            style={{ color: '#000000' }} // bright gold #fde68a
+            style={{ color: '#000000' }}
           >
             AUTHORIZED
             <br />
@@ -144,7 +153,7 @@ export default function TeamPage({ params }: any) {
         {/* Portrait block (cream background) */}
         <div
           className="mx-5 mb-5 rounded-2xl pt-4 pb-5 px-4 shadow-inner"
-          style={{ backgroundColor: '#fef3c7' }} // cream
+          style={{ backgroundColor: '#fef3c7' }}
         >
           {/* Portrait photo */}
           <div
@@ -167,7 +176,7 @@ export default function TeamPage({ params }: any) {
           {/* Name / phone / region */}
           <h1
             className="text-lg font-semibold mb-1"
-            style={{ color: '#000000' }} // slate-900 #111827
+            style={{ color: '#000000' }}
           >
             {data.name || slug}
           </h1>
@@ -175,17 +184,14 @@ export default function TeamPage({ params }: any) {
           {data.phone && (
             <p
               className="text-sm font-medium mb-0.5"
-              style={{ color: '#000000' }} // slate-800 #1f2937
+              style={{ color: '#000000' }}
             >
               {data.phone}
             </p>
           )}
 
           {data.region && (
-            <p
-              className="text-sm"
-              style={{ color: '#000000' }} //#1f2937
-            >
+            <p className="text-sm" style={{ color: '#000000' }}>
               Region: {data.region}
             </p>
           )}
@@ -194,15 +200,16 @@ export default function TeamPage({ params }: any) {
         {/* Status badge */}
         <div className="pb-2">
           {isActive ? (
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium"
+            <div
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium"
               style={{
-                backgroundColor: '#bbf7d0', // emerald-100
-                color: '#065f46',           // emerald-800
+                backgroundColor: '#bbf7d0',
+                color: '#065f46',
               }}
             >
               <span
                 className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: '#10b981' }} // emerald-500
+                style={{ backgroundColor: '#10b981' }}
               />
               Verified Authorized Consultant
             </div>
@@ -210,13 +217,13 @@ export default function TeamPage({ params }: any) {
             <div
               className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium"
               style={{
-                backgroundColor: '#000000',	// #fecaca
-                color: '#FFFFFF',	//#991b1b
+                backgroundColor: '#000000',
+                color: '#FFFFFF',
               }}
             >
               <span
                 className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: '#000000' }}	//#ef4444
+                style={{ backgroundColor: '#000000' }}
               />
               ID Not Active
             </div>
@@ -226,19 +233,19 @@ export default function TeamPage({ params }: any) {
         {/* Footer line */}
         <div
           className="px-6 pb-4 pt-2 text-[11px] leading-relaxed"
-          style={{ color: '#000000' }} // almost white #fefce8'
+          style={{ color: '#000000' }}
         >
-          This page is hosted on CityJeweller.in and confirms the identity
-          of the consultant whose ID card you scanned. For any doubt, you
-          may contact our support team via the official website.
+          This page is hosted on CityJeweller.in and confirms the identity of the
+          consultant whose ID card you scanned. For any doubt, you may contact
+          our support team via the official website.
         </div>
 
         {/* Website footer */}
         <div
           className="py-2 text-[12px] font-serif tracking-[0.18em] uppercase"
           style={{
-            backgroundColor: '#fef3c7',	//#020617
-            color: '#000000',		//#fde68a
+            backgroundColor: '#fef3c7',
+            color: '#000000',
           }}
         >
           cityjeweller.in
