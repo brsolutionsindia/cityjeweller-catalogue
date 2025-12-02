@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { ref, get } from 'firebase/database';
+import { ref, get, set, push } from 'firebase/database';
 import { db } from '../../firebaseConfig'; // ⬅️ adjust path if needed
 
 /* =========================
@@ -12,6 +12,8 @@ type MetalType = 'GOLD_24' | 'GOLD_22' | 'GOLD_18' | 'GOLD_14' | 'SILVER';
 type StoneUnit = 'gm' | 'ct' | 'rt';
 type StoneRateType = 'per_gm' | 'per_ct' | 'per_rt' | 'per_piece';
 type TouchedField = 'gross' | 'gold' | null;
+
+type RateConfig = Record<string, number | string | undefined>;
 
 interface StoneLineInput {
   id: string;
@@ -295,7 +297,7 @@ const EstimatePage: React.FC = () => {
   const [stones, setStones] = useState<StoneLineInput[]>(defaultStones);
   const [touchedField, setTouchedField] = useState<TouchedField>(null);
 
-  const [rateConfig, setRateConfig] = useState<any | null>(null);
+  const [rateConfig, setRateConfig] = useState<RateConfig | null>(null);
   const [ratePer10GmInput, setRatePer10GmInput] = useState<string>('');
   const [overridden, setOverridden] = useState({
     goldRate: false,
@@ -330,8 +332,9 @@ const EstimatePage: React.FC = () => {
       setConfigError(null);
       try {
         const ratesSnap = await get(ref(db, '/Global SKU/Rates'));
-        const ratesVal = ratesSnap.val() || {};
-        setRateConfig(ratesVal);
+const ratesVal = (ratesSnap.val() || {}) as RateConfig;
+setRateConfig(ratesVal);
+
 
         // HSN list
         const hsnSnap = await get(ref(db, '/Global SKU/Rates/HSNList'));
@@ -351,7 +354,7 @@ const EstimatePage: React.FC = () => {
         // initialise ratePer10Gm for default metal
         const initialRate = resolveRatePer10Gm('GOLD_22', ratesVal);
         setRatePer10GmInput(initialRate > 0 ? String(initialRate) : '');
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error loading config', err);
         setConfigError(
           'Live rates not available. You can still enter your own rate manually.',
@@ -550,61 +553,65 @@ const handleAddStoneLine = () => {
 };
 
 
-  const handleSubmitEnquiry = async () => {
-    setSubmitStatus(null);
-    if (!customerName || !customerMobile) {
-      setSubmitStatus('Please enter customer name and mobile number.');
-      return;
-    }
-    try {
-      const enquiryRef = ref(db, `/EstimateEnquiries/${Date.now()}`);
-      const payload = {
-        createdAt: new Date().toISOString(),
-        metalType,
-        grossWeight: estimateResult.effectiveGrossWeight,
-        goldWeight: estimateResult.effectiveGoldWeight,
-        ratePer10Gm,
-        ratePerGm: estimateResult.ratePerGm,
-        metalValue: estimateResult.metalValue,
-        stoneLines: estimateResult.stoneLines.map((s) => ({
-          label: s.label,
-          weightValue: s.weightValue,
-          weightUnit: s.weightUnit,
-          rateType: s.rateType,
-          rateValue: s.rateValue,
-          pieces: s.pieces,
-          stoneValue: s.stoneValue,
-        })),
-        stonesTotalValue: estimateResult.stonesTotalValue,
-        labourAmount: estimateResult.labourAmount,
-        discountType: 'amount',
-        discountValue: 0,
-        discountAmount: 0,
-        subTotalBeforeDiscount: estimateResult.subTotalBeforeDiscount,
-        amountAfterDiscount: estimateResult.amountAfterDiscount,
-        hsnCode: hsnList.find((h) => h.id === selectedHsnId)?.code ?? '',
-        gstRate,
-        gstAmount: estimateResult.gstAmount,
-        grandTotal: estimateResult.grandTotal,
-        overridden,
-        articleType: 'Article',
-        customerName,
-        customerMobile,
-        customerCity,
-        preferredContact,
-        remarks: customerRemarks,
-        source: 'web_estimate_page',
-      };
+const handleSubmitEnquiry = async () => {
+  setSubmitStatus(null);
+  if (!customerName || !customerMobile) {
+    setSubmitStatus('Please enter customer name and mobile number.');
+    return;
+  }
+  try {
+    // Use a Firebase-generated unique ID under /EstimateEnquiries
+    const enquiriesRootRef = ref(db, '/EstimateEnquiries');
+    const enquiryRef = push(enquiriesRootRef);
 
-      await import('firebase/database').then(({ set }) => set(enquiryRef, payload));
-      setSubmitStatus('Enquiry saved successfully.');
-    } catch (err) {
-      console.error(err);
-      setSubmitStatus(
-        'Could not save enquiry. Please try again or WhatsApp us directly.',
-      );
-    }
-  };
+    const payload = {
+      createdAt: new Date().toISOString(),
+      metalType,
+      grossWeight: estimateResult.effectiveGrossWeight,
+      goldWeight: estimateResult.effectiveGoldWeight,
+      ratePer10Gm,
+      ratePerGm: estimateResult.ratePerGm,
+      metalValue: estimateResult.metalValue,
+      stoneLines: estimateResult.stoneLines.map((s) => ({
+        label: s.label,
+        weightValue: s.weightValue,
+        weightUnit: s.weightUnit,
+        rateType: s.rateType,
+        rateValue: s.rateValue,
+        pieces: s.pieces,
+        stoneValue: s.stoneValue,
+      })),
+      stonesTotalValue: estimateResult.stonesTotalValue,
+      labourAmount: estimateResult.labourAmount,
+      discountType: 'amount',
+      discountValue: 0,
+      discountAmount: 0,
+      subTotalBeforeDiscount: estimateResult.subTotalBeforeDiscount,
+      amountAfterDiscount: estimateResult.amountAfterDiscount,
+      hsnCode: hsnList.find((h) => h.id === selectedHsnId)?.code ?? '',
+      gstRate,
+      gstAmount: estimateResult.gstAmount,
+      grandTotal: estimateResult.grandTotal,
+      overridden,
+      articleType: 'Article',
+      customerName,
+      customerMobile,
+      customerCity,
+      preferredContact,
+      remarks: customerRemarks,
+      source: 'web_estimate_page',
+    };
+
+    await set(enquiryRef, payload);
+
+    setSubmitStatus('Enquiry saved successfully.');
+  } catch (err: unknown) {
+    console.error('Error saving enquiry:', err);
+    setSubmitStatus(
+      'Could not save enquiry. Please try again or WhatsApp us directly.',
+    );
+  }
+};
 
   /* =========================
      Render
@@ -1217,7 +1224,8 @@ const formatStoneDesc = (s: StoneLineResult): string => {
 };
 
 
-function resolveRatePer10Gm(metal: MetalType, cfg: any): number {
+function resolveRatePer10Gm(metal: MetalType, cfg: RateConfig | null): number {
+
   if (!cfg) return 0;
   // /Global SKU/Rates:
   //  Gold 24kt, Gold 22kt, Gold 18kt, Gold 14kt are per 10gm
