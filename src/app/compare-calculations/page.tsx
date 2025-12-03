@@ -68,7 +68,6 @@ interface StoneLineResult extends StoneLineInput {
 }
 
 interface EstimateInput {
-  metalType: MetalType;
   grossWeight: number | null;
   goldWeight: number | null;
   stones: StoneLineInput[];
@@ -95,6 +94,7 @@ interface EstimateInput {
   miscDiscountMode: MiscDiscountMode;
   miscDiscountValue: number | null;
 }
+
 
 interface EstimateResult {
   effectiveGoldWeight: number;
@@ -207,7 +207,6 @@ const METAL_RATE_PATHS: Record<MetalType, string> = {
 
 function calculateEstimate(input: EstimateInput): EstimateResult {
   const {
-    metalType,
     grossWeight,
     goldWeight,
     stones,
@@ -635,27 +634,26 @@ const EstimateComparisonPage: React.FC = () => {
     const labourDisc = parseNumber(labourDiscountStr);
     const miscDisc = parseNumber(miscDiscountStr);
 
-    return calculateEstimate({
-      metalType,
-      grossWeight,
-      goldWeight,
-      stones,
-      touchedField,
-      ratePer10Gm,
-      ctToGm: DEFAULT_CT_TO_GM,
-      rtToGm: DEFAULT_RT_TO_GM,
-      gstRate,
-      goldGrossMode,
-      polishMode,
-      polishValue,
-      labourMode,
-      labourParam,
-      miscCharges,
-      labourDiscountMode,
-      labourDiscountValue: labourDisc,
-      miscDiscountMode,
-      miscDiscountValue: miscDisc,
-    });
+  return calculateEstimate({
+    grossWeight,
+    goldWeight,
+    stones,
+    touchedField,
+    ratePer10Gm,
+    ctToGm: DEFAULT_CT_TO_GM,
+    rtToGm: DEFAULT_RT_TO_GM,
+    gstRate,
+    goldGrossMode,
+    polishMode,
+    polishValue,
+    labourMode,
+    labourParam,
+    miscCharges,
+    labourDiscountMode,
+    labourDiscountValue: labourDisc,
+    miscDiscountMode,
+    miscDiscountValue: miscDisc,
+  });
   }, [
     metalType,
     grossWeightStr,
