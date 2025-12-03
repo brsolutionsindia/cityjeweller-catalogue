@@ -232,7 +232,8 @@ function calculateEstimate(input: EstimateInput): EstimateResult {
 
   // 1. Stones: weights, values, line discounts
   const stoneLines: StoneLineResult[] = [];
-  let totalStoneWeightGm = 0;
+  // 🔴 REMOVE this line:
+  // let totalStoneWeightGm = 0;
   let stonesTotalValue = 0;
   let stonesDiscountTotal = 0;
 
@@ -310,7 +311,8 @@ function calculateEstimate(input: EstimateInput): EstimateResult {
 
     const netStoneValue = round(stoneValue - discountAmount, 2);
 
-    totalStoneWeightGm += stoneWeightGm;
+    // 🔴 REMOVE this line:
+    // totalStoneWeightGm += stoneWeightGm;
     stonesTotalValue += netStoneValue;
     stonesDiscountTotal += discountAmount;
 
@@ -331,11 +333,12 @@ function calculateEstimate(input: EstimateInput): EstimateResult {
     });
   });
 
-  totalStoneWeightGm = round(totalStoneWeightGm, 3);
+  // 🔴 REMOVE this line:
+  // totalStoneWeightGm = round(totalStoneWeightGm, 3);
   stonesTotalValue = round(stonesTotalValue, 2);
   stonesDiscountTotal = round(stonesDiscountTotal, 2);
 
-  // 2. Gold/gross relation
+// 2. Gold/gross relation
   let effGross = grossWeight ?? 0;
   let effGold = goldWeight ?? 0;
 
