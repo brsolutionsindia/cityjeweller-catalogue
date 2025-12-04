@@ -95,7 +95,6 @@ interface EstimateInput {
   miscDiscountValue: number | null;
 }
 
-
 interface EstimateResult {
   effectiveGoldWeight: number;
   effectiveGrossWeight: number;
@@ -151,11 +150,12 @@ const metalOptions: { value: MetalType; label: string }[] = [
   { value: 'SILVER', label: 'Silver' },
 ];
 
+// 🔁 Diam1 / Stone1 disabled by default
 const defaultStones: StoneLineInput[] = [
   {
     id: 'DIAM1',
     label: 'Diam1',
-    enabled: true,
+    enabled: false,
     kind: 'diamond',
     weightValue: null,
     weightDisplay: '',
@@ -172,7 +172,7 @@ const defaultStones: StoneLineInput[] = [
   {
     id: 'STONE1',
     label: 'Stone1',
-    enabled: true,
+    enabled: false,
     kind: 'stone',
     weightValue: null,
     weightDisplay: '',
@@ -198,7 +198,7 @@ const METAL_RATE_PATHS: Record<MetalType, string> = {
   GOLD_22: '/Global SKU/Rates/Gold 22kt',
   GOLD_18: '/Global SKU/Rates/Gold 18kt',
   GOLD_14: '/Global SKU/Rates/Gold 14kt',
-  SILVER: '/Global SKU/Rates/Silver'
+  SILVER: '/Global SKU/Rates/Silver',
 };
 
 /* =========================
@@ -231,8 +231,6 @@ function calculateEstimate(input: EstimateInput): EstimateResult {
 
   // 1. Stones: weights, values, line discounts
   const stoneLines: StoneLineResult[] = [];
-  // 🔴 REMOVE this line:
-  // let totalStoneWeightGm = 0;
   let stonesTotalValue = 0;
   let stonesDiscountTotal = 0;
 
@@ -310,8 +308,6 @@ function calculateEstimate(input: EstimateInput): EstimateResult {
 
     const netStoneValue = round(stoneValue - discountAmount, 2);
 
-    // 🔴 REMOVE this line:
-    // totalStoneWeightGm += stoneWeightGm;
     stonesTotalValue += netStoneValue;
     stonesDiscountTotal += discountAmount;
 
@@ -332,12 +328,10 @@ function calculateEstimate(input: EstimateInput): EstimateResult {
     });
   });
 
-  // 🔴 REMOVE this line:
-  // totalStoneWeightGm = round(totalStoneWeightGm, 3);
   stonesTotalValue = round(stonesTotalValue, 2);
   stonesDiscountTotal = round(stonesDiscountTotal, 2);
 
-// 2. Gold/gross relation
+  // 2. Gold/gross relation
   let effGross = grossWeight ?? 0;
   let effGold = goldWeight ?? 0;
 
@@ -449,7 +443,6 @@ function calculateEstimate(input: EstimateInput): EstimateResult {
       labourDiscountAmount = (labourBase * labDiscVal) / 100;
       break;
     case 'per_gm':
-      // "Rs ___ per gm of Gold"
       labourDiscountAmount = effGold * labDiscVal;
       break;
     case 'flat':
@@ -570,28 +563,29 @@ const EstimateComparisonPage: React.FC = () => {
   const [polishMode, setPolishMode] = useState<PolishMode>('gm');
   const [polishValueStr, setPolishValueStr] = useState<string>('');
 
-  const [labourMode, setLabourMode] =
-    useState<LabourMode>('pct_gold');
+  const [labourMode, setLabourMode] = useState<LabourMode>('pct_gold');
   const [labourParamStr, setLabourParamStr] = useState<string>('');
 
   const [miscChargesStr, setMiscChargesStr] = useState<string>('');
 
   const [labourDiscountMode, setLabourDiscountMode] =
     useState<LineDiscountMode>('none');
-  const [labourDiscountStr, setLabourDiscountStr] =
-    useState<string>('');
+  const [labourDiscountStr, setLabourDiscountStr] = useState<string>('');
 
   const [miscDiscountMode, setMiscDiscountMode] =
     useState<MiscDiscountMode>('none');
-  const [miscDiscountStr, setMiscDiscountStr] =
-    useState<string>('');
+  const [miscDiscountStr, setMiscDiscountStr] = useState<string>('');
 
   const [remarks, setRemarks] = useState<string>('');
 
-  const [comparisonItems, setComparisonItems] = useState<
-    ComparisonItem[]
-  >([]);
+  const [comparisonItems, setComparisonItems] = useState<ComparisonItem[]>([]);
   const [showComparison, setShowComparison] = useState(false);
+
+  // Master Cityjeweller.in calculation mode
+  const [isCityjCalc, setIsCityjCalc] = useState(false);
+
+  // Add Polish checkbox
+  const [enablePolish, setEnablePolish] = useState(false);
 
   /* -------- Auto-fetch metal rate from Firebase (user can overwrite) -------- */
 
@@ -608,52 +602,137 @@ const EstimateComparisonPage: React.FC = () => {
         const val = snap.val();
         if (val != null) {
           const num =
-            typeof val === 'number'
-              ? val
-              : parseFloat(String(val));
+            typeof val === 'number' ? val : parseFloat(String(val));
           if (!Number.isNaN(num)) {
             setRatePer10GmInput(num.toString());
           }
         }
       } catch (err) {
-        console.error('Failed to fetch metal rate from Firebase', err);
+        console.error('Failed to fetch metal rate ', err);
       }
     };
 
     fetchRate();
   }, [metalType, ratePer10GmInput]);
 
+  /* -------- Cityjeweller.in Calculation Mode Behaviour -------- */
+
+  React.useEffect(() => {
+    if (!isCityjCalc) return;
+
+    // Labour % depending on metal
+    const pct =
+      metalType === 'GOLD_24' || metalType === 'GOLD_22' ? 10 : 20;
+    setLabourMode('pct_gold');
+    setLabourParamStr(String(pct));
+
+    // Disable & clear polish
+    setEnablePolish(false);
+    setPolishValueStr('');
+
+    // Disable all discounts
+    setLabourDiscountMode('none');
+    setLabourDiscountStr('');
+    setMiscDiscountMode('none');
+    setMiscDiscountStr('');
+    setStones((prev) =>
+      prev.map((s) => ({
+        ...s,
+        discountMode: 'none',
+        discountValue: null,
+        discountDisplay: '',
+      })),
+    );
+
+    // Reset misc charges
+    setMiscChargesStr('');
+
+    // Reset rate to Firebase (clear so auto-fetch runs)
+    setRatePer10GmInput('');
+
+    // Remarks autofill
+    setRemarks('Cityjeweller.in calculation');
+  }, [isCityjCalc, metalType]);
+
+  /* -------- Derived texts (dull formula hints) -------- */
+
+  const goldGrossHint = useMemo(() => {
+    switch (goldGrossMode) {
+      case 'GROSS_EQUALS_GOLD':
+        return 'Formula: Gold Wt = Gross Wt (no separate deduction of stones or diamonds).';
+      case 'GROSS_MINUS_STONE':
+        return 'Formula: Gold Wt = Gross Wt − Total Stone Wt (non-diamond stones).';
+      case 'GROSS_MINUS_DIAM':
+        return 'Formula: Gold Wt = Gross Wt − Total Diamond Wt.';
+      case 'GROSS_MINUS_STONE_DIAM':
+      default:
+        return 'Formula: Gold Wt = Gross Wt − (Total Stone Wt + Total Diamond Wt).';
+    }
+  }, [goldGrossMode]);
+
+  const labourFormulaHint = useMemo(() => {
+    switch (labourMode) {
+      case 'per_gm_gold':
+        return 'Formula: Labour = (Gold Wt in gm) × (Rs per gm).';
+      case 'flat':
+        return 'Formula: Labour = Flat fixed amount.';
+      case 'pct_gold':
+        return 'Formula: Labour = % of Gold value.';
+      case 'pct_gold_plus_diam':
+        return 'Formula: Labour = % of (Gold value + Diamond value).';
+      case 'pct_gold_plus_stone':
+        return 'Formula: Labour = % of (Gold value + Stone value).';
+      case 'pct_gold_plus_diam_stone':
+        return 'Formula: Labour = % of (Gold + Diamond + Stone value).';
+      default:
+        return '';
+    }
+  }, [labourMode]);
+
   /* -------- Derived estimate -------- */
 
   const estimateResult: EstimateResult = useMemo(() => {
     const grossWeight = parseNumber(grossWeightStr);
     const goldWeight = parseNumber(goldWeightStr);
-    const polishValue = parseNumber(polishValueStr);
+
+    // Cityj mode or Add Polish unchecked => ignore polish value
+    const polishValue =
+      isCityjCalc || !enablePolish ? null : parseNumber(polishValueStr);
+
+    // When Cityj mode is ON, force all stone discounts to NONE in calculation too
+    const stonesForCalc = isCityjCalc
+      ? stones.map((s) => ({
+          ...s,
+          discountMode: 'none',
+          discountValue: null,
+        }))
+      : stones;
+
     const labourParam = parseNumber(labourParamStr);
     const miscCharges = parseNumber(miscChargesStr);
     const labourDisc = parseNumber(labourDiscountStr);
     const miscDisc = parseNumber(miscDiscountStr);
 
-  return calculateEstimate({
-    grossWeight,
-    goldWeight,
-    stones,
-    touchedField,
-    ratePer10Gm,
-    ctToGm: DEFAULT_CT_TO_GM,
-    rtToGm: DEFAULT_RT_TO_GM,
-    gstRate,
-    goldGrossMode,
-    polishMode,
-    polishValue,
-    labourMode,
-    labourParam,
-    miscCharges,
-    labourDiscountMode,
-    labourDiscountValue: labourDisc,
-    miscDiscountMode,
-    miscDiscountValue: miscDisc,
-  });
+    return calculateEstimate({
+      grossWeight,
+      goldWeight,
+      stones: stonesForCalc,
+      touchedField,
+      ratePer10Gm,
+      ctToGm: DEFAULT_CT_TO_GM,
+      rtToGm: DEFAULT_RT_TO_GM,
+      gstRate,
+      goldGrossMode,
+      polishMode,
+      polishValue,
+      labourMode,
+      labourParam,
+      miscCharges,
+      labourDiscountMode,
+      labourDiscountValue: labourDisc,
+      miscDiscountMode,
+      miscDiscountValue: miscDisc,
+    });
   }, [
     metalType,
     grossWeightStr,
@@ -672,6 +751,8 @@ const EstimateComparisonPage: React.FC = () => {
     labourDiscountStr,
     miscDiscountMode,
     miscDiscountStr,
+    isCityjCalc,
+    enablePolish,
   ]);
 
   /* -------- Labour description for Summary -------- */
@@ -803,10 +884,8 @@ const EstimateComparisonPage: React.FC = () => {
 
   const handleAddStoneLine = () => {
     setStones((prev) => {
-      const diamCount = prev.filter((s) => s.label.startsWith('Diam'))
-        .length;
-      const stoneCount = prev.filter((s) => s.label.startsWith('Stone'))
-        .length;
+      const diamCount = prev.filter((s) => s.label.startsWith('Diam')).length;
+      const stoneCount = prev.filter((s) => s.label.startsWith('Stone')).length;
 
       const useDiam = diamCount <= stoneCount;
       const base = useDiam ? 'Diam' : 'Stone';
@@ -870,7 +949,14 @@ const EstimateComparisonPage: React.FC = () => {
       result: estimateResult,
     };
 
-    setComparisonItems((prev) => [...prev, item]);
+    setComparisonItems((prev) => {
+      const next = [...prev, item];
+      if (prev.length === 0) {
+        // First saved calculation
+        alert('add another calculation to compare with');
+      }
+      return next;
+    });
     setShowComparison(true);
   };
 
@@ -889,6 +975,26 @@ const EstimateComparisonPage: React.FC = () => {
           labour, discounts) and compare them side by side.
         </p>
       </header>
+
+      {/* Master Cityjeweller.in Calculation Toggle */}
+      <div className="border rounded-md p-3 bg-blue-50 flex items-start gap-2">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={isCityjCalc}
+          onChange={(e) => setIsCityjCalc(e.target.checked)}
+        />
+        <div>
+          <p className="text-sm font-medium">
+            Cityjeweller.in calculation
+          </p>
+          <p className="text-[11px] text-gray-600">
+            Uses fixed Cityjeweller.in rules: metal rate fixed, standard labour %
+            on gold, no polish, no discounts, and no misc charges. Uncheck this
+            to customise the calculation.
+          </p>
+        </div>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left column – inputs */}
@@ -923,34 +1029,7 @@ const EstimateComparisonPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="block text-xs font-medium">
-                Relation between Gross & Gold Weight
-              </label>
-              <select
-                value={goldGrossMode}
-                onChange={(e) =>
-                  setGoldGrossMode(
-                    e.target.value as GoldGrossMode,
-                  )
-                }
-                className="w-full border rounded px-2 py-1 text-xs"
-              >
-                <option value="GROSS_EQUALS_GOLD">
-                  Gold Wt = Gross Wt (includes stones & diamonds)
-                </option>
-                <option value="GROSS_MINUS_STONE">
-                  Gold Wt = Gross − Stone Wt (includes diamonds)
-                </option>
-                <option value="GROSS_MINUS_DIAM">
-                  Gold Wt = Gross − Diamond Wt (includes stones)
-                </option>
-                <option value="GROSS_MINUS_STONE_DIAM">
-                  Gold Wt = Gross − (Stone + Diamond) Wt (default)
-                </option>
-              </select>
-            </div>
-
+            {/* Gross & Gold inputs */}
             <div className="grid grid-cols-2 gap-3 mt-2">
               <div>
                 <label className="block text-xs font-medium mb-1">
@@ -968,9 +1047,7 @@ const EstimateComparisonPage: React.FC = () => {
               </div>
               <div>
                 <label className="block text-xs font-medium mb-1">
-                  {metalType === 'SILVER'
-                    ? 'Silver Wt (gm)'
-                    : 'Gold Wt (gm)'}
+                  {metalType === 'SILVER' ? 'Silver Wt (gm)' : 'Gold Wt (gm)'}
                 </label>
                 <input
                   type="number"
@@ -984,6 +1061,36 @@ const EstimateComparisonPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Relation (now AFTER weights, dull style) */}
+            <div className="mt-2">
+              <label className="block text-[11px] text-gray-600 mb-1">
+                Relation between Gross & Gold Weight
+              </label>
+              <select
+                value={goldGrossMode}
+                onChange={(e) =>
+                  setGoldGrossMode(e.target.value as GoldGrossMode)
+                }
+                className="w-full border rounded px-2 py-1 text-[11px]"
+              >
+                <option value="GROSS_EQUALS_GOLD">
+                  Gold Wt = Gross Wt (includes stones & diamonds)
+                </option>
+                <option value="GROSS_MINUS_STONE">
+                  Gold Wt = Gross − Stone Wt (includes diamonds)
+                </option>
+                <option value="GROSS_MINUS_DIAM">
+                  Gold Wt = Gross − Diamond Wt (includes stones)
+                </option>
+                <option value="GROSS_MINUS_STONE_DIAM">
+                  Gold Wt = Gross − (Stone + Diamond) Wt (default)
+                </option>
+              </select>
+              <p className="text-[11px] text-gray-400 mt-1 italic">
+                {goldGrossHint}
+              </p>
+            </div>
+
             <p className="text-[11px] text-gray-600 mt-1">
               Effective Net Wt (Gold) ={' '}
               {estimateResult.effectiveGoldWeight.toFixed(3)} gm
@@ -992,43 +1099,7 @@ const EstimateComparisonPage: React.FC = () => {
             </p>
           </div>
 
-          {/* Polish */}
-          <div className="border rounded-md p-4 space-y-3">
-            <h2 className="font-semibold text-sm">
-              Polish (as Gold)
-            </h2>
-            <div className="flex gap-2 items-center">
-              <select
-                value={polishMode}
-                onChange={(e) =>
-                  setPolishMode(e.target.value as PolishMode)
-                }
-                className="border rounded px-2 py-1 text-xs"
-              >
-                <option value="gm">
-                  Polish = __ gm of Gold
-                </option>
-                <option value="pct">
-                  Polish = __ % of Gold Wt
-                </option>
-              </select>
-              <input
-                type="number"
-                value={polishValueStr}
-                onChange={(e) => setPolishValueStr(e.target.value)}
-                placeholder={
-                  polishMode === 'gm' ? 'gm' : '% of gold wt'
-                }
-                className="flex-1 border rounded px-2 py-1 text-sm"
-              />
-            </div>
-            <p className="text-[11px] text-gray-600">
-              Calculated Polish Wt ={' '}
-              {estimateResult.polishWeightGm.toFixed(3)} gm
-            </p>
-          </div>
-
-          {/* Stone lines + discounts */}
+          {/* Stones / Diamonds */}
           <div className="border rounded-md p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-sm">
@@ -1053,10 +1124,7 @@ const EstimateComparisonPage: React.FC = () => {
                     <span className="text-xs font-medium">
                       {s.label}{' '}
                       <span className="text-[10px] text-gray-500">
-                        ({s.kind === 'diamond'
-                          ? 'Diamond'
-                          : 'Stone'}
-                        )
+                        ({s.kind === 'diamond' ? 'Diamond' : 'Stone'})
                       </span>
                     </span>
                     <label className="flex items-center gap-1 text-[11px]">
@@ -1085,9 +1153,7 @@ const EstimateComparisonPage: React.FC = () => {
                           <div className="flex gap-1">
                             <input
                               type="number"
-                              value={
-                                s.weightDisplay ?? ''
-                              }
+                              value={s.weightDisplay ?? ''}
                               onChange={(e) =>
                                 handleStoneChange(
                                   s.id,
@@ -1108,15 +1174,9 @@ const EstimateComparisonPage: React.FC = () => {
                               }
                               className="w-1/3 border rounded px-1 py-1 text-xs"
                             >
-                              <option value="gm">
-                                gm
-                              </option>
-                              <option value="ct">
-                                ct
-                              </option>
-                              <option value="rt">
-                                rt
-                              </option>
+                              <option value="gm">gm</option>
+                              <option value="ct">ct</option>
+                              <option value="rt">rt</option>
                             </select>
                           </div>
                         </div>
@@ -1127,9 +1187,7 @@ const EstimateComparisonPage: React.FC = () => {
                           <div className="flex gap-1">
                             <input
                               type="number"
-                              value={
-                                s.rateDisplay ?? ''
-                              }
+                              value={s.rateDisplay ?? ''}
                               onChange={(e) =>
                                 handleStoneChange(
                                   s.id,
@@ -1150,18 +1208,10 @@ const EstimateComparisonPage: React.FC = () => {
                               }
                               className="w-1/3 border rounded px-1 py-1 text-xs"
                             >
-                              <option value="per_gm">
-                                /gm
-                              </option>
-                              <option value="per_ct">
-                                /ct
-                              </option>
-                              <option value="per_rt">
-                                /rt
-                              </option>
-                              <option value="per_piece">
-                                /pc
-                              </option>
+                              <option value="per_gm">/gm</option>
+                              <option value="per_ct">/ct</option>
+                              <option value="per_rt">/rt</option>
+                              <option value="per_piece">/pc</option>
                             </select>
                           </div>
                         </div>
@@ -1172,9 +1222,7 @@ const EstimateComparisonPage: React.FC = () => {
                             </label>
                             <input
                               type="number"
-                              value={
-                                s.piecesDisplay ?? ''
-                              }
+                              value={s.piecesDisplay ?? ''}
                               onChange={(e) =>
                                 handleStoneChange(
                                   s.id,
@@ -1203,27 +1251,22 @@ const EstimateComparisonPage: React.FC = () => {
                                 e.target.value,
                               )
                             }
-                            className="border rounded px-2 py-1 text-[11px]"
+                            disabled={isCityjCalc}
+                            className="border rounded px-2 py-1 text-[11px] disabled:bg-gray-100"
                           >
-                            <option value="none">
-                              No discount
-                            </option>
+                            <option value="none">No discount</option>
                             <option value="pct">
                               % of {s.label} value
                             </option>
                             <option value="per_gm">
                               Rs / gm of {s.label}
                             </option>
-                            <option value="flat">
-                              Rs flat
-                            </option>
+                            <option value="flat">Rs flat</option>
                           </select>
-                          {s.discountMode !== 'none' && (
+                          {s.discountMode !== 'none' && !isCityjCalc && (
                             <input
                               type="number"
-                              value={
-                                s.discountDisplay ?? ''
-                              }
+                              value={s.discountDisplay ?? ''}
                               onChange={(e) =>
                                 handleStoneChange(
                                   s.id,
@@ -1235,6 +1278,12 @@ const EstimateComparisonPage: React.FC = () => {
                               className="flex-1 border rounded px-2 py-1 text-xs"
                             />
                           )}
+                          {isCityjCalc && (
+                            <span className="text-[10px] text-gray-500">
+                              Discounts disabled in Cityjeweller.in
+                              calculation
+                            </span>
+                          )}
                         </div>
                       </div>
                     </>
@@ -1244,12 +1293,79 @@ const EstimateComparisonPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Rates, Labour, Misc & Discounts */}
+          {/* Add Polish toggle + Polish section (AFTER stones) */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1 text-xs">
+                <input
+                  type="checkbox"
+                  checked={enablePolish}
+                  onChange={(e) => setEnablePolish(e.target.checked)}
+                  disabled={isCityjCalc}
+                />
+                <span
+                  className={
+                    isCityjCalc ? 'text-gray-400' : 'text-gray-700'
+                  }
+                >
+                  Add Polish
+                </span>
+              </label>
+            </div>
+            {isCityjCalc && (
+              <p className="text-[11px] text-gray-400 italic">
+                Polish is disabled in Cityjeweller.in calculation mode.
+              </p>
+            )}
+
+            {enablePolish && !isCityjCalc && (
+              <div className="border rounded-md p-4 space-y-3">
+                <h2 className="font-semibold text-sm">
+                  Polish (as Gold)
+                </h2>
+                <div className="flex gap-2 items-center">
+                  <select
+                    value={polishMode}
+                    onChange={(e) =>
+                      setPolishMode(e.target.value as PolishMode)
+                    }
+                    className="border rounded px-2 py-1 text-xs"
+                  >
+                    <option value="gm">
+                      Polish = __ gm of Gold
+                    </option>
+                    <option value="pct">
+                      Polish = __ % of Gold Wt
+                    </option>
+                  </select>
+                  <input
+                    type="number"
+                    value={polishValueStr}
+                    onChange={(e) => setPolishValueStr(e.target.value)}
+                    placeholder={
+                      polishMode === 'gm' ? 'gm' : '% of gold wt'
+                    }
+                    className="flex-1 border rounded px-2 py-1 text-sm"
+                  />
+                </div>
+                <p className="text-[11px] text-gray-400 italic">
+                  {polishMode === 'gm'
+                    ? 'Polish weight is added as extra gold in grams.'
+                    : 'Polish weight is calculated as a % of effective gold weight and added as extra gold.'}
+                </p>
+                <p className="text-[11px] text-gray-600">
+                  Calculated Polish Wt ={' '}
+                  {estimateResult.polishWeightGm.toFixed(3)} gm
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Gold / Silver Rate – separate section */}
           <div className="border rounded-md p-4 space-y-3">
             <h2 className="font-semibold text-sm">
-              Rates, Labour & Misc / Discounts
+              Gold / Silver Rate
             </h2>
-
             <div>
               <label className="block text-xs font-medium mb-1">
                 {metalType === 'SILVER'
@@ -1260,12 +1376,24 @@ const EstimateComparisonPage: React.FC = () => {
                 type="number"
                 value={ratePer10GmInput}
                 onChange={(e) => setRatePer10GmInput(e.target.value)}
-                className="w-full border rounded px-2 py-1 text-sm"
+                disabled={isCityjCalc}
+                className="w-full border rounded px-2 py-1 text-sm disabled:bg-gray-100"
               />
               <p className="text-[11px] text-gray-600 mt-1">
                 Rate per gm: Rs.{estimateResult.ratePerGm.toFixed(2)}
               </p>
+              {isCityjCalc && (
+                <p className="text-[11px] text-gray-400 italic">
+                  Rate is locked in Cityjeweller.in calculation mode. Uncheck
+                  the checkbox above to edit.
+                </p>
+              )}
             </div>
+          </div>
+
+          {/* Labour – separate section */}
+          <div className="border rounded-md p-4 space-y-3">
+            <h2 className="font-semibold text-sm">Labour</h2>
 
             <div>
               <label className="block text-xs font-medium mb-1">
@@ -1275,11 +1403,10 @@ const EstimateComparisonPage: React.FC = () => {
                 <select
                   value={labourMode}
                   onChange={(e) =>
-                    setLabourMode(
-                      e.target.value as LabourMode,
-                    )
+                    setLabourMode(e.target.value as LabourMode)
                   }
-                  className="w-full border rounded px-2 py-1 text-xs"
+                  disabled={isCityjCalc}
+                  className="w-full border rounded px-2 py-1 text-xs disabled:bg-gray-100"
                 >
                   <option value="per_gm_gold">
                     Rs __ per gm Gold
@@ -1300,14 +1427,17 @@ const EstimateComparisonPage: React.FC = () => {
                     ___% of Gold + Diam + Stone value
                   </option>
                 </select>
+                {/* Dull labour formula hint */}
+                <p className="text-[11px] text-gray-400 italic">
+                  {labourFormulaHint}
+                </p>
                 <input
                   type="number"
                   value={labourParamStr}
-                  onChange={(e) =>
-                    setLabourParamStr(e.target.value)
-                  }
+                  onChange={(e) => setLabourParamStr(e.target.value)}
                   placeholder="Enter labour parameter"
-                  className="w-full border rounded px-2 py-1 text-sm"
+                  disabled={isCityjCalc}
+                  className="w-full border rounded px-2 py-1 text-sm disabled:bg-gray-100"
                 />
                 <p className="text-[11px] text-gray-600">
                   Labour (before discount): Rs.
@@ -1329,7 +1459,8 @@ const EstimateComparisonPage: React.FC = () => {
                       e.target.value as LineDiscountMode,
                     )
                   }
-                  className="border rounded px-2 py-1 text-[11px]"
+                  disabled={isCityjCalc}
+                  className="border rounded px-2 py-1 text-[11px] disabled:bg-gray-100"
                 >
                   <option value="none">No discount</option>
                   <option value="pct">% of Labour</option>
@@ -1338,7 +1469,7 @@ const EstimateComparisonPage: React.FC = () => {
                   </option>
                   <option value="flat">Rs flat</option>
                 </select>
-                {labourDiscountMode !== 'none' && (
+                {labourDiscountMode !== 'none' && !isCityjCalc && (
                   <input
                     type="number"
                     value={labourDiscountStr}
@@ -1348,6 +1479,11 @@ const EstimateComparisonPage: React.FC = () => {
                     className="flex-1 border rounded px-2 py-1 text-xs"
                   />
                 )}
+                {isCityjCalc && (
+                  <span className="text-[10px] text-gray-500">
+                    Discounts disabled in Cityjeweller.in calculation
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-gray-600">
                 Labour Discount: Rs.
@@ -1356,8 +1492,14 @@ const EstimateComparisonPage: React.FC = () => {
                 {estimateResult.labourNet.toFixed(2)}
               </p>
             </div>
+          </div>
 
-            {/* Misc & misc discount */}
+          {/* Misc – separate section */}
+          <div className="border rounded-md p-4 space-y-3">
+            <h2 className="font-semibold text-sm">
+              Misc Charges & Discounts
+            </h2>
+
             <div className="grid gap-2 md:grid-cols-2">
               <div>
                 <label className="block text-xs font-medium mb-1">
@@ -1366,10 +1508,9 @@ const EstimateComparisonPage: React.FC = () => {
                 <input
                   type="number"
                   value={miscChargesStr}
-                  onChange={(e) =>
-                    setMiscChargesStr(e.target.value)
-                  }
-                  className="w-full border rounded px-2 py-1 text-sm"
+                  onChange={(e) => setMiscChargesStr(e.target.value)}
+                  disabled={isCityjCalc}
+                  className="w-full border rounded px-2 py-1 text-sm disabled:bg-gray-100"
                 />
               </div>
               <div>
@@ -1384,7 +1525,8 @@ const EstimateComparisonPage: React.FC = () => {
                         e.target.value as MiscDiscountMode,
                       )
                     }
-                    className="border rounded px-2 py-1 text-[11px]"
+                    disabled={isCityjCalc}
+                    className="border rounded px-2 py-1 text-[11px] disabled:bg-gray-100"
                   >
                     <option value="none">No discount</option>
                     <option value="pct_total">
@@ -1392,7 +1534,7 @@ const EstimateComparisonPage: React.FC = () => {
                     </option>
                     <option value="flat">Rs flat</option>
                   </select>
-                  {miscDiscountMode !== 'none' && (
+                  {miscDiscountMode !== 'none' && !isCityjCalc && (
                     <input
                       type="number"
                       value={miscDiscountStr}
@@ -1401,6 +1543,11 @@ const EstimateComparisonPage: React.FC = () => {
                       }
                       className="flex-1 border rounded px-2 py-1 text-xs"
                     />
+                  )}
+                  {isCityjCalc && (
+                    <span className="text-[10px] text-gray-500">
+                      Discounts disabled in Cityjeweller.in calculation
+                    </span>
                   )}
                 </div>
               </div>
@@ -1436,9 +1583,7 @@ const EstimateComparisonPage: React.FC = () => {
               </p>
               <p className="text-[11px] text-red-600">
                 {metalType === 'SILVER'
-                  ? `Silver Rate per 10gm = Rs.${ratePer10Gm.toFixed(
-                      0,
-                    )}`
+                  ? `Silver Rate per 10gm = Rs.${ratePer10Gm.toFixed(0)}`
                   : `Gold Rate per 10gm = Rs.${ratePer10Gm.toFixed(
                       0,
                     )} (${metalLabel(metalType)})`}
@@ -1457,19 +1602,14 @@ const EstimateComparisonPage: React.FC = () => {
                   label="Polish (extra gold):"
                   desc={`${estimateResult.polishWeightGm.toFixed(
                     3,
-                  )} gm × Rs.${estimateResult.ratePerGm.toFixed(
-                    2,
-                  )}`}
+                  )} gm × Rs.${estimateResult.ratePerGm.toFixed(2)}`}
                   amount={estimateResult.polishValue}
                 />
               )}
 
               {/* Stones (net after discount) */}
               {estimateResult.stoneLines
-                .filter(
-                  (s) =>
-                    s.enabled && s.netStoneValue !== 0,
-                )
+                .filter((s) => s.enabled && s.netStoneValue !== 0)
                 .map((s) => (
                   <Row
                     key={s.id}
@@ -1554,9 +1694,10 @@ const EstimateComparisonPage: React.FC = () => {
                 Remarks / Reference (shop name, pattern etc.)
               </label>
               <input
-                className="w-full border rounded px-2 py-1 text-sm"
+                className="w-full border rounded px-2 py-1 text-sm disabled:bg-gray-100"
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
+                disabled={isCityjCalc}
               />
             </div>
             <button
@@ -1564,7 +1705,7 @@ const EstimateComparisonPage: React.FC = () => {
               onClick={handleAddToComparison}
               className="mt-2 w-full bg-emerald-600 text-white text-sm font-medium py-2 rounded"
             >
-              Compare
+              Save Calculation for comparison
             </button>
             {comparisonItems.length > 0 && (
               <p className="text-[11px] text-gray-700 mt-1">
@@ -1597,10 +1738,9 @@ const EstimateComparisonPage: React.FC = () => {
       </div>
 
       {/* Comparison table */}
-      {showComparison &&
-        comparisonItems.length >= 2 && (
-          <ComparisonTable items={comparisonItems} />
-        )}
+      {showComparison && comparisonItems.length >= 2 && (
+        <ComparisonTable items={comparisonItems} />
+      )}
     </div>
   );
 };
@@ -1617,11 +1757,7 @@ const Row: React.FC<{
   color?: string;
 }> = ({ label, desc, amount, bold, color }) => {
   return (
-    <div
-      className={`flex justify-between text-sm ${
-        color ?? ''
-      }`}
-    >
+    <div className={`flex justify-between text-sm ${color ?? ''}`}>
       <div className="flex flex-col">
         <span className={bold ? 'font-semibold' : ''}>
           {label}
@@ -1648,9 +1784,7 @@ const DiffCell: React.FC<{
       different ? 'font-semibold text-emerald-700' : ''
     }`}
   >
-    {typeof value === 'number'
-      ? value.toLocaleString()
-      : value}
+    {typeof value === 'number' ? value.toLocaleString() : value}
   </td>
 );
 
@@ -1659,10 +1793,7 @@ const ComparisonTable: React.FC<{
 }> = ({ items }) => {
   const base = items[0];
 
-  const isDiff = (
-    field: keyof EstimateResult,
-    item: ComparisonItem,
-  ) => {
+  const isDiff = (field: keyof EstimateResult, item: ComparisonItem) => {
     const a = base.result[field];
     const b = item.result[field];
     if (typeof a === 'number' && typeof b === 'number') {
@@ -1735,10 +1866,7 @@ const ComparisonTable: React.FC<{
               {/* Polish gm */}
               <DiffCell
                 value={it.result.polishWeightGm.toFixed(3)}
-                different={isDiff(
-                  'polishWeightGm',
-                  it,
-                )}
+                different={isDiff('polishWeightGm', it)}
               />
               {/* Polish amount */}
               <DiffCell
