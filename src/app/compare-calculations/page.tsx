@@ -700,13 +700,14 @@ const EstimateComparisonPage: React.FC = () => {
       isCityjCalc || !enablePolish ? null : parseNumber(polishValueStr);
 
     // When Cityj mode is ON, force all stone discounts to NONE in calculation too
-    const stonesForCalc = isCityjCalc
-      ? stones.map((s) => ({
-          ...s,
-          discountMode: 'none',
-          discountValue: null,
-        }))
-      : stones;
+    const stonesForCalc: StoneLineInput[] = isCityjCalc
+  ? stones.map((s): StoneLineInput => ({
+      ...s,
+      discountMode: 'none' as LineDiscountMode,
+      discountValue: null,
+    }))
+  : stones;
+
 
     const labourParam = parseNumber(labourParamStr);
     const miscCharges = parseNumber(miscChargesStr);
