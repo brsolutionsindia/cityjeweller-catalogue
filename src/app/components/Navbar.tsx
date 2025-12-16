@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type FormEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -24,10 +24,10 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (searchText.trim()) {
-	router.push(`/search?query=${encodeURIComponent(searchText.trim())}`);
+      router.push(`/search?query=${encodeURIComponent(searchText.trim())}`);
       setSearchText('');
     }
   };
@@ -62,6 +62,7 @@ export default function Navbar() {
   {/* Top Nav */}
   <ul className={styles.navLinksScrollable}>
     <li><Link href="/">Home</Link></li>
+    <li><Link href="/compare-calculations">Comparison-Calculator</Link></li>
     <li><Link href="/#contact">Contact</Link></li>
   </ul>
 </div>

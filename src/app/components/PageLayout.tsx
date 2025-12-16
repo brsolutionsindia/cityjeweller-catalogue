@@ -1,3 +1,6 @@
+'use client';
+
+import type React from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import WhatsAppButton from './WhatsAppButton';

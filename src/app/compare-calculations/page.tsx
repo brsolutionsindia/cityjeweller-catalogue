@@ -1,5 +1,6 @@
 'use client';
 
+import PageLayout from '../components/PageLayout'; 
 import React, { useMemo, useState } from 'react';
 import { ref, get } from 'firebase/database';
 import { db } from '../../firebaseConfig'; // 🔁 adjust path if needed
@@ -966,6 +967,7 @@ const EstimateComparisonPage: React.FC = () => {
   ========================= */
 
   return (
+<PageLayout>
     <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">
@@ -1743,6 +1745,7 @@ const EstimateComparisonPage: React.FC = () => {
         <ComparisonTable items={comparisonItems} />
       )}
     </div>
+</PageLayout>
   );
 };
 
