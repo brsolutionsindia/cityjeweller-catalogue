@@ -1104,7 +1104,7 @@ const handleCompareForMe = () => {
 
 
 {/* ✅ Compact: Want us to do the comparison? (placed immediately after Metal & Weights) */}
-            <div className="border rounded-md p-4 space-y-2">
+            <div className="border border-indigo-200 bg-indigo-50 rounded-md p-4 space-y-2">
               <label className="flex items-center gap-2 text-xs">
                 <input
                   type="checkbox"
