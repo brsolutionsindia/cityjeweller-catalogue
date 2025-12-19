@@ -1,6 +1,6 @@
 'use client';
 
-import PageLayout from '../components/PageLayout'; 
+import PageLayout from '../components/PageLayout';
 import React, { useMemo, useState } from 'react';
 import { ref, get } from 'firebase/database';
 import { db } from '../../firebaseConfig'; // 🔁 adjust path if needed
@@ -547,11 +547,19 @@ interface ComparisonItem {
 ========================= */
 
 const EstimateComparisonPage: React.FC = () => {
+  // 🔗 NEW: manual comparison request (compact UI)
+  const [wantManualComparison, setWantManualComparison] = useState<boolean>(false);
+  const [designWeblink, setDesignWeblink] = useState<string>('');
+
   const [metalType, setMetalType] = useState<MetalType>('GOLD_22');
   const [grossWeightStr, setGrossWeightStr] = useState('');
   const [goldWeightStr, setGoldWeightStr] = useState('');
   const [stones, setStones] = useState<StoneLineInput[]>(defaultStones);
   const [touchedField, setTouchedField] = useState<TouchedField>(null);
+
+  // ✅ NEW: master toggles
+  const [enableStonesSection, setEnableStonesSection] = useState(false);
+  const [enableMiscSection, setEnableMiscSection] = useState(false);
 
   const [goldGrossMode, setGoldGrossMode] =
     useState<GoldGrossMode>('GROSS_MINUS_STONE_DIAM');
@@ -590,31 +598,37 @@ const EstimateComparisonPage: React.FC = () => {
 
   /* -------- Auto-fetch metal rate from Firebase (user can overwrite) -------- */
 
-  React.useEffect(() => {
-    // If user has typed something, don't override
-    if (ratePer10GmInput && ratePer10GmInput.trim() !== '') return;
+/* -------- Auto-fetch metal rate from Firebase (user can overwrite) -------- */
 
-    const path = METAL_RATE_PATHS[metalType];
-    if (!path) return;
+React.useEffect(() => {
+  // If user has typed something, don't override
+  if (ratePer10GmInput && ratePer10GmInput.trim() !== '') return;
 
-    const fetchRate = async () => {
-      try {
-        const snap = await get(ref(db, path));
-        const val = snap.val();
-        if (val != null) {
-          const num =
-            typeof val === 'number' ? val : parseFloat(String(val));
-          if (!Number.isNaN(num)) {
-            setRatePer10GmInput(num.toString());
-          }
+  const path = METAL_RATE_PATHS[metalType];
+  if (!path) return;
+
+  const fetchRate = async () => {
+    try {
+      const snap = await get(ref(db, path));
+      const val = snap.val();
+      if (val != null) {
+        const raw = typeof val === 'number' ? val : parseFloat(String(val));
+        if (!Number.isNaN(raw)) {
+          // ✅ Silver is stored as Rate per 1000 gm in Firebase.
+          // Convert to "per 10 gm" for UI + existing calculation logic.
+          const normalized = metalType === 'SILVER' ? raw / 100 : raw;
+
+          setRatePer10GmInput(normalized.toString());
         }
-      } catch (err) {
-        console.error('Failed to fetch metal rate ', err);
       }
-    };
+    } catch (err) {
+      console.error('Failed to fetch metal rate ', err);
+    }
+  };
 
-    fetchRate();
-  }, [metalType, ratePer10GmInput]);
+  fetchRate();
+}, [metalType, ratePer10GmInput]);
+
 
   /* -------- Cityjeweller.in Calculation Mode Behaviour -------- */
 
@@ -622,8 +636,7 @@ const EstimateComparisonPage: React.FC = () => {
     if (!isCityjCalc) return;
 
     // Labour % depending on metal
-    const pct =
-      metalType === 'GOLD_24' || metalType === 'GOLD_22' ? 10 : 20;
+    const pct = metalType === 'GOLD_24' || metalType === 'GOLD_22' ? 10 : 20;
     setLabourMode('pct_gold');
     setLabourParamStr(String(pct));
 
@@ -645,7 +658,8 @@ const EstimateComparisonPage: React.FC = () => {
       })),
     );
 
-    // Reset misc charges
+    // ✅ Misc section off (minimized) + reset
+    setEnableMiscSection(false);
     setMiscChargesStr('');
 
     // Reset rate to Firebase (clear so auto-fetch runs)
@@ -654,6 +668,33 @@ const EstimateComparisonPage: React.FC = () => {
     // Remarks autofill
     setRemarks('Cityjeweller.in calculation');
   }, [isCityjCalc, metalType]);
+
+  /* -------- Stones section enable/disable behaviour -------- */
+
+  React.useEffect(() => {
+    if (!enableStonesSection) {
+      // If user disables the section, force all lines off (no calculation)
+      setStones((prev) => prev.map((s) => ({ ...s, enabled: false })));
+      return;
+    }
+
+    // If user enables the section, default enable Diam1 + Stone1
+    setStones((prev) =>
+      prev.map((s) =>
+        s.id === 'DIAM1' || s.id === 'STONE1' ? { ...s, enabled: true } : s,
+      ),
+    );
+  }, [enableStonesSection]);
+
+  /* -------- Misc section enable/disable behaviour -------- */
+
+  React.useEffect(() => {
+    if (!enableMiscSection) {
+      setMiscChargesStr('');
+      setMiscDiscountMode('none');
+      setMiscDiscountStr('');
+    }
+  }, [enableMiscSection]);
 
   /* -------- Derived texts (dull formula hints) -------- */
 
@@ -697,23 +738,26 @@ const EstimateComparisonPage: React.FC = () => {
     const goldWeight = parseNumber(goldWeightStr);
 
     // Cityj mode or Add Polish unchecked => ignore polish value
-    const polishValue =
-      isCityjCalc || !enablePolish ? null : parseNumber(polishValueStr);
+    const polishValue = isCityjCalc || !enablePolish ? null : parseNumber(polishValueStr);
 
-    // When Cityj mode is ON, force all stone discounts to NONE in calculation too
-    const stonesForCalc: StoneLineInput[] = isCityjCalc
-  ? stones.map((s): StoneLineInput => ({
-      ...s,
-      discountMode: 'none' as LineDiscountMode,
-      discountValue: null,
-    }))
-  : stones;
-
+    // ✅ Stones: ignore all stones unless section enabled
+    // ✅ Cityj: force discounts none
+    const stonesForCalc: StoneLineInput[] = !enableStonesSection
+      ? stones.map((s) => ({ ...s, enabled: false }))
+      : isCityjCalc
+        ? stones.map((s) => ({
+            ...s,
+            discountMode: 'none' as LineDiscountMode,
+            discountValue: null,
+          }))
+        : stones;
 
     const labourParam = parseNumber(labourParamStr);
-    const miscCharges = parseNumber(miscChargesStr);
+
+    // ✅ Misc: ignore unless section enabled
+    const miscCharges = enableMiscSection && !isCityjCalc ? parseNumber(miscChargesStr) : null;
     const labourDisc = parseNumber(labourDiscountStr);
-    const miscDisc = parseNumber(miscDiscountStr);
+    const miscDisc = enableMiscSection && !isCityjCalc ? parseNumber(miscDiscountStr) : null;
 
     return calculateEstimate({
       grossWeight,
@@ -736,7 +780,6 @@ const EstimateComparisonPage: React.FC = () => {
       miscDiscountValue: miscDisc,
     });
   }, [
-    metalType,
     grossWeightStr,
     goldWeightStr,
     stones,
@@ -755,6 +798,8 @@ const EstimateComparisonPage: React.FC = () => {
     miscDiscountStr,
     isCityjCalc,
     enablePolish,
+    enableStonesSection,
+    enableMiscSection,
   ]);
 
   /* -------- Labour description for Summary -------- */
@@ -792,10 +837,7 @@ const EstimateComparisonPage: React.FC = () => {
     if (touchedField === 'gross') {
       const currentGold = parseNumber(goldWeightStr);
       const computed = estimateResult.effectiveGoldWeight;
-      if (
-        currentGold == null ||
-        round(currentGold, 3) !== round(computed, 3)
-      ) {
+      if (currentGold == null || round(currentGold, 3) !== round(computed, 3)) {
         setGoldWeightStr(computed ? computed.toFixed(3) : '');
       }
     } else if (touchedField === 'gold') {
@@ -817,6 +859,22 @@ const EstimateComparisonPage: React.FC = () => {
   ]);
 
   /* -------- Handlers -------- */
+
+const handleCompareForMe = () => {
+    const link = designWeblink.trim();
+
+    if (!link) {
+      alert('Please paste the design weblink first.');
+      return;
+    }
+
+    const msg =
+      `Compare request (Cityjeweller.in)\n` +
+      `Design link: ${link}\n`;
+
+    const waUrl = `https://wa.me/919023130944?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
+  };
 
   const handleStoneChange = (
     id: string,
@@ -932,8 +990,7 @@ const EstimateComparisonPage: React.FC = () => {
     }
 
     const label =
-      remarks.trim() ||
-      `Option ${comparisonItems.length + 1} (${metalLabel(metalType)})`;
+      remarks.trim() || `Option ${comparisonItems.length + 1} (${metalLabel(metalType)})`;
 
     const item: ComparisonItem = {
       id: Date.now().toString(),
@@ -954,7 +1011,6 @@ const EstimateComparisonPage: React.FC = () => {
     setComparisonItems((prev) => {
       const next = [...prev, item];
       if (prev.length === 0) {
-        // First saved calculation
         alert('add another calculation to compare with');
       }
       return next;
@@ -967,583 +1023,461 @@ const EstimateComparisonPage: React.FC = () => {
   ========================= */
 
   return (
-<PageLayout>
-    <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">
-          Jewellery Estimate – Comparison Mode
-        </h1>
-        <p className="text-sm text-gray-600">
-          Create multiple calculation patterns (gold weight logic, polish,
-          labour, discounts) and compare them side by side.
-        </p>
-      </header>
-
-      {/* Master Cityjeweller.in Calculation Toggle */}
-      <div className="border rounded-md p-3 bg-blue-50 flex items-start gap-2">
-        <input
-          type="checkbox"
-          className="mt-1"
-          checked={isCityjCalc}
-          onChange={(e) => setIsCityjCalc(e.target.checked)}
-        />
-        <div>
-          <p className="text-sm font-medium">
-            Cityjeweller.in calculation
+    <PageLayout>
+      <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+        <header className="space-y-1">
+          <h1 className="text-2xl font-semibold">Jewellery Estimate – Comparison Mode</h1>
+          <p className="text-sm text-gray-600">
+            Create multiple calculation patterns (gross to net weight logic, polish, labour, discounts) and compare them side by side.
           </p>
-          <p className="text-[11px] text-gray-600">
-            Uses fixed Cityjeweller.in rules: metal rate fixed, standard labour %
-            on gold, no polish, no discounts, and no misc charges. Uncheck this
-            to customise the calculation.
-          </p>
-        </div>
-      </div>
+        </header>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left column – inputs */}
-        <section className="space-y-4">
-          {/* Metal & weights */}
-          <div className="border rounded-md p-4 space-y-3">
-            <h2 className="font-semibold text-sm">Metal & Weights</h2>
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Left column – inputs */}
+          <section className="space-y-4">
+            {/* Metal & weights */}
+            <div className="border rounded-md p-4 space-y-3">
+              <h2 className="font-semibold text-sm">Metal & Weights</h2>
 
-            <div className="space-y-2">
-              <label className="block text-xs font-medium mb-1">
-                Metal Type
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {metalOptions.map((m) => (
-                  <button
-                    key={m.value}
-                    type="button"
-                    onClick={() => {
-                      setMetalType(m.value);
-                      // clear rate so that auto-fetch for new metal can run
-                      setRatePer10GmInput('');
+              {/* Gross & Gold inputs */}
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Gross Wt (gm)</label>
+                  <input
+                    type="number"
+                    value={grossWeightStr}
+                    onChange={(e) => {
+                      setGrossWeightStr(e.target.value);
+                      setTouchedField('gross');
                     }}
-                    className={`px-3 py-1 text-xs rounded-full border ${
-                      metalType === m.value
-                        ? 'bg-amber-100 border-amber-500'
-                        : 'bg-white'
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
+                    className="w-full border rounded px-2 py-1 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">
+                    {metalType === 'SILVER' ? 'Silver Wt (gm)' : 'Gold Wt (gm)'}
+                  </label>
+                  <input
+                    type="number"
+                    value={goldWeightStr}
+                    onChange={(e) => {
+                      setGoldWeightStr(e.target.value);
+                      setTouchedField('gold');
+                    }}
+                    className="w-full border rounded px-2 py-1 text-sm"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Gross & Gold inputs */}
-            <div className="grid grid-cols-2 gap-3 mt-2">
-              <div>
-                <label className="block text-xs font-medium mb-1">
-                  Gross Wt (gm)
+              {/* Relation (after weights) */}
+              <div className="mt-2">
+                <label className="block text-[11px] text-gray-600 mb-1">
+                  Relation between Gross & Gold Weight
                 </label>
-                <input
-                  type="number"
-                  value={grossWeightStr}
-                  onChange={(e) => {
-                    setGrossWeightStr(e.target.value);
-                    setTouchedField('gross');
-                  }}
-                  className="w-full border rounded px-2 py-1 text-sm"
-                />
+                <select
+                  value={goldGrossMode}
+                  onChange={(e) => setGoldGrossMode(e.target.value as GoldGrossMode)}
+                  className="w-full border rounded px-2 py-1 text-[11px]"
+                >
+                  <option value="GROSS_EQUALS_GOLD">
+                    Gold Wt = Gross Wt (includes stones & diamonds)
+                  </option>
+                  <option value="GROSS_MINUS_STONE">
+                    Gold Wt = Gross − Stone Wt (includes diamonds)
+                  </option>
+                  <option value="GROSS_MINUS_DIAM">
+                    Gold Wt = Gross − Diamond Wt (includes stones)
+                  </option>
+                  <option value="GROSS_MINUS_STONE_DIAM">
+                    Gold Wt = Gross − (Stone + Diamond) Wt (default)
+                  </option>
+                </select>
+                <p className="text-[11px] text-gray-400 mt-1 italic">{goldGrossHint}</p>
               </div>
-              <div>
-                <label className="block text-xs font-medium mb-1">
-                  {metalType === 'SILVER' ? 'Silver Wt (gm)' : 'Gold Wt (gm)'}
-                </label>
-                <input
-                  type="number"
-                  value={goldWeightStr}
-                  onChange={(e) => {
-                    setGoldWeightStr(e.target.value);
-                    setTouchedField('gold');
-                  }}
-                  className="w-full border rounded px-2 py-1 text-sm"
-                />
-              </div>
-            </div>
 
-            {/* Relation (now AFTER weights, dull style) */}
-            <div className="mt-2">
-              <label className="block text-[11px] text-gray-600 mb-1">
-                Relation between Gross & Gold Weight
-              </label>
-              <select
-                value={goldGrossMode}
-                onChange={(e) =>
-                  setGoldGrossMode(e.target.value as GoldGrossMode)
-                }
-                className="w-full border rounded px-2 py-1 text-[11px]"
-              >
-                <option value="GROSS_EQUALS_GOLD">
-                  Gold Wt = Gross Wt (includes stones & diamonds)
-                </option>
-                <option value="GROSS_MINUS_STONE">
-                  Gold Wt = Gross − Stone Wt (includes diamonds)
-                </option>
-                <option value="GROSS_MINUS_DIAM">
-                  Gold Wt = Gross − Diamond Wt (includes stones)
-                </option>
-                <option value="GROSS_MINUS_STONE_DIAM">
-                  Gold Wt = Gross − (Stone + Diamond) Wt (default)
-                </option>
-              </select>
-              <p className="text-[11px] text-gray-400 mt-1 italic">
-                {goldGrossHint}
+              <p className="text-[11px] text-gray-600 mt-1">
+                Effective Net Wt (Gold) = {estimateResult.effectiveGoldWeight.toFixed(3)} gm
+                &nbsp; | Effective Gross Wt = {estimateResult.effectiveGrossWeight.toFixed(3)} gm
               </p>
             </div>
 
-            <p className="text-[11px] text-gray-600 mt-1">
-              Effective Net Wt (Gold) ={' '}
-              {estimateResult.effectiveGoldWeight.toFixed(3)} gm
-              &nbsp; | Effective Gross Wt ={' '}
-              {estimateResult.effectiveGrossWeight.toFixed(3)} gm
-            </p>
-          </div>
 
-          {/* Stones / Diamonds */}
-          <div className="border rounded-md p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-sm">
-                Stones / Diamonds (with Discounts)
-              </h2>
-              <button
-                type="button"
-                onClick={handleAddStoneLine}
-                className="text-xs text-amber-700 border border-amber-500 rounded px-2 py-1"
-              >
-                + Add Stone
-              </button>
-            </div>
 
-            <div className="space-y-3">
-              {stones.map((s) => (
-                <div
-                  key={s.id}
-                  className="border rounded-md px-2 py-2 space-y-2 bg-gray-50"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium">
-                      {s.label}{' '}
-                      <span className="text-[10px] text-gray-500">
-                        ({s.kind === 'diamond' ? 'Diamond' : 'Stone'})
-                      </span>
-                    </span>
-                    <label className="flex items-center gap-1 text-[11px]">
-                      <input
-                        type="checkbox"
-                        checked={s.enabled}
-                        onChange={(e) =>
-                          handleStoneChange(
-                            s.id,
-                            'enabled',
-                            e.target.checked,
-                          )
-                        }
-                      />
-                      Enabled
-                    </label>
-                  </div>
-
-                  {s.enabled && (
-                    <>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <label className="block text-[11px]">
-                            Weight
-                          </label>
-                          <div className="flex gap-1">
-                            <input
-                              type="number"
-                              value={s.weightDisplay ?? ''}
-                              onChange={(e) =>
-                                handleStoneChange(
-                                  s.id,
-                                  'weightValue',
-                                  e.target.value,
-                                )
-                              }
-                              className="w-2/3 border rounded px-2 py-1 text-xs"
-                            />
-                            <select
-                              value={s.weightUnit}
-                              onChange={(e) =>
-                                handleStoneChange(
-                                  s.id,
-                                  'weightUnit',
-                                  e.target.value,
-                                )
-                              }
-                              className="w-1/3 border rounded px-1 py-1 text-xs"
-                            >
-                              <option value="gm">gm</option>
-                              <option value="ct">ct</option>
-                              <option value="rt">rt</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="block text-[11px]">
-                            Rate
-                          </label>
-                          <div className="flex gap-1">
-                            <input
-                              type="number"
-                              value={s.rateDisplay ?? ''}
-                              onChange={(e) =>
-                                handleStoneChange(
-                                  s.id,
-                                  'rateValue',
-                                  e.target.value,
-                                )
-                              }
-                              className="w-2/3 border rounded px-2 py-1 text-xs"
-                            />
-                            <select
-                              value={s.rateType}
-                              onChange={(e) =>
-                                handleStoneChange(
-                                  s.id,
-                                  'rateType',
-                                  e.target.value,
-                                )
-                              }
-                              className="w-1/3 border rounded px-1 py-1 text-xs"
-                            >
-                              <option value="per_gm">/gm</option>
-                              <option value="per_ct">/ct</option>
-                              <option value="per_rt">/rt</option>
-                              <option value="per_piece">/pc</option>
-                            </select>
-                          </div>
-                        </div>
-                        {s.rateType === 'per_piece' && (
-                          <div className="space-y-1">
-                            <label className="block text-[11px]">
-                              Pieces
-                            </label>
-                            <input
-                              type="number"
-                              value={s.piecesDisplay ?? ''}
-                              onChange={(e) =>
-                                handleStoneChange(
-                                  s.id,
-                                  'pieces',
-                                  e.target.value,
-                                )
-                              }
-                              className="w-full border rounded px-2 py-1 text-xs"
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* line discount */}
-                      <div className="mt-1">
-                        <label className="block text-[11px] mb-0.5">
-                          Discount on {s.label}
-                        </label>
-                        <div className="flex gap-1 items-center">
-                          <select
-                            value={s.discountMode}
-                            onChange={(e) =>
-                              handleStoneChange(
-                                s.id,
-                                'discountMode',
-                                e.target.value,
-                              )
-                            }
-                            disabled={isCityjCalc}
-                            className="border rounded px-2 py-1 text-[11px] disabled:bg-gray-100"
-                          >
-                            <option value="none">No discount</option>
-                            <option value="pct">
-                              % of {s.label} value
-                            </option>
-                            <option value="per_gm">
-                              Rs / gm of {s.label}
-                            </option>
-                            <option value="flat">Rs flat</option>
-                          </select>
-                          {s.discountMode !== 'none' && !isCityjCalc && (
-                            <input
-                              type="number"
-                              value={s.discountDisplay ?? ''}
-                              onChange={(e) =>
-                                handleStoneChange(
-                                  s.id,
-                                  'discountValue',
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="Discount"
-                              className="flex-1 border rounded px-2 py-1 text-xs"
-                            />
-                          )}
-                          {isCityjCalc && (
-                            <span className="text-[10px] text-gray-500">
-                              Discounts disabled in Cityjeweller.in
-                              calculation
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Add Polish toggle + Polish section (AFTER stones) */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-1 text-xs">
+{/* ✅ Compact: Want us to do the comparison? (placed immediately after Metal & Weights) */}
+            <div className="border rounded-md p-4 space-y-2">
+              <label className="flex items-center gap-2 text-xs">
                 <input
                   type="checkbox"
-                  checked={enablePolish}
-                  onChange={(e) => setEnablePolish(e.target.checked)}
-                  disabled={isCityjCalc}
+                  checked={wantManualComparison}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setWantManualComparison(checked);
+                    if (!checked) setDesignWeblink(''); // optional: clear when turned off
+                  }}
                 />
-                <span
-                  className={
-                    isCityjCalc ? 'text-gray-400' : 'text-gray-700'
-                  }
-                >
-                  Add Polish
-                </span>
+                Want us to do the comparison?
               </label>
-            </div>
-            {isCityjCalc && (
-              <p className="text-[11px] text-gray-400 italic">
-                Polish is disabled in Cityjeweller.in calculation mode.
-              </p>
-            )}
 
-            {enablePolish && !isCityjCalc && (
-              <div className="border rounded-md p-4 space-y-3">
-                <h2 className="font-semibold text-sm">
-                  Polish (as Gold)
-                </h2>
-                <div className="flex gap-2 items-center">
-                  <select
-                    value={polishMode}
-                    onChange={(e) =>
-                      setPolishMode(e.target.value as PolishMode)
-                    }
-                    className="border rounded px-2 py-1 text-xs"
-                  >
-                    <option value="gm">
-                      Polish = __ gm of Gold
-                    </option>
-                    <option value="pct">
-                      Polish = __ % of Gold Wt
-                    </option>
-                  </select>
+              {wantManualComparison && (
+                <div className="space-y-2 pt-1">
+                  <p className="text-[11px] text-gray-600">
+                    Share the weblink of your chosen design. We’ll study it and prepare a comparison chart
+                    against Cityjeweller.in rates.
+                  </p>
+
                   <input
-                    type="number"
-                    value={polishValueStr}
-                    onChange={(e) => setPolishValueStr(e.target.value)}
-                    placeholder={
-                      polishMode === 'gm' ? 'gm' : '% of gold wt'
-                    }
-                    className="flex-1 border rounded px-2 py-1 text-sm"
+                    type="text"
+                    value={designWeblink}
+                    onChange={(e) => setDesignWeblink(e.target.value)}
+                    placeholder="Paste design/product weblink here"
+                    className="w-full border rounded px-2 py-1 text-sm"
                   />
-                </div>
-                <p className="text-[11px] text-gray-400 italic">
-                  {polishMode === 'gm'
-                    ? 'Polish weight is added as extra gold in grams.'
-                    : 'Polish weight is calculated as a % of effective gold weight and added as extra gold.'}
-                </p>
-                <p className="text-[11px] text-gray-600">
-                  Calculated Polish Wt ={' '}
-                  {estimateResult.polishWeightGm.toFixed(3)} gm
-                </p>
-              </div>
-            )}
-          </div>
 
-          {/* Gold / Silver Rate – separate section */}
-          <div className="border rounded-md p-4 space-y-3">
-            <h2 className="font-semibold text-sm">
-              Gold / Silver Rate
-            </h2>
-            <div>
-              <label className="block text-xs font-medium mb-1">
-                {metalType === 'SILVER'
-                  ? 'Silver Rate per 10 gm'
-                  : 'Gold Rate per 10 gm'}
-              </label>
-              <input
-                type="number"
-                value={ratePer10GmInput}
-                onChange={(e) => setRatePer10GmInput(e.target.value)}
-                disabled={isCityjCalc}
-                className="w-full border rounded px-2 py-1 text-sm disabled:bg-gray-100"
-              />
-              <p className="text-[11px] text-gray-600 mt-1">
-                Rate per gm: Rs.{estimateResult.ratePerGm.toFixed(2)}
-              </p>
-              {isCityjCalc && (
-                <p className="text-[11px] text-gray-400 italic">
-                  Rate is locked in Cityjeweller.in calculation mode. Uncheck
-                  the checkbox above to edit.
-                </p>
+                  <button
+                    type="button"
+                    onClick={handleCompareForMe}
+                    className="w-full bg-green-600 text-white text-sm font-medium py-2 rounded"
+                  >
+                    Compare for me
+                  </button>
+
+                  <p className="text-[10px] text-gray-500">
+                    Clicking “Compare for me” will open WhatsApp and send this link to: 919023130944
+                  </p>
+                </div>
               )}
             </div>
+
+
+{/* Add Stone toggle (ALWAYS fixed position like Add Polish) */}
+<div className="flex items-center gap-2">
+  <label className="flex items-center gap-2 text-xs">
+    <input
+      type="checkbox"
+      checked={enableStonesSection}
+      onChange={(e) => setEnableStonesSection(e.target.checked)}
+    />
+    Add Stone
+  </label>
+</div>
+
+{/* Stones / Diamonds section (ONLY shows when enabled) */}
+{enableStonesSection && (
+  <div className="border rounded-md p-4 space-y-3">
+    <div className="flex items-center justify-between">
+      <h2 className="font-semibold text-sm">Stones / Diamonds (with Discounts)</h2>
+      {/* ❌ REMOVE checkbox from here */}
+    </div>
+
+    <div className="flex justify-end">
+      <button
+        type="button"
+        onClick={handleAddStoneLine}
+        className="text-xs text-amber-700 border border-amber-500 rounded px-2 py-1"
+      >
+        + Add Stone
+      </button>
+    </div>
+
+    <div className="space-y-3">
+      {stones.map((s) => (
+        <div key={s.id} className="border rounded-md px-2 py-2 space-y-2 bg-gray-50">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium">
+              {s.label}{' '}
+              <span className="text-[10px] text-gray-500">
+                ({s.kind === 'diamond' ? 'Diamond' : 'Stone'})
+              </span>
+            </span>
+
+            <label className="flex items-center gap-1 text-[11px]">
+              <input
+                type="checkbox"
+                checked={s.enabled}
+                onChange={(e) => handleStoneChange(s.id, 'enabled', e.target.checked)}
+              />
+              Enabled
+            </label>
           </div>
 
-          {/* Labour – separate section */}
-          <div className="border rounded-md p-4 space-y-3">
-            <h2 className="font-semibold text-sm">Labour</h2>
+{s.enabled && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="block text-[11px]">Weight</label>
+                  <div className="flex gap-1">
+                    <input
+                      type="number"
+                      value={s.weightDisplay ?? ''}
+                      onChange={(e) => handleStoneChange(s.id, 'weightValue', e.target.value)}
+                      className="w-2/3 border rounded px-2 py-1 text-xs"
+                    />
+                    <select
+                      value={s.weightUnit}
+                      onChange={(e) => handleStoneChange(s.id, 'weightUnit', e.target.value)}
+                      className="w-1/3 border rounded px-1 py-1 text-xs"
+                    >
+                      <option value="gm">gm</option>
+                      <option value="ct">ct</option>
+                      <option value="rt">rt</option>
+                    </select>
+                  </div>
+                </div>
 
-            <div>
-              <label className="block text-xs font-medium mb-1">
-                Labour Calculation
-              </label>
-              <div className="space-y-1">
-                <select
-                  value={labourMode}
-                  onChange={(e) =>
-                    setLabourMode(e.target.value as LabourMode)
-                  }
-                  disabled={isCityjCalc}
-                  className="w-full border rounded px-2 py-1 text-xs disabled:bg-gray-100"
-                >
-                  <option value="per_gm_gold">
-                    Rs __ per gm Gold
-                  </option>
-                  <option value="flat">
-                    Rs ___ flat
-                  </option>
-                  <option value="pct_gold">
-                    ___% of Gold value (default)
-                  </option>
-                  <option value="pct_gold_plus_diam">
-                    ___% of Gold + Diamond value
-                  </option>
-                  <option value="pct_gold_plus_stone">
-                    ___% of Gold + Stone value
-                  </option>
-                  <option value="pct_gold_plus_diam_stone">
-                    ___% of Gold + Diam + Stone value
-                  </option>
-                </select>
-                {/* Dull labour formula hint */}
-                <p className="text-[11px] text-gray-400 italic">
-                  {labourFormulaHint}
-                </p>
-                <input
-                  type="number"
-                  value={labourParamStr}
-                  onChange={(e) => setLabourParamStr(e.target.value)}
-                  placeholder="Enter labour parameter"
-                  disabled={isCityjCalc}
-                  className="w-full border rounded px-2 py-1 text-sm disabled:bg-gray-100"
-                />
-                <p className="text-[11px] text-gray-600">
-                  Labour (before discount): Rs.
-                  {estimateResult.labourBase.toFixed(2)}
-                </p>
-              </div>
-            </div>
+                <div className="space-y-1">
+                  <label className="block text-[11px]">Rate</label>
+                  <div className="flex gap-1">
+                    <input
+                      type="number"
+                      value={s.rateDisplay ?? ''}
+                      onChange={(e) => handleStoneChange(s.id, 'rateValue', e.target.value)}
+                      className="w-2/3 border rounded px-2 py-1 text-xs"
+                    />
+                    <select
+                      value={s.rateType}
+                      onChange={(e) => handleStoneChange(s.id, 'rateType', e.target.value)}
+                      className="w-1/3 border rounded px-1 py-1 text-xs"
+                    >
+                      <option value="per_gm">/gm</option>
+                      <option value="per_ct">/ct</option>
+                      <option value="per_rt">/rt</option>
+                      <option value="per_piece">/pc</option>
+                    </select>
+                  </div>
+                </div>
 
-            {/* Labour discount */}
-            <div>
-              <label className="block text-xs font-medium mb-1">
-                Labour Discount
-              </label>
-              <div className="flex gap-1 items-center">
-                <select
-                  value={labourDiscountMode}
-                  onChange={(e) =>
-                    setLabourDiscountMode(
-                      e.target.value as LineDiscountMode,
-                    )
-                  }
-                  disabled={isCityjCalc}
-                  className="border rounded px-2 py-1 text-[11px] disabled:bg-gray-100"
-                >
-                  <option value="none">No discount</option>
-                  <option value="pct">% of Labour</option>
-                  <option value="per_gm">
-                    Rs per gm of Gold
-                  </option>
-                  <option value="flat">Rs flat</option>
-                </select>
-                {labourDiscountMode !== 'none' && !isCityjCalc && (
-                  <input
-                    type="number"
-                    value={labourDiscountStr}
-                    onChange={(e) =>
-                      setLabourDiscountStr(e.target.value)
-                    }
-                    className="flex-1 border rounded px-2 py-1 text-xs"
-                  />
-                )}
-                {isCityjCalc && (
-                  <span className="text-[10px] text-gray-500">
-                    Discounts disabled in Cityjeweller.in calculation
-                  </span>
+                {s.rateType === 'per_piece' && (
+                  <div className="space-y-1">
+                    <label className="block text-[11px]">Pieces</label>
+                    <input
+                      type="number"
+                      value={s.piecesDisplay ?? ''}
+                      onChange={(e) => handleStoneChange(s.id, 'pieces', e.target.value)}
+                      className="w-full border rounded px-2 py-1 text-xs"
+                    />
+                  </div>
                 )}
               </div>
-              <p className="text-[11px] text-gray-600">
-                Labour Discount: Rs.
-                {estimateResult.labourDiscountAmount.toFixed(2)} | Net
-                Labour: Rs.
-                {estimateResult.labourNet.toFixed(2)}
-              </p>
-            </div>
-          </div>
 
-          {/* Misc – separate section */}
-          <div className="border rounded-md p-4 space-y-3">
-            <h2 className="font-semibold text-sm">
-              Misc Charges & Discounts
-            </h2>
-
-            <div className="grid gap-2 md:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium mb-1">
-                  Misc Charges (flat Rs.)
-                </label>
-                <input
-                  type="number"
-                  value={miscChargesStr}
-                  onChange={(e) => setMiscChargesStr(e.target.value)}
-                  disabled={isCityjCalc}
-                  className="w-full border rounded px-2 py-1 text-sm disabled:bg-gray-100"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1">
-                  Misc Discount on Total
-                </label>
+              {/* line discount */}
+              <div className="mt-1">
+                <label className="block text-[11px] mb-0.5">Discount on {s.label}</label>
                 <div className="flex gap-1 items-center">
                   <select
-                    value={miscDiscountMode}
-                    onChange={(e) =>
-                      setMiscDiscountMode(
-                        e.target.value as MiscDiscountMode,
-                      )
-                    }
+                    value={s.discountMode}
+                    onChange={(e) => handleStoneChange(s.id, 'discountMode', e.target.value)}
                     disabled={isCityjCalc}
                     className="border rounded px-2 py-1 text-[11px] disabled:bg-gray-100"
                   >
                     <option value="none">No discount</option>
-                    <option value="pct_total">
-                      % of Total (before GST)
-                    </option>
+                    <option value="pct">% of {s.label} value</option>
+                    <option value="per_gm">Rs / gm of {s.label}</option>
                     <option value="flat">Rs flat</option>
                   </select>
-                  {miscDiscountMode !== 'none' && !isCityjCalc && (
+
+                  {s.discountMode !== 'none' && !isCityjCalc && (
                     <input
                       type="number"
-                      value={miscDiscountStr}
-                      onChange={(e) =>
-                        setMiscDiscountStr(e.target.value)
-                      }
+                      value={s.discountDisplay ?? ''}
+                      onChange={(e) => handleStoneChange(s.id, 'discountValue', e.target.value)}
+                      placeholder="Discount"
+                      className="flex-1 border rounded px-2 py-1 text-xs"
+                    />
+                  )}
+
+                  {isCityjCalc && (
+                    <span className="text-[10px] text-gray-500">
+                      Discounts disabled in Cityjeweller.in calculation
+                    </span>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+
+            {/* Add Polish toggle + Polish section (AFTER stones) */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={enablePolish}
+                    onChange={(e) => setEnablePolish(e.target.checked)}
+                    disabled={isCityjCalc}
+                  />
+                  <span className={isCityjCalc ? 'text-gray-400' : 'text-gray-700'}>
+                    Add Polish
+                  </span>
+                </label>
+              </div>
+              {isCityjCalc && (
+                <p className="text-[11px] text-gray-400 italic">
+                  Polish is disabled in Cityjeweller.in calculation mode.
+                </p>
+              )}
+
+              {enablePolish && !isCityjCalc && (
+                <div className="border rounded-md p-4 space-y-3">
+                  <h2 className="font-semibold text-sm">Polish (as Gold)</h2>
+                  <div className="flex gap-2 items-center">
+                    <select
+                      value={polishMode}
+                      onChange={(e) => setPolishMode(e.target.value as PolishMode)}
+                      className="border rounded px-2 py-1 text-xs"
+                    >
+                      <option value="gm">Polish = __ gm of Gold</option>
+                      <option value="pct">Polish = __ % of Gold Wt</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={polishValueStr}
+                      onChange={(e) => setPolishValueStr(e.target.value)}
+                      placeholder={polishMode === 'gm' ? 'gm' : '% of gold wt'}
+                      className="flex-1 border rounded px-2 py-1 text-sm"
+                    />
+                  </div>
+                  <p className="text-[11px] text-gray-400 italic">
+                    {polishMode === 'gm'
+                      ? 'Polish weight is added as extra gold in grams.'
+                      : 'Polish weight is calculated as a % of effective gold weight and added as extra gold.'}
+                  </p>
+                  <p className="text-[11px] text-gray-600">
+                    Calculated Polish Wt = {estimateResult.polishWeightGm.toFixed(3)} gm
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Gold / Silver Rate – separate section (✅ Metal type moved here) */}
+            <div className="border rounded-md p-4 space-y-3">
+              <h2 className="font-semibold text-sm">Gold / Silver Rate</h2>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-medium mb-1">Metal Type</label>
+                <div className="flex flex-wrap gap-2">
+                  {metalOptions.map((m) => (
+                    <button
+                      key={m.value}
+                      type="button"
+                      onClick={() => {
+                        setMetalType(m.value);
+                        // clear rate so that auto-fetch for new metal can run
+                        setRatePer10GmInput('');
+                      }}
+                      className={`px-3 py-1 text-xs rounded-full border ${
+                        metalType === m.value ? 'bg-amber-100 border-amber-500' : 'bg-white'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium mb-1">
+                  {metalType === 'SILVER' ? 'Silver Rate per 10 gm' : 'Gold Rate per 10 gm'}
+                </label>
+                <input
+                  type="number"
+                  value={ratePer10GmInput}
+                  onChange={(e) => setRatePer10GmInput(e.target.value)}
+                  disabled={isCityjCalc}
+                  className="w-full border rounded px-2 py-1 text-sm disabled:bg-gray-100"
+                />
+                <p className="text-[11px] text-gray-600 mt-1">
+                  Rate per gm: Rs.{estimateResult.ratePerGm.toFixed(2)}
+                </p>
+                {isCityjCalc && (
+                  <p className="text-[11px] text-gray-400 italic">
+                    Rate is locked in Cityjeweller.in calculation mode. Uncheck the checkbox below to edit.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* ✅ Cityjeweller.in toggle moved just BEFORE Labour */}
+            <div className="border rounded-md p-3 bg-blue-50 flex items-start gap-2">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={isCityjCalc}
+                onChange={(e) => setIsCityjCalc(e.target.checked)}
+              />
+              <div>
+                <p className="text-sm font-medium">Cityjeweller.in calculation</p>
+                <p className="text-[11px] text-gray-600">
+                  Uses fixed Cityjeweller.in rules: metal rate fixed, standard labour % on gold, no polish,
+                  no discounts, and no misc charges. Uncheck this to customise the calculation.
+                </p>
+              </div>
+            </div>
+
+            {/* Labour – separate section */}
+            <div className="border rounded-md p-4 space-y-3">
+              <h2 className="font-semibold text-sm">Labour</h2>
+
+              <div>
+                <label className="block text-xs font-medium mb-1">Labour Calculation</label>
+                <div className="space-y-1">
+                  <select
+                    value={labourMode}
+                    onChange={(e) => setLabourMode(e.target.value as LabourMode)}
+                    disabled={isCityjCalc}
+                    className="w-full border rounded px-2 py-1 text-xs disabled:bg-gray-100"
+                  >
+                    <option value="per_gm_gold">Rs __ per gm Gold</option>
+                    <option value="flat">Rs ___ flat</option>
+                    <option value="pct_gold">___% of Gold value (default)</option>
+                    <option value="pct_gold_plus_diam">___% of Gold + Diamond value</option>
+                    <option value="pct_gold_plus_stone">___% of Gold + Stone value</option>
+                    <option value="pct_gold_plus_diam_stone">
+                      ___% of Gold + Diam + Stone value
+                    </option>
+                  </select>
+
+                  <p className="text-[11px] text-gray-400 italic">{labourFormulaHint}</p>
+
+                  <input
+                    type="number"
+                    value={labourParamStr}
+                    onChange={(e) => setLabourParamStr(e.target.value)}
+                    placeholder="Enter labour parameter"
+                    disabled={isCityjCalc}
+                    className="w-full border rounded px-2 py-1 text-sm disabled:bg-gray-100"
+                  />
+                  <p className="text-[11px] text-gray-600">
+                    Labour (before discount): Rs.{estimateResult.labourBase.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Labour discount */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Labour Discount</label>
+                <div className="flex gap-1 items-center">
+                  <select
+                    value={labourDiscountMode}
+                    onChange={(e) => setLabourDiscountMode(e.target.value as LineDiscountMode)}
+                    disabled={isCityjCalc}
+                    className="border rounded px-2 py-1 text-[11px] disabled:bg-gray-100"
+                  >
+                    <option value="none">No discount</option>
+                    <option value="pct">% of Labour</option>
+                    <option value="per_gm">Rs per gm of Gold</option>
+                    <option value="flat">Rs flat</option>
+                  </select>
+                  {labourDiscountMode !== 'none' && !isCityjCalc && (
+                    <input
+                      type="number"
+                      value={labourDiscountStr}
+                      onChange={(e) => setLabourDiscountStr(e.target.value)}
                       className="flex-1 border rounded px-2 py-1 text-xs"
                     />
                   )}
@@ -1553,199 +1487,236 @@ const EstimateComparisonPage: React.FC = () => {
                     </span>
                   )}
                 </div>
+                <p className="text-[11px] text-gray-600">
+                  Labour Discount: Rs.{estimateResult.labourDiscountAmount.toFixed(2)} | Net Labour: Rs.
+                  {estimateResult.labourNet.toFixed(2)}
+                </p>
               </div>
             </div>
 
-            {/* GST */}
-            <div className="mt-2">
-              <label className="block text-xs font-medium mb-1">
-                GST %
-              </label>
-              <input
-                type="number"
-                value={gstRate}
-                onChange={(e) =>
-                  setGstRate(Number(e.target.value || 0))
-                }
-                className="w-24 border rounded px-2 py-1 text-xs"
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* Right column – summary & compare */}
-        <section className="space-y-4">
-          {/* Summary card */}
-          <div className="rounded-md border bg-yellow-50 overflow-hidden">
-            <div className="bg-yellow-200 px-4 py-2 flex items-center justify-between">
-              <h2 className="font-semibold text-sm">Summary</h2>
-            </div>
-            <div className="px-4 py-3 space-y-2 text-sm">
-              <p className="text-[11px] text-gray-700">
-                {new Date().toLocaleString()}
-              </p>
-              <p className="text-[11px] text-red-600">
-                {metalType === 'SILVER'
-                  ? `Silver Rate per 10gm = Rs.${ratePer10Gm.toFixed(0)}`
-                  : `Gold Rate per 10gm = Rs.${ratePer10Gm.toFixed(
-                      0,
-                    )} (${metalLabel(metalType)})`}
-              </p>
-
-              {/* Gold & Polish */}
-              <Row
-                label="Gold:"
-                desc={`${estimateResult.effectiveGoldWeight.toFixed(
-                  3,
-                )} gm × Rs.${estimateResult.ratePerGm.toFixed(2)}`}
-                amount={estimateResult.goldValueOnly}
-              />
-              {estimateResult.polishWeightGm > 0 && (
-                <Row
-                  label="Polish (extra gold):"
-                  desc={`${estimateResult.polishWeightGm.toFixed(
-                    3,
-                  )} gm × Rs.${estimateResult.ratePerGm.toFixed(2)}`}
-                  amount={estimateResult.polishValue}
-                />
-              )}
-
-              {/* Stones (net after discount) */}
-              {estimateResult.stoneLines
-                .filter((s) => s.enabled && s.netStoneValue !== 0)
-                .map((s) => (
-                  <Row
-                    key={s.id}
-                    label={`${s.label}:`}
-                    desc={formatStoneDesc(s)}
-                    amount={s.netStoneValue}
+            {/* ✅ Misc – minimized until enabled */}
+            <div className="border rounded-md p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-sm">Misc Charges & Discounts</h2>
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={enableMiscSection}
+                    onChange={(e) => setEnableMiscSection(e.target.checked)}
+                    disabled={isCityjCalc}
                   />
-                ))}
-              {estimateResult.stonesDiscountTotal > 0 && (
-                <Row
-                  label="Diamond & Stone Discounts:"
-                  desc=""
-                  amount={-estimateResult.stonesDiscountTotal}
-                  color="text-emerald-700"
-                />
+                  Add Misc
+                </label>
+              </div>
+
+              {!enableMiscSection ? (
+                <p className="text-[11px] text-gray-500 italic">
+                  Enable “Add Misc” to add extra charges/discounts.
+                </p>
+              ) : (
+                <>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-medium mb-1">
+                        Misc Charges (flat Rs.)
+                      </label>
+                      <input
+                        type="number"
+                        value={miscChargesStr}
+                        onChange={(e) => setMiscChargesStr(e.target.value)}
+                        disabled={isCityjCalc}
+                        className="w-full border rounded px-2 py-1 text-sm disabled:bg-gray-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Misc Discount on Total</label>
+                      <div className="flex gap-1 items-center">
+                        <select
+                          value={miscDiscountMode}
+                          onChange={(e) => setMiscDiscountMode(e.target.value as MiscDiscountMode)}
+                          disabled={isCityjCalc}
+                          className="border rounded px-2 py-1 text-[11px] disabled:bg-gray-100"
+                        >
+                          <option value="none">No discount</option>
+                          <option value="pct_total">% of Total (before GST)</option>
+                          <option value="flat">Rs flat</option>
+                        </select>
+                        {miscDiscountMode !== 'none' && !isCityjCalc && (
+                          <input
+                            type="number"
+                            value={miscDiscountStr}
+                            onChange={(e) => setMiscDiscountStr(e.target.value)}
+                            className="flex-1 border rounded px-2 py-1 text-xs"
+                          />
+                        )}
+                        {isCityjCalc && (
+                          <span className="text-[10px] text-gray-500">
+                            Discounts disabled in Cityjeweller.in calculation
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
 
-              {/* Labour */}
-              <Row
-                label="Labour:"
-                desc={labourDescription}
-                amount={estimateResult.labourNet}
-              />
-              {estimateResult.labourDiscountAmount > 0 && (
-                <Row
-                  label="Labour Discount:"
-                  desc=""
-                  amount={-estimateResult.labourDiscountAmount}
-                  color="text-emerald-700"
+              {/* GST (always visible) */}
+              <div className="mt-2">
+                <label className="block text-xs font-medium mb-1">GST %</label>
+                <input
+                  type="number"
+                  value={gstRate}
+                  onChange={(e) => setGstRate(Number(e.target.value || 0))}
+                  className="w-24 border rounded px-2 py-1 text-xs"
                 />
-              )}
-
-              {/* Misc */}
-              {estimateResult.miscCharges !== 0 && (
-                <Row
-                  label="Misc Charges:"
-                  desc=""
-                  amount={estimateResult.miscCharges}
-                />
-              )}
-              {estimateResult.miscDiscountAmount !== 0 && (
-                <Row
-                  label="Misc Discount:"
-                  desc=""
-                  amount={-estimateResult.miscDiscountAmount}
-                  color="text-emerald-700"
-                />
-              )}
-
-              {/* Total before GST */}
-              <Row
-                label="Total (before GST):"
-                desc=""
-                amount={estimateResult.subTotalBeforeGst}
-                bold
-              />
-
-              {/* GST */}
-              <Row
-                label={`GST (${gstRate}%)`}
-                desc=""
-                amount={estimateResult.gstAmount}
-                color="text-purple-700"
-              />
+              </div>
             </div>
-            <div className="bg-sky-500 text-white font-semibold text-lg px-4 py-2 flex justify-between">
-              <span>Grand Total:</span>
-              <span>
-                Rs.
-                {estimateResult.grandTotal.toLocaleString()}
-              </span>
-            </div>
-          </div>
+          </section>
 
-          {/* Compare panel */}
-          <div className="border rounded-md p-4 space-y-3">
-            <h2 className="font-semibold text-sm">
-              Add to Comparison
-            </h2>
-            <div>
-              <label className="block text-xs mb-1">
-                Remarks / Reference (shop name, pattern etc.)
-              </label>
-              <input
-                className="w-full border rounded px-2 py-1 text-sm disabled:bg-gray-100"
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                disabled={isCityjCalc}
-              />
+          {/* Right column – summary & compare */}
+          <section className="space-y-4">
+            {/* Summary card */}
+            <div className="rounded-md border bg-yellow-50 overflow-hidden">
+              <div className="bg-yellow-200 px-4 py-2 flex items-center justify-between">
+                <h2 className="font-semibold text-sm">Summary</h2>
+              </div>
+              <div className="px-4 py-3 space-y-2 text-sm">
+                <p className="text-[11px] text-gray-700">{new Date().toLocaleString()}</p>
+                <p className="text-[11px] text-red-600">
+                  {metalType === 'SILVER'
+                    ? `Silver Rate per 10gm = Rs.${ratePer10Gm.toFixed(0)}`
+                    : `Gold Rate per 10gm = Rs.${ratePer10Gm.toFixed(0)} (${metalLabel(metalType)})`}
+                </p>
+
+                {/* Gold & Polish */}
+                <Row
+                  label="Gold:"
+                  desc={`${estimateResult.effectiveGoldWeight.toFixed(3)} gm × Rs.${estimateResult.ratePerGm.toFixed(2)}`}
+                  amount={estimateResult.goldValueOnly}
+                />
+                {estimateResult.polishWeightGm > 0 && (
+                  <Row
+                    label="Polish (extra gold):"
+                    desc={`${estimateResult.polishWeightGm.toFixed(3)} gm × Rs.${estimateResult.ratePerGm.toFixed(2)}`}
+                    amount={estimateResult.polishValue}
+                  />
+                )}
+
+                {/* Stones (net after discount) */}
+                {estimateResult.stoneLines
+                  .filter((s) => s.enabled && s.netStoneValue !== 0)
+                  .map((s) => (
+                    <Row
+                      key={s.id}
+                      label={`${s.label}:`}
+                      desc={formatStoneDesc(s)}
+                      amount={s.netStoneValue}
+                    />
+                  ))}
+                {estimateResult.stonesDiscountTotal > 0 && (
+                  <Row
+                    label="Diamond & Stone Discounts:"
+                    desc=""
+                    amount={-estimateResult.stonesDiscountTotal}
+                    color="text-emerald-700"
+                  />
+                )}
+
+                {/* Labour */}
+                <Row label="Labour:" desc={labourDescription} amount={estimateResult.labourNet} />
+                {estimateResult.labourDiscountAmount > 0 && (
+                  <Row
+                    label="Labour Discount:"
+                    desc=""
+                    amount={-estimateResult.labourDiscountAmount}
+                    color="text-emerald-700"
+                  />
+                )}
+
+                {/* Misc */}
+                {estimateResult.miscCharges !== 0 && (
+                  <Row label="Misc Charges:" desc="" amount={estimateResult.miscCharges} />
+                )}
+                {estimateResult.miscDiscountAmount !== 0 && (
+                  <Row
+                    label="Misc Discount:"
+                    desc=""
+                    amount={-estimateResult.miscDiscountAmount}
+                    color="text-emerald-700"
+                  />
+                )}
+
+                {/* Total before GST */}
+                <Row
+                  label="Total (before GST):"
+                  desc=""
+                  amount={estimateResult.subTotalBeforeGst}
+                  bold
+                />
+
+                {/* GST */}
+                <Row
+                  label={`GST (${gstRate}%)`}
+                  desc=""
+                  amount={estimateResult.gstAmount}
+                  color="text-purple-700"
+                />
+              </div>
+              <div className="bg-sky-500 text-white font-semibold text-lg px-4 py-2 flex justify-between">
+                <span>Grand Total:</span>
+                <span>Rs.{estimateResult.grandTotal.toLocaleString()}</span>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={handleAddToComparison}
-              className="mt-2 w-full bg-emerald-600 text-white text-sm font-medium py-2 rounded"
-            >
-              Save Calculation for comparison
-            </button>
-            {comparisonItems.length > 0 && (
-              <p className="text-[11px] text-gray-700 mt-1">
-                Saved options:{' '}
-                {comparisonItems.map((c, idx) => (
-                  <span
-                    key={c.id}
-                    className="inline-block text-[11px] px-2 py-0.5 bg-gray-100 rounded-full mr-1"
-                  >
-                    {idx + 1}. {c.label}
-                  </span>
-                ))}
-              </p>
-            )}
-            {comparisonItems.length >= 2 && (
+
+            {/* Compare panel */}
+            <div className="border rounded-md p-4 space-y-3">
+              <h2 className="font-semibold text-sm">Add to Comparison</h2>
+              <div>
+                <label className="block text-xs mb-1">Remarks / Reference (shop name, pattern etc.)</label>
+                <input
+                  className="w-full border rounded px-2 py-1 text-sm disabled:bg-gray-100"
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  disabled={isCityjCalc}
+                />
+              </div>
               <button
                 type="button"
-                onClick={() =>
-                  setShowComparison((prev) => !prev)
-                }
-                className="mt-2 w-full bg-blue-600 text-white text-sm font-medium py-2 rounded"
+                onClick={handleAddToComparison}
+                className="mt-2 w-full bg-emerald-600 text-white text-sm font-medium py-2 rounded"
               >
-                {showComparison
-                  ? 'Hide Comparison Table'
-                  : 'Show Comparison'}
+                Save Calculation for comparison
               </button>
-            )}
-          </div>
-        </section>
-      </div>
+              {comparisonItems.length > 0 && (
+                <p className="text-[11px] text-gray-700 mt-1">
+                  Saved options:{' '}
+                  {comparisonItems.map((c, idx) => (
+                    <span
+                      key={c.id}
+                      className="inline-block text-[11px] px-2 py-0.5 bg-gray-100 rounded-full mr-1"
+                    >
+                      {idx + 1}. {c.label}
+                    </span>
+                  ))}
+                </p>
+              )}
+              {comparisonItems.length >= 2 && (
+                <button
+                  type="button"
+                  onClick={() => setShowComparison((prev) => !prev)}
+                  className="mt-2 w-full bg-blue-600 text-white text-sm font-medium py-2 rounded"
+                >
+                  {showComparison ? 'Hide Comparison Table' : 'Show Comparison'}
+                </button>
+              )}
+            </div>
+          </section>
+        </div>
 
-      {/* Comparison table */}
-      {showComparison && comparisonItems.length >= 2 && (
-        <ComparisonTable items={comparisonItems} />
-      )}
-    </div>
-</PageLayout>
+        {/* Comparison table */}
+        {showComparison && comparisonItems.length >= 2 && <ComparisonTable items={comparisonItems} />}
+      </div>
+    </PageLayout>
   );
 };
 
@@ -1763,18 +1734,10 @@ const Row: React.FC<{
   return (
     <div className={`flex justify-between text-sm ${color ?? ''}`}>
       <div className="flex flex-col">
-        <span className={bold ? 'font-semibold' : ''}>
-          {label}
-        </span>
-        {desc && (
-          <span className="text-[11px] text-gray-600">
-            {desc}
-          </span>
-        )}
+        <span className={bold ? 'font-semibold' : ''}>{label}</span>
+        {desc && <span className="text-[11px] text-gray-600">{desc}</span>}
       </div>
-      <div className={bold ? 'font-semibold' : ''}>
-        Rs.{amount.toFixed(2)}
-      </div>
+      <div className={bold ? 'font-semibold' : ''}>Rs.{amount.toFixed(2)}</div>
     </div>
   );
 };
@@ -1783,11 +1746,7 @@ const DiffCell: React.FC<{
   value: string | number;
   different: boolean;
 }> = ({ value, different }) => (
-  <td
-    className={`border px-2 py-1 text-xs ${
-      different ? 'font-semibold text-emerald-700' : ''
-    }`}
-  >
+  <td className={`border px-2 py-1 text-xs ${different ? 'font-semibold text-emerald-700' : ''}`}>
     {typeof value === 'number' ? value.toLocaleString() : value}
   </td>
 );
@@ -1808,9 +1767,7 @@ const ComparisonTable: React.FC<{
 
   return (
     <div className="border rounded-md p-4 mt-4 overflow-x-auto bg-white">
-      <h2 className="font-semibold text-sm mb-2">
-        Comparison Summary (differences are in bold green)
-      </h2>
+      <h2 className="font-semibold text-sm mb-2">Comparison Summary (differences are in bold green)</h2>
       <table className="min-w-full border text-xs">
         <thead className="bg-gray-100">
           <tr>
@@ -1837,94 +1794,45 @@ const ComparisonTable: React.FC<{
         <tbody>
           {items.map((it, idx) => (
             <tr key={it.id}>
-              <td className="border px-2 py-1">
-                {idx + 1}
-              </td>
-              <td className="border px-2 py-1">
-                {it.label}
-              </td>
-              <td className="border px-2 py-1">
-                {metalLabel(it.metalType)}
-              </td>
+              <td className="border px-2 py-1">{idx + 1}</td>
+              <td className="border px-2 py-1">{it.label}</td>
+              <td className="border px-2 py-1">{metalLabel(it.metalType)}</td>
               <DiffCell
                 value={it.ratePer10Gm.toFixed(0)}
-                different={
-                  round(it.ratePer10Gm, 2) !==
-                  round(base.ratePer10Gm, 2)
-                }
+                different={round(it.ratePer10Gm, 2) !== round(base.ratePer10Gm, 2)}
               />
               <DiffCell
                 value={it.grossWeight.toFixed(3)}
-                different={
-                  round(it.grossWeight, 3) !==
-                  round(base.grossWeight, 3)
-                }
+                different={round(it.grossWeight, 3) !== round(base.grossWeight, 3)}
               />
               <DiffCell
                 value={it.goldWeight.toFixed(3)}
-                different={
-                  round(it.goldWeight, 3) !==
-                  round(base.goldWeight, 3)
-                }
+                different={round(it.goldWeight, 3) !== round(base.goldWeight, 3)}
               />
-              {/* Polish gm */}
-              <DiffCell
-                value={it.result.polishWeightGm.toFixed(3)}
-                different={isDiff('polishWeightGm', it)}
-              />
-              {/* Polish amount */}
-              <DiffCell
-                value={it.result.polishValue.toFixed(2)}
-                different={isDiff('polishValue', it)}
-              />
-              {/* Gold value */}
-              <DiffCell
-                value={it.result.goldValueOnly.toFixed(2)}
-                different={isDiff('goldValueOnly', it)}
-              />
-              {/* Stones net */}
-              <DiffCell
-                value={it.result.stonesTotalValue.toFixed(2)}
-                different={isDiff('stonesTotalValue', it)}
-              />
-              {/* Diamond + Stone discount */}
+              <DiffCell value={it.result.polishWeightGm.toFixed(3)} different={isDiff('polishWeightGm', it)} />
+              <DiffCell value={it.result.polishValue.toFixed(2)} different={isDiff('polishValue', it)} />
+              <DiffCell value={it.result.goldValueOnly.toFixed(2)} different={isDiff('goldValueOnly', it)} />
+              <DiffCell value={it.result.stonesTotalValue.toFixed(2)} different={isDiff('stonesTotalValue', it)} />
               <DiffCell
                 value={it.result.stonesDiscountTotal.toFixed(2)}
                 different={isDiff('stonesDiscountTotal', it)}
               />
-              {/* Labour net */}
-              <DiffCell
-                value={it.result.labourNet.toFixed(2)}
-                different={isDiff('labourNet', it)}
-              />
-              {/* Labour discount */}
+              <DiffCell value={it.result.labourNet.toFixed(2)} different={isDiff('labourNet', it)} />
               <DiffCell
                 value={it.result.labourDiscountAmount.toFixed(2)}
                 different={isDiff('labourDiscountAmount', it)}
               />
-              {/* Misc charges */}
-              <DiffCell
-                value={it.result.miscCharges.toFixed(2)}
-                different={isDiff('miscCharges', it)}
-              />
-              {/* Misc discount */}
+              <DiffCell value={it.result.miscCharges.toFixed(2)} different={isDiff('miscCharges', it)} />
               <DiffCell
                 value={it.result.miscDiscountAmount.toFixed(2)}
                 different={isDiff('miscDiscountAmount', it)}
               />
-              {/* Totals */}
               <DiffCell
                 value={it.result.subTotalBeforeGst.toFixed(2)}
                 different={isDiff('subTotalBeforeGst', it)}
               />
-              <DiffCell
-                value={it.result.gstAmount.toFixed(2)}
-                different={isDiff('gstAmount', it)}
-              />
-              <DiffCell
-                value={it.result.grandTotal}
-                different={isDiff('grandTotal', it)}
-              />
+              <DiffCell value={it.result.gstAmount.toFixed(2)} different={isDiff('gstAmount', it)} />
+              <DiffCell value={it.result.grandTotal} different={isDiff('grandTotal', it)} />
             </tr>
           ))}
         </tbody>
@@ -2004,14 +1912,10 @@ const formatStoneDesc = (s: StoneLineResult): string => {
       pcsText = '0';
     }
 
-    return `${pcsText} pcs * ${rateText}${rateUnit} = Rs. ${s.netStoneValue.toFixed(
-      2,
-    )}`;
+    return `${pcsText} pcs * ${rateText}${rateUnit} = Rs. ${s.netStoneValue.toFixed(2)}`;
   }
 
-  return `${weightText}${unitText} * ${rateText}${rateUnit} = Rs. ${s.netStoneValue.toFixed(
-    2,
-  )}`;
+  return `${weightText}${unitText} * ${rateText}${rateUnit} = Rs. ${s.netStoneValue.toFixed(2)}`;
 };
 
 export default EstimateComparisonPage;
