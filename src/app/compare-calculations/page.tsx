@@ -132,6 +132,40 @@ interface EstimateResult {
    Helpers
 ========================= */
 
+const GrandTotalCell: React.FC<{
+  value: number;
+  baseValue: number;
+  isBase: boolean;
+  different: boolean;
+}> = ({ value, baseValue, isBase, different }) => {
+  const delta = Math.round(value - baseValue);
+  const sign = delta > 0 ? '+' : '';
+  const deltaText = `Diff: ${sign}${delta.toLocaleString()}`;
+
+  return (
+    <td className={`border px-2 py-1 text-xs ${different ? 'font-semibold text-emerald-700' : ''}`}>
+      <div className="flex items-baseline gap-2">
+        <span>{value.toLocaleString()}</span>
+
+        {!isBase && (
+          <span className="text-[10px] text-gray-500">
+            ({deltaText})
+          </span>
+        )}
+      </div>
+    </td>
+  );
+};
+
+
+
+const formatDelta = (baseVal: number, currentVal: number) => {
+  const d = Math.round(currentVal - baseVal);
+  if (d === 0) return 'Diff: 0';
+  const sign = d > 0 ? '+' : '';
+  return `Diff: ${sign}${d.toLocaleString()}`;
+};
+
 const round = (val: number, decimals: number) => {
   const factor = Math.pow(10, decimals);
   return Math.round(val * factor) / factor;
@@ -521,6 +555,233 @@ function calculateEstimate(input: EstimateInput): EstimateResult {
     grandTotal,
   };
 }
+
+
+
+// ✅ PDF export (client-side)
+async function generateComparisonPdf(items: ComparisonItem[]) {
+  if (!items || items.length < 2) {
+    alert('Add at least 2 saved calculations to generate PDF.');
+    return;
+  }
+
+  // dynamic imports keep bundle light + avoid SSR issues
+  const { jsPDF } = await import('jspdf');
+// ---------- Diff logic (same spirit as web) ----------
+const base = items[0];
+
+const roundN = (n: number, d: number) => {
+  const f = Math.pow(10, d);
+  return Math.round(n * f) / f;
+};
+
+// Column index -> "is different?" check for each row
+// NOTE: indices match your body array order below.
+const isDifferentAt = (rowIndex: number, colIndex: number) => {
+  if (rowIndex === 0) return false; // base row never highlighted
+  const it = items[rowIndex];
+
+  // body columns:
+  // 0 #, 1 Label, 2 Metal, 3 GoldRate/10, 4 Gross, 5 Gold, 6 Polish gm,
+  // 7 Polish Amt, 8 Gold Value, 9 Stones net, 10 Disc, 11 Labour net,
+  // 12 Labour Disc, 13 Misc, 14 Misc Disc, 15 TotalBeforeGST, 16 GST, 17 GrandTotal
+
+  switch (colIndex) {
+    case 3:
+      return roundN(it.ratePer10Gm, 2) !== roundN(base.ratePer10Gm, 2);
+    case 4:
+      return roundN(it.grossWeight, 3) !== roundN(base.grossWeight, 3);
+    case 5:
+      return roundN(it.goldWeight, 3) !== roundN(base.goldWeight, 3);
+
+    case 6:
+      return roundN(it.result.polishWeightGm, 3) !== roundN(base.result.polishWeightGm, 3);
+    case 7:
+      return roundN(it.result.polishValue, 2) !== roundN(base.result.polishValue, 2);
+    case 8:
+      return roundN(it.result.goldValueOnly, 2) !== roundN(base.result.goldValueOnly, 2);
+    case 9:
+      return roundN(it.result.stonesTotalValue, 2) !== roundN(base.result.stonesTotalValue, 2);
+    case 10:
+      return roundN(it.result.stonesDiscountTotal, 2) !== roundN(base.result.stonesDiscountTotal, 2);
+    case 11:
+      return roundN(it.result.labourNet, 2) !== roundN(base.result.labourNet, 2);
+    case 12:
+      return roundN(it.result.labourDiscountAmount, 2) !== roundN(base.result.labourDiscountAmount, 2);
+    case 13:
+      return roundN(it.result.miscCharges, 2) !== roundN(base.result.miscCharges, 2);
+    case 14:
+      return roundN(it.result.miscDiscountAmount, 2) !== roundN(base.result.miscDiscountAmount, 2);
+    case 15:
+      return roundN(it.result.subTotalBeforeGst, 2) !== roundN(base.result.subTotalBeforeGst, 2);
+    case 16:
+      return roundN(it.result.gstAmount, 2) !== roundN(base.result.gstAmount, 2);
+    case 17:
+      return Math.round(it.result.grandTotal) !== Math.round(base.result.grandTotal);
+
+    default:
+      return false;
+  }
+};
+
+  const autoTable = (await import('jspdf-autotable')).default;
+
+  const doc = new jsPDF({
+    orientation: 'landscape', // ✅ better fit for wide table
+    unit: 'pt',
+    format: 'a4',
+  });
+
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+
+  // ---------- Header ----------
+  const title = 'Jewellery Estimate – Comparison Summary';
+  const sub = new Date().toLocaleString();
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text(title, 40, 36);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(`Generated on: ${sub}`, 40, 52);
+
+// ---------- Watermark (helper) ----------
+const addWatermark = () => {
+  // Draw BEHIND the table (we'll call this from willDrawPage)
+  // Use opacity so it never hides text.
+  // jsPDF supports GState in v2+
+  const gState = new (doc as any).GState({ opacity: 0.06 });
+
+  doc.saveGraphicsState?.();
+  doc.setGState?.(gState);
+
+  doc.setTextColor(120); // still visible but light
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(46);
+
+  const x = pageW / 2;
+  const y = 90;
+
+  doc.text('Cityjeweller.in', x, y, {
+    align: 'center',
+    angle: -18,
+  });
+
+  // restore so table styling is unaffected
+  doc.restoreGraphicsState?.();
+  doc.setTextColor(0);
+};
+
+
+
+  // ---------- Build table ----------
+  const head = [[
+    '#',
+    'Label',
+    'Metal',
+    'Gold Rate/10gm',
+    'Gross Wt',
+    'Gold Wt',
+    'Polish (gm)',
+    'Polish Amt',
+    'Gold Value',
+    'Stones (net)',
+    'Diam+Stone Disc',
+    'Labour (net)',
+    'Labour Disc',
+    'Misc',
+    'Misc Disc',
+    'Total Before GST',
+    'GST',
+    'Grand Total',
+  ]];
+
+  const body = items.map((it, idx) => [
+    String(idx + 1),
+    it.label,
+    metalLabel(it.metalType),
+    String(Math.round(it.ratePer10Gm)),
+    it.grossWeight.toFixed(3),
+    it.goldWeight.toFixed(3),
+    it.result.polishWeightGm.toFixed(3),
+    it.result.polishValue.toFixed(2),
+    it.result.goldValueOnly.toFixed(2),
+    it.result.stonesTotalValue.toFixed(2),
+    it.result.stonesDiscountTotal.toFixed(2),
+    it.result.labourNet.toFixed(2),
+    it.result.labourDiscountAmount.toFixed(2),
+    it.result.miscCharges.toFixed(2),
+    it.result.miscDiscountAmount.toFixed(2),
+    it.result.subTotalBeforeGst.toFixed(2),
+    it.result.gstAmount.toFixed(2),
+    (() => {
+  const baseGT = Math.round(base.result.grandTotal);
+  const curGT = Math.round(it.result.grandTotal);
+  const deltaText = idx === 0 ? '' : ` (${formatDelta(baseGT, curGT)})`;
+  return `${curGT.toLocaleString()}${deltaText}`;
+})(),
+
+  ]);
+
+
+autoTable(doc, {
+  head,
+  body,
+  startY: 70,
+  margin: { left: 30, right: 30 },
+  styles: {
+    font: 'helvetica',
+    fontSize: 8,
+    cellPadding: 3,
+    overflow: 'linebreak',
+    lineWidth: 0.2,
+  },
+  headStyles: {
+    fontStyle: 'bold',
+  },
+
+  // ✅ Watermark goes BEFORE table drawing (so it never blocks text)
+  willDrawPage: () => {
+    addWatermark();
+  },
+
+  didParseCell: (data) => {
+    if (data.section !== 'body') return;
+
+    const rowIndex = data.row.index;
+    const colIndex = data.column.index;
+
+    if (isDifferentAt(rowIndex, colIndex)) {
+      data.cell.styles.fontStyle = 'bold';
+      data.cell.styles.textColor = [0, 128, 64];
+      data.cell.styles.fillColor = [236, 253, 245];
+    }
+  },
+
+  // ✅ keep footer here (after page is drawn)
+  didDrawPage: () => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(120);
+    doc.text('Generated via Cityjeweller.in comparison tool', 30, pageH - 18);
+    doc.setTextColor(0);
+  },
+});
+
+
+
+  // ---------- Download ----------
+  const safeName = `Cityjeweller_in_comparison_${new Date()
+    .toISOString()
+    .slice(0, 19)
+    .replace(/[:T]/g, '-')}.pdf`;
+
+  doc.save(safeName);
+}
+
+
 
 /* =========================
    Comparison Item Type
@@ -1764,7 +2025,20 @@ const ComparisonTable: React.FC<{
 
   return (
     <div className="border rounded-md p-4 mt-4 overflow-x-auto bg-white">
-      <h2 className="font-semibold text-sm mb-2">Comparison Summary (differences are in bold green)</h2>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <h2 className="font-semibold text-sm">
+          Comparison Summary (differences are in bold green)
+        </h2>
+
+<button
+  type="button"
+  onClick={() => generateComparisonPdf(items)}
+  className="px-3 py-1.5 rounded bg-slate-900 !text-white text-xs font-medium hover:bg-slate-800"
+>
+  Generate PDF
+</button>
+      </div>
+
       <table className="min-w-full border text-xs">
         <thead className="bg-gray-100">
           <tr>
@@ -1788,12 +2062,14 @@ const ComparisonTable: React.FC<{
             <th className="border px-2 py-1">Grand Total</th>
           </tr>
         </thead>
+
         <tbody>
           {items.map((it, idx) => (
             <tr key={it.id}>
               <td className="border px-2 py-1">{idx + 1}</td>
               <td className="border px-2 py-1">{it.label}</td>
               <td className="border px-2 py-1">{metalLabel(it.metalType)}</td>
+
               <DiffCell
                 value={it.ratePer10Gm.toFixed(0)}
                 different={round(it.ratePer10Gm, 2) !== round(base.ratePer10Gm, 2)}
@@ -1806,30 +2082,25 @@ const ComparisonTable: React.FC<{
                 value={it.goldWeight.toFixed(3)}
                 different={round(it.goldWeight, 3) !== round(base.goldWeight, 3)}
               />
+
               <DiffCell value={it.result.polishWeightGm.toFixed(3)} different={isDiff('polishWeightGm', it)} />
               <DiffCell value={it.result.polishValue.toFixed(2)} different={isDiff('polishValue', it)} />
               <DiffCell value={it.result.goldValueOnly.toFixed(2)} different={isDiff('goldValueOnly', it)} />
               <DiffCell value={it.result.stonesTotalValue.toFixed(2)} different={isDiff('stonesTotalValue', it)} />
-              <DiffCell
-                value={it.result.stonesDiscountTotal.toFixed(2)}
-                different={isDiff('stonesDiscountTotal', it)}
-              />
+              <DiffCell value={it.result.stonesDiscountTotal.toFixed(2)} different={isDiff('stonesDiscountTotal', it)} />
               <DiffCell value={it.result.labourNet.toFixed(2)} different={isDiff('labourNet', it)} />
-              <DiffCell
-                value={it.result.labourDiscountAmount.toFixed(2)}
-                different={isDiff('labourDiscountAmount', it)}
-              />
+              <DiffCell value={it.result.labourDiscountAmount.toFixed(2)} different={isDiff('labourDiscountAmount', it)} />
               <DiffCell value={it.result.miscCharges.toFixed(2)} different={isDiff('miscCharges', it)} />
-              <DiffCell
-                value={it.result.miscDiscountAmount.toFixed(2)}
-                different={isDiff('miscDiscountAmount', it)}
-              />
-              <DiffCell
-                value={it.result.subTotalBeforeGst.toFixed(2)}
-                different={isDiff('subTotalBeforeGst', it)}
-              />
+              <DiffCell value={it.result.miscDiscountAmount.toFixed(2)} different={isDiff('miscDiscountAmount', it)} />
+              <DiffCell value={it.result.subTotalBeforeGst.toFixed(2)} different={isDiff('subTotalBeforeGst', it)} />
               <DiffCell value={it.result.gstAmount.toFixed(2)} different={isDiff('gstAmount', it)} />
-              <DiffCell value={it.result.grandTotal} different={isDiff('grandTotal', it)} />
+              <GrandTotalCell
+  value={it.result.grandTotal}
+  baseValue={base.result.grandTotal}
+  isBase={idx === 0}
+  different={isDiff('grandTotal', it)}
+/>
+
             </tr>
           ))}
         </tbody>
@@ -1837,6 +2108,7 @@ const ComparisonTable: React.FC<{
     </div>
   );
 };
+
 
 /* =========================
    Misc helpers
