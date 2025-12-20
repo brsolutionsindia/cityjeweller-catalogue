@@ -1141,9 +1141,6 @@ const handleCompareForMe = () => {
                     Compare for me
                   </button>
 
-                  <p className="text-[10px] text-gray-500">
-                    Clicking “Compare for me” will open WhatsApp and send this link to: 919023130944
-                  </p>
                 </div>
               )}
             </div>
