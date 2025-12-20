@@ -12,12 +12,14 @@ function QuoteParamListener({ onOpen }: { onOpen: () => void }) {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const quote = searchParams.get('getquote');
+    const quote = searchParams?.get('getquote');
     if (quote === '1') onOpen();
+    // optional: you can also remove param via router.replace if you want
   }, [searchParams, onOpen]);
 
   return null;
 }
+
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
