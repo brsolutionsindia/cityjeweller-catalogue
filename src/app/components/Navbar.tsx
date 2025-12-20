@@ -26,11 +26,12 @@ export default function Navbar() {
 const searchParams = useSearchParams();
 
 useEffect(() => {
-  const quote = searchParams.get('getquote');
-  if (quote === '1') {
-    setQuoteOpen(true);
-  }
+  const quote = searchParams?.get('getquote');   // ✅ optional chaining
+  if (quote === '1') setQuoteOpen(true);
 }, [searchParams]);
+
+
+
 
   // Close dropdown menu when clicked outside
   useEffect(() => {
