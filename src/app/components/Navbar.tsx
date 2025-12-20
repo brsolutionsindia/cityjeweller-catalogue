@@ -1,12 +1,23 @@
 'use client';
 
-import { useState, useRef, useEffect, type FormEvent } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import styles from '../navbar.module.css';
 import { diamondItems, goldItems, silverItems, gemstoneItems, cvdItems, miscItems } from '../../data/catalogMenu';
+
+/** ✅ This child is the only place that uses useSearchParams() */
+function QuoteParamListener({ onOpen }: { onOpen: () => void }) {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const quote = searchParams.get('getquote');
+    if (quote === '1') onOpen();
+  }, [searchParams, onOpen]);
+
+  return null;
+}
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -20,18 +31,9 @@ export default function Navbar() {
   const quoteRef = useRef<HTMLDivElement | null>(null);
 
   const router = useRouter();
-
   const WHATSAPP_NUMBER = '919023130944'; // +91 9023130944
 
-const searchParams = useSearchParams();
-
-useEffect(() => {
-  const quote = searchParams?.get('getquote');   // ✅ optional chaining
-  if (quote === '1') setQuoteOpen(true);
-}, [searchParams]);
-
-
-
+  const openQuote = useCallback(() => setQuoteOpen(true), []);
 
   // Close dropdown menu when clicked outside
   useEffect(() => {
@@ -95,6 +97,11 @@ useEffect(() => {
       className={`${styles.navbar} flex items-center justify-between gap-4`}
       style={{ borderRadius: '12px', padding: '1rem', backgroundColor: '#f9f9f9' }}
     >
+      {/* ✅ Wrap the listener in Suspense */}
+      <Suspense fallback={null}>
+        <QuoteParamListener onOpen={openQuote} />
+      </Suspense>
+
       {/* Hamburger Icon */}
       <div style={{ cursor: 'pointer' }} onClick={() => setMenuOpen(!menuOpen)} aria-label="Open menu">
         <div className={styles.hamburgerIcon}>
