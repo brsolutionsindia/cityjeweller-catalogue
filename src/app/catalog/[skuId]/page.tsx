@@ -27,9 +27,23 @@ const extractUrl = (val: unknown): string => {
 };
 
 export default function CatalogSkuPage() {
-  const { skuId } = useParams<{ skuId: string }>();
   const router = useRouter();
-  const decodedSkuId = decodeURIComponent(skuId);
+  const params = useParams();
+const skuIdParam = (params as { skuId?: string } | null)?.skuId;
+
+if (!skuIdParam) {
+  return (
+    <PageLayout>
+      <OfferBar goldRate="Loading..." rateDate="" />
+      <section style={{ maxWidth: 1200, margin: '0 auto', padding: 16 }}>
+        <p>Invalid product URL.</p>
+      </section>
+    </PageLayout>
+  );
+}
+
+const decodedSkuId = decodeURIComponent(skuIdParam);
+
 
   const [rateDate, setRateDate] = useState('');
   const [goldRate, setGoldRate] = useState('Loading...');

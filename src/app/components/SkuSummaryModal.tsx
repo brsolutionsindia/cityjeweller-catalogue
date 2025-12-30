@@ -6,8 +6,8 @@ import { useSearchParams } from 'next/navigation';
 
 type Props = {
   skuId: string;
-  onClose: () => void;
-  fullPage?: boolean; // ✅ ADD
+  onClose?: () => void;
+  fullPage?: boolean;
 };
 
 type SkuData = {
@@ -65,16 +65,21 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose, fullPage = false }) 
       try {
         const skuRef = ref(db, `Global SKU/SKU/${skuId}`);
         const skuSnap = await get(skuRef);
+
         if (skuSnap.exists()) {
-          setSkuData(skuSnap.val());
-          const goldRatePerGram = parseFloat(skuSnap.val().goldRatePerGram || '0');
+          const val = skuSnap.val();
+          setSkuData(val);
+
+          const goldRatePerGram = parseFloat(val?.goldRatePerGram || '0');
           setGoldRate(goldRatePerGram);
         }
 
         const imgRef = ref(db, `Global SKU/Images/${skuId}/Primary`);
         const imgSnap = await get(imgRef);
         const url = imgSnap.val();
-        if (url && typeof url === 'string' && url.startsWith('http')) setImageUrl(url);
+        if (url && typeof url === 'string' && url.startsWith('http')) {
+          setImageUrl(url);
+        }
       } catch (error) {
         console.error('Error fetching SKU data:', error);
       }
@@ -85,15 +90,20 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose, fullPage = false }) 
 
   const summary = useMemo(() => {
     if (!skuData) return null;
+
     const gross = parseFloat(String(skuData.gross || '0'));
     const net = parseFloat(String(skuData.net || '0'));
     const goldPrice = parseFloat(String(skuData.goldPrice || '0'));
+
     const onlyStone = goldPrice === 0;
     const noStone = gross === net;
+
     const NetUnit = skuData.NetUnit || '';
     const containsD = NetUnit.includes('S1');
     const containsSt = NetUnit.includes('S2');
+
     const isSilver = (skuData?.GoldRateUnit || '').toUpperCase().includes('SIL');
+
     return { gross, net, goldPrice, onlyStone, noStone, containsD, containsSt, isSilver };
   }, [skuData]);
 
@@ -104,31 +114,34 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose, fullPage = false }) 
 
   if (!skuData || !summary) return null;
 
-  // ✅ Wrapper classes depend on mode
+  // ✅ IMPORTANT: In fullPage mode, DO NOT use fixed overlay wrapper.
   const wrapperClass = fullPage
     ? 'w-full'
     : 'fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-40 px-4';
 
+  // ✅ In fullPage mode, no max-height scroll container (let the page scroll normally)
+  const cardClass = fullPage
+    ? 'bg-white rounded-2xl shadow-sm w-full overflow-hidden flex flex-col border border-gray-200'
+    : 'bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto relative flex flex-col';
+
+  // ✅ Padding: modal needed extra bottom space due to sticky enquiry button
+  const bodyClass = fullPage ? 'px-4 py-4' : 'pb-32 px-4';
+
   return (
     <div className={wrapperClass}>
-      <div
-        className={
-          fullPage
-            ? 'bg-white rounded-2xl shadow-sm w-full overflow-hidden flex flex-col border border-gray-200'
-            : 'bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto relative flex flex-col'
-        }
-      >
-        {/* ✅ Top bar (only show close X in modal mode) */}
+      <div className={cardClass}>
+        {/* ✅ Close only for modal */}
         {!fullPage && (
           <button
             className="absolute top-3 right-4 text-gray-500 hover:text-red-500 text-xl"
-            onClick={onClose}
+            onClick={() => onClose?.()}
+            aria-label="Close"
           >
             ✕
           </button>
         )}
 
-        <div className={fullPage ? 'px-4 py-4' : 'pb-32 px-4'}>
+        <div className={bodyClass}>
           {/* Product Image */}
           <div className="mb-4 text-center">
             <Image
@@ -140,10 +153,14 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose, fullPage = false }) 
             />
           </div>
 
-          {/* Sticky Enquiry Button
-              ✅ In fullPage, keep it but not as "sticky inside modal overlay".
-              ✅ On mobile, you can make it sticky to viewport later if you want. */}
-          <div className={fullPage ? 'bg-white pt-2 pb-2 flex justify-center' : 'sticky bottom-0 bg-white pt-4 pb-2 flex justify-center z-10'}>
+          {/* Enquiry button */}
+          <div
+            className={
+              fullPage
+                ? 'bg-white pt-2 pb-2 flex justify-center'
+                : 'sticky bottom-0 bg-white pt-4 pb-2 flex justify-center z-10'
+            }
+          >
             <a
               href={`https://wa.me/919023130944?text=${encodeURIComponent(
                 `Hi, I am interested in your jewellery item - ${skuId}. Please confirm its availability and payment details.`
@@ -186,26 +203,32 @@ const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose, fullPage = false }) 
                 </>
               )}
 
-              {/* Skip detailed breakdown if it's silver */}
+              {/* Skip breakdown if silver */}
               {!summary.isSilver && (
                 <>
                   {skuData.goldPrice && parseFloat(skuData.goldPrice) > 0 && (
                     <>
-                      <div><strong>Net Weight:</strong> {skuData.net} gm ({skuData.goldPurety}kt) × {formatINR(goldRate)}</div>
+                      <div>
+                        <strong>Net Weight:</strong> {skuData.net} gm ({skuData.goldPurety}kt) × {formatINR(goldRate)}
+                      </div>
                       <div className="text-right">= {formatINR(skuData.goldPrice)}</div>
                     </>
                   )}
 
                   {summary.containsD && skuData.stone1 && parseFloat(skuData.stone1) > 0 && (
                     <>
-                      <div><strong>Diamond:</strong> {skuData.stone1} {skuData.St1Unit} × {skuData.stone1Rate} {skuData.St1RateUnit}</div>
+                      <div>
+                        <strong>Diamond:</strong> {skuData.stone1} {skuData.St1Unit} × {skuData.stone1Rate} {skuData.St1RateUnit}
+                      </div>
                       <div className="text-right">= {formatINR(skuData.stone1Price)}</div>
                     </>
                   )}
 
                   {summary.containsSt && skuData.stone2 && parseFloat(skuData.stone2) > 0 && (
                     <>
-                      <div><strong>Stone:</strong> {skuData.stone2} {skuData.St2Unit} × {skuData.stone2Rate} {skuData.St2RateUnit}</div>
+                      <div>
+                        <strong>Stone:</strong> {skuData.stone2} {skuData.St2Unit} × {skuData.stone2Rate} {skuData.St2RateUnit}
+                      </div>
                       <div className="text-right">= {formatINR(skuData.stone2Price)}</div>
                     </>
                   )}
