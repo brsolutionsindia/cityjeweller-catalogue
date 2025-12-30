@@ -29,21 +29,20 @@ const extractUrl = (val: unknown): string => {
 export default function CatalogSkuPage() {
   const router = useRouter();
   const params = useParams();
-const skuIdParam = (params as { skuId?: string } | null)?.skuId;
+  const skuIdParam = (params as { skuId?: string } | null)?.skuId;
 
-if (!skuIdParam) {
-  return (
-    <PageLayout>
-      <OfferBar goldRate="Loading..." rateDate="" />
-      <section style={{ maxWidth: 1200, margin: '0 auto', padding: 16 }}>
-        <p>Invalid product URL.</p>
-      </section>
-    </PageLayout>
-  );
-}
+  if (!skuIdParam) {
+    return (
+      <PageLayout>
+        <OfferBar goldRate="Loading..." rateDate="" />
+        <section style={{ maxWidth: 1200, margin: '0 auto', padding: 16 }}>
+          <p>Invalid product URL.</p>
+        </section>
+      </PageLayout>
+    );
+  }
 
-const decodedSkuId = decodeURIComponent(skuIdParam);
-
+  const decodedSkuId = decodeURIComponent(skuIdParam);
 
   const [rateDate, setRateDate] = useState('');
   const [goldRate, setGoldRate] = useState('Loading...');
@@ -59,7 +58,10 @@ const decodedSkuId = decodeURIComponent(skuIdParam);
 
   // Detect “silver” / “diamond” from SKU data
   const remarksLower = useMemo(() => (skuData?.remarks || '').toLowerCase(), [skuData]);
-  const isSilver = useMemo(() => remarksLower.includes('sil') || remarksLower.includes('silver'), [remarksLower]);
+  const isSilver = useMemo(
+    () => remarksLower.includes('sil') || remarksLower.includes('silver'),
+    [remarksLower]
+  );
   const isDiamond = useMemo(() => remarksLower.includes('diamond'), [remarksLower]);
 
   // --- Load rates/date (gold + silver + date) ---
@@ -140,10 +142,12 @@ const decodedSkuId = decodeURIComponent(skuIdParam);
           maxWidth: 1200,
           margin: '0 auto',
           padding: '14px 12px 28px',
+          overflowX: 'hidden', // ✅ stops "only right side visible" from horizontal overflow
         }}
       >
         {/* Breadcrumb + actions */}
         <div
+          className="pdpTopbar"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -171,6 +175,7 @@ const decodedSkuId = decodeURIComponent(skuIdParam);
               <span style={{ fontWeight: 600, color: 'rgba(0,0,0,0.85)' }}>Catalog</span>
               <span style={{ margin: '0 8px' }}>›</span>
               <span style={{ fontWeight: 700, color: 'rgba(0,0,0,0.9)' }}>{decodedSkuId}</span>
+
               {isSilver && (
                 <span
                   style={{
@@ -205,7 +210,7 @@ const decodedSkuId = decodeURIComponent(skuIdParam);
           </div>
 
           {/* Right side quick actions */}
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div className="pdpActions" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <button
               type="button"
               onClick={() => {
@@ -264,67 +269,56 @@ const decodedSkuId = decodeURIComponent(skuIdParam);
             <p style={{ margin: 0, color: 'rgba(0,0,0,0.7)' }}>SKU: {decodedSkuId}</p>
           </div>
         ) : (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1fr) 360px',
-              gap: 16,
-            }}
-          >
-            {/* Left: Primary content (your existing detail UI) */}
-            <div
-              style={{
-                border: '1px solid rgba(0,0,0,0.08)',
-                borderRadius: 18,
-                background: '#fff',
-                overflow: 'hidden',
-              }}
-            >
-              {/* Header strip like modern PDP */}
+          <div className="pdpGrid">
+            {/* Left: Primary content */}
+            <div className="pdpMain">
               <div
                 style={{
-                  padding: '14px 16px',
-                  borderBottom: '1px solid rgba(0,0,0,0.06)',
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  flexWrap: 'wrap',
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  borderRadius: 18,
+                  background: '#fff',
+                  overflow: 'hidden',
                 }}
               >
-                <div>
-                  <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.6)', fontWeight: 700 }}>
-                    Product ID
+                {/* Header strip like modern PDP */}
+                <div
+                  style={{
+                    padding: '14px 16px',
+                    borderBottom: '1px solid rgba(0,0,0,0.06)',
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.6)', fontWeight: 700 }}>
+                      Product ID
+                    </div>
+                    <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: 0.2 }}>
+                      {decodedSkuId}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: 0.2 }}>
-                    {decodedSkuId}
+
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.55)', fontWeight: 700 }}>
+                      Rate Date
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(0,0,0,0.85)' }}>
+                      {rateDate || '—'}
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.55)', fontWeight: 700 }}>
-                    Rate Date
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(0,0,0,0.85)' }}>
-                    {rateDate || '—'}
-                  </div>
+                <div style={{ padding: 10 }}>
+                  <SkuSummaryModal skuId={decodedSkuId} onClose={() => router.back()} fullPage />
                 </div>
-              </div>
-
-              {/* ✅ Keep ALL existing detail: your SkuSummaryModal */}
-              <div style={{ padding: 10 }}>
-                <SkuSummaryModal skuId={decodedSkuId} onClose={() => router.back()} fullPage />
               </div>
             </div>
 
-            {/* Right: Sticky purchase panel (modern e-commerce) */}
-            <aside
-              style={{
-                position: 'sticky',
-                top: 12,
-                alignSelf: 'start',
-              }}
-            >
+            {/* Right: Sticky purchase panel */}
+            <aside className="pdpAside">
               <div
                 style={{
                   border: '1px solid rgba(0,0,0,0.08)',
@@ -333,16 +327,9 @@ const decodedSkuId = decodeURIComponent(skuIdParam);
                   padding: 14,
                 }}
               >
-                <div style={{ fontWeight: 900, fontSize: 14, marginBottom: 8 }}>
-                  Quick Actions
-                </div>
+                <div style={{ fontWeight: 900, fontSize: 14, marginBottom: 8 }}>Quick Actions</div>
 
-                <div
-                  style={{
-                    display: 'grid',
-                    gap: 10,
-                  }}
-                >
+                <div style={{ display: 'grid', gap: 10 }}>
                   <button
                     type="button"
                     onClick={() => {
@@ -431,7 +418,7 @@ const decodedSkuId = decodeURIComponent(skuIdParam);
                 </div>
               </div>
 
-              {/* ✅ Diamond-only: video section (embedded) — KEEP EXISTING DETAIL */}
+              {/* Diamond video */}
               {isDiamond && (
                 <div
                   style={{
@@ -499,11 +486,42 @@ const decodedSkuId = decodeURIComponent(skuIdParam);
           </div>
         )}
 
-        {/* Responsive fallback for small screens */}
+        {/* ✅ Correct responsive CSS */}
         <style jsx>{`
+          .pdpGrid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 360px;
+            gap: 16px;
+            align-items: start;
+          }
+
+          /* ✅ critical: prevent grid children from forcing overflow */
+          .pdpMain,
+          .pdpAside {
+            min-width: 0;
+          }
+
+          .pdpAside {
+            position: sticky;
+            top: 12px;
+            align-self: start;
+          }
+
           @media (max-width: 980px) {
-            section :global(.pdpGrid) {
-              grid-template-columns: 1fr !important;
+            .pdpGrid {
+              grid-template-columns: 1fr;
+            }
+
+            .pdpAside {
+              position: static;
+              top: auto;
+            }
+
+            /* optional: stack actions nicely */
+            .pdpActions {
+              width: 100%;
+              justify-content: flex-start;
+              flex-wrap: wrap;
             }
           }
         `}</style>
