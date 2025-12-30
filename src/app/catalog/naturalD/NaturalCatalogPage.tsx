@@ -1,8 +1,8 @@
-// ✅ Updated version of NaturalCatalogPage with embedded video viewer
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import { ref, onValue } from 'firebase/database';
+import { useRouter } from 'next/navigation';
 import { db } from '../../../firebaseConfig';
 import PageLayout from '../../components/PageLayout';
 import styles from '../../page.module.css';
@@ -24,8 +24,8 @@ interface Diamond {
   Status?: string;
   CertNo?: string;
   Certified?: string;
-  VideoURL?: string; // normalized field we will use on UI
-  Video?: string;    // raw field from Firebase (if present)
+  VideoURL?: string;
+  Video?: string;
   Measurement?: string;
   Depth?: string;
   Table?: string;
@@ -33,7 +33,6 @@ interface Diamond {
   OfferPrice?: number;
 }
 
-// Raw Firebase row may have `Video` or `VideoURL`
 type RawDiamond = Diamond;
 
 const clarityMap = {
@@ -69,7 +68,6 @@ const fluorescenceMap = {
   VSL: 'Very Slight – Slightly visible under UV',
 };
 
-// Handles Excel HYPERLINK("url") and plain URLs
 const extractUrl = (val: string | undefined): string => {
   if (!val) return '';
   const str = String(val).trim();
@@ -89,13 +87,11 @@ const InfoPopup = ({
   valueMap: Record<string, string>;
 }) => {
   const [show, setShow] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
+  const refEl = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
-        setShow(false);
-      }
+      if (refEl.current && !refEl.current.contains(event.target as Node)) setShow(false);
     };
     if (show) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -105,13 +101,8 @@ const InfoPopup = ({
 
   return (
     <span
-      ref={ref}
-      style={{
-        cursor: 'pointer',
-        color: '#0070f3',
-        fontWeight: 'bold',
-        position: 'relative', // fontSize inherited from parent
-      }}
+      ref={refEl}
+      style={{ cursor: 'pointer', color: '#0070f3', fontWeight: 'bold', position: 'relative' }}
       onClick={(e) => {
         e.stopPropagation();
         setShow((prev) => !prev);
@@ -159,7 +150,7 @@ export default function NaturalCatalogPage() {
     Fluorescence: '',
   });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleSelectionToggle = (id: string) => {
     setSelectedIds((prev) =>
@@ -167,7 +158,6 @@ export default function NaturalCatalogPage() {
     );
   };
 
-  // Build available shapes
   useEffect(() => {
     const dataRef = ref(db, 'Global SKU/NaturalDiamonds');
     onValue(
@@ -177,9 +167,7 @@ export default function NaturalCatalogPage() {
         if (!val) return;
         const shapes = new Set<string>();
         Object.values(val).forEach((d) => {
-          if (d.Shape && d.Status === 'AVAILABLE') {
-            shapes.add(d.Shape);
-          }
+          if (d.Shape && d.Status === 'AVAILABLE') shapes.add(d.Shape);
         });
         setAvailableShapes(Array.from(shapes).sort());
       },
@@ -187,7 +175,6 @@ export default function NaturalCatalogPage() {
     );
   }, []);
 
-  // Load items for selected shape
   useEffect(() => {
     setIsLoading(true);
     const dataRef = ref(db, 'Global SKU/NaturalDiamonds');
@@ -200,11 +187,9 @@ export default function NaturalCatalogPage() {
       }
 
       const parsed: Diamond[] = Object.values(val)
-        .map((dRaw) => dRaw as RawDiamond)
         .filter((d) => d.Status === 'AVAILABLE' && d.Shape === filters.Shape)
         .map((d) => ({
           ...d,
-          // Prefer explicit Video field, fallback to VideoURL
           VideoURL: extractUrl(d.Video || d.VideoURL),
         }));
 
@@ -213,7 +198,6 @@ export default function NaturalCatalogPage() {
     });
   }, [filters.Shape]);
 
-  // Apply filters + sort
   useEffect(() => {
     let result = diamonds.filter(
       (d) =>
@@ -236,8 +220,7 @@ export default function NaturalCatalogPage() {
     setFiltered(result);
   }, [filters, diamonds, sortOption]);
 
-  const unique = (key: keyof Diamond) =>
-    Array.from(new Set(diamonds.map((d) => d[key]))).sort();
+  const unique = (key: keyof Diamond) => Array.from(new Set(diamonds.map((d) => d[key]))).sort();
 
   return (
     <PageLayout>
@@ -258,9 +241,7 @@ export default function NaturalCatalogPage() {
             Shape:{' '}
             <select
               value={filters.Shape}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, Shape: e.target.value, SizeRange: '' }))
-              }
+              onChange={(e) => setFilters((prev) => ({ ...prev, Shape: e.target.value, SizeRange: '' }))}
             >
               {availableShapes.map((shape) => (
                 <option key={shape} value={shape}>
@@ -302,9 +283,7 @@ export default function NaturalCatalogPage() {
             id="sortOption"
             value={sortOption}
             onChange={(e) =>
-              setSortOption(
-                e.target.value as 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc'
-              )
+              setSortOption(e.target.value as 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc')
             }
           >
             <option value="price-asc">Price: Low to High</option>
@@ -341,18 +320,12 @@ export default function NaturalCatalogPage() {
               className={`${styles.catalogCard} ${styles.labGrownPage}`}
               key={d.StoneId}
               onClick={() => {
-                if (d.VideoURL) {
-                  setActiveVideoUrl(d.VideoURL);
-                } else {
-                  alert('Enquire Now to get Video');
-                }
+                const id = d.StoneId ?? '';
+                if (!id) return;
+                router.push(`/diamond/${encodeURIComponent(id)}?type=natural`);
               }}
             >
-              {/* Compare checkbox */}
-              <div
-                className="compareCheckbox"
-                style={{ textAlign: 'center', marginBottom: '4px' }}
-              >
+              <div className="compareCheckbox" style={{ textAlign: 'center', marginBottom: '4px' }}>
                 <label style={{ fontSize: '0.65rem' }}>
                   <input
                     type="checkbox"
@@ -364,7 +337,6 @@ export default function NaturalCatalogPage() {
                 </label>
               </div>
 
-              {/* Shape icon */}
               <div className="imageContainer">
                 <Image
                   src={shapeIcon[d.Shape ?? ''] || '/default.png'}
@@ -376,32 +348,17 @@ export default function NaturalCatalogPage() {
               </div>
 
               <div className="cardContent">
-                {/* Size & Shape */}
                 <p>{(parseFloat(d.Size ?? '0')).toFixed(2)}ct ({d.Shape})</p>
 
-                {/* Color & Clarity (bigger line) */}
-                <p
-                  style={{
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    margin: '4px 0',
-                    textAlign: 'center',
-                  }}
-                >
+                <p style={{ fontSize: '0.95rem', fontWeight: 600, margin: '4px 0', textAlign: 'center' }}>
                   <InfoPopup text={d.Color ?? ''} label="Color" valueMap={colorMap} />
                   {' · '}
                   <InfoPopup text={d.Clarity ?? ''} label="Clarity" valueMap={clarityMap} />
                 </p>
 
-                {/* Details (small) */}
-                <div
-                  style={{
-                    fontSize: '0.65rem',
-                    lineHeight: '1.3',
-                    textAlign: 'center',
-                  }}
-                >
+                <div style={{ fontSize: '0.65rem', lineHeight: '1.3', textAlign: 'center' }}>
                   <p>({d.Measurement ?? ''} mm)</p>
+
                   <p>
                     D
                     <InfoPopup
@@ -425,28 +382,16 @@ export default function NaturalCatalogPage() {
                     <InfoPopup text={d.Cut ?? ''} label="Cut" valueMap={gradeMap} />,{' '}
                     <InfoPopup text={d.Polish ?? ''} label="Polish" valueMap={gradeMap} />,{' '}
                     <InfoPopup text={d.Symm ?? ''} label="Symmetry" valueMap={gradeMap} />,{' '}
-                    <InfoPopup
-                      text={d.Fluorescence ?? ''}
-                      label="Fluorescence"
-                      valueMap={fluorescenceMap}
-                    />
+                    <InfoPopup text={d.Fluorescence ?? ''} label="Fluorescence" valueMap={fluorescenceMap} />
                   </p>
                 </div>
 
                 {d.MRP && d.OfferPrice ? (
                   <p>
-                    <span
-                      style={{
-                        textDecoration: 'line-through',
-                        color: '#888',
-                        marginRight: '0.5rem',
-                      }}
-                    >
+                    <span style={{ textDecoration: 'line-through', color: '#888', marginRight: '0.5rem' }}>
                       ₹{Math.round(d.MRP)}
                     </span>
-                    <span style={{ color: '#c00', fontWeight: 'bold' }}>
-                      ₹{Math.round(d.OfferPrice)}
-                    </span>
+                    <span style={{ color: '#c00', fontWeight: 'bold' }}>₹{Math.round(d.OfferPrice)}</span>
                   </p>
                 ) : null}
               </div>
@@ -455,6 +400,7 @@ export default function NaturalCatalogPage() {
                 <div className="codeSection">
                   <span className="codeValue">{d.StoneId ?? ''}</span>
                 </div>
+
                 <a
                   href={`https://wa.me/919023130944?text=${encodeURIComponent(
                     `I am interested in Product ID ${d.StoneId ?? ''}.`
@@ -470,69 +416,8 @@ export default function NaturalCatalogPage() {
             </div>
           ))}
         </div>
-
-        {/* Embedded video/webpage viewer */}
-        {activeVideoUrl && (
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.6)',
-              zIndex: 1000,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '1rem',
-            }}
-            onClick={() => setActiveVideoUrl(null)}
-          >
-            <div
-              style={{
-                background: '#000',
-                borderRadius: '8px',
-                maxWidth: '900px',
-                width: '100%',
-                maxHeight: '80vh',
-                padding: '0.5rem',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div style={{ textAlign: 'right', marginBottom: '0.25rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveVideoUrl(null)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#fff',
-                    fontSize: '1rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  ✕ Close
-                </button>
-              </div>
-              <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
-                <iframe
-                  src={activeVideoUrl}
-                  title="Diamond Video"
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    border: 'none',
-                  }}
-                  allowFullScreen
-                />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Global trust / info section (reusable across pages) */}
       <TrustInfoStrip />
     </PageLayout>
   );

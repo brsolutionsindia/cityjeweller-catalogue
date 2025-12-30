@@ -32,7 +32,6 @@ interface Diamond {
   OfferPrice?: number;
 }
 
-// Some rows may store "Video URL" instead of "VideoURL"
 type RawDiamond = Diamond & { 'Video URL'?: string };
 
 const clarityMap = {
@@ -75,11 +74,11 @@ const InfoPopup = ({
   valueMap: Record<string, string>;
 }) => {
   const [show, setShow] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
+  const refEl = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) setShow(false);
+      if (refEl.current && !refEl.current.contains(event.target as Node)) setShow(false);
     };
     if (show) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -89,13 +88,8 @@ const InfoPopup = ({
 
   return (
     <span
-      ref={ref}
-      style={{
-        cursor: 'pointer',
-        color: '#0070f3',
-        fontWeight: 'bold',
-        position: 'relative',
-      }}
+      ref={refEl}
+      style={{ cursor: 'pointer', color: '#0070f3', fontWeight: 'bold', position: 'relative' }}
       onClick={(e) => {
         e.stopPropagation();
         setShow((prev) => !prev);
@@ -125,18 +119,12 @@ const InfoPopup = ({
   );
 };
 
-// More robust extractor: handles HYPERLINK("...") and plain URLs
 const extractUrl = (val: unknown): string => {
   if (!val) return '';
   const str = String(val).trim();
-
-  // Excel-style: HYPERLINK("https://...")
   const match = str.match(/HYPERLINK\("(.+?)"/);
   if (match?.[1]) return match[1];
-
-  // Plain URL
   if (str.startsWith('http')) return str;
-
   return '';
 };
 
@@ -158,10 +146,8 @@ export default function LabGrownCatalogPage() {
     Fluorescence: '',
   });
   const [selected, setSelected] = useState<string[]>([]);
-  const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null); // embedded viewer
   const router = useRouter();
 
-  // Build available shapes (NO certification check)
   useEffect(() => {
     const dataRef = ref(db, 'Global SKU/CVD');
     onValue(
@@ -179,7 +165,6 @@ export default function LabGrownCatalogPage() {
     );
   }, []);
 
-  // Load items for selected shape (NO certification check)
   useEffect(() => {
     setIsLoading(true);
     const dataRef = ref(db, 'Global SKU/CVD');
@@ -192,14 +177,9 @@ export default function LabGrownCatalogPage() {
       }
 
       const parsed: Diamond[] = Object.values(val)
-        .filter(
-          (d) =>
-            d.Status === 'AVAILABLE' &&
-            d.Shape === filters.Shape
-        )
+        .filter((d) => d.Status === 'AVAILABLE' && d.Shape === filters.Shape)
         .map((d) => ({
           ...d,
-          // handle both "VideoURL" and "Video URL" keys
           VideoURL: extractUrl(d.VideoURL ?? d['Video URL']),
         }));
 
@@ -208,7 +188,6 @@ export default function LabGrownCatalogPage() {
     });
   }, [filters.Shape]);
 
-  // Apply optional filters + sort
   useEffect(() => {
     let result = diamonds.filter(
       (d) =>
@@ -220,17 +199,18 @@ export default function LabGrownCatalogPage() {
         (!filters.Symm || d.Symm === filters.Symm) &&
         (!filters.Fluorescence || d.Fluorescence === filters.Fluorescence)
     );
+
     result = result.sort((a, b) => {
       if (sortOption === 'price-asc') return (a.OfferPrice ?? 0) - (b.OfferPrice ?? 0);
       if (sortOption === 'price-desc') return (b.OfferPrice ?? 0) - (a.OfferPrice ?? 0);
       if (sortOption === 'size-asc') return parseFloat(a.Size ?? '0') - parseFloat(b.Size ?? '0');
       return parseFloat(b.Size ?? '0') - parseFloat(a.Size ?? '0');
     });
+
     setFiltered(result);
   }, [filters, diamonds, sortOption]);
 
-  const unique = (key: keyof Diamond) =>
-    Array.from(new Set(diamonds.map((d) => d[key]))).sort();
+  const unique = (key: keyof Diamond) => Array.from(new Set(diamonds.map((d) => d[key]))).sort();
 
   return (
     <PageLayout>
@@ -251,9 +231,7 @@ export default function LabGrownCatalogPage() {
             Shape:{' '}
             <select
               value={filters.Shape}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, Shape: e.target.value, SizeRange: '' }))
-              }
+              onChange={(e) => setFilters((prev) => ({ ...prev, Shape: e.target.value, SizeRange: '' }))}
             >
               {availableShapes.map((shape) => (
                 <option key={shape} value={shape}>
@@ -280,8 +258,8 @@ export default function LabGrownCatalogPage() {
               >
                 <option value="">All {label}</option>
                 {unique(key as keyof Diamond).map((val) => (
-                  <option key={val as string} value={val as string}>
-                    {val as string}
+                  <option key={String(val)} value={String(val)}>
+                    {String(val)}
                   </option>
                 ))}
               </select>
@@ -295,9 +273,7 @@ export default function LabGrownCatalogPage() {
             id="sortOption"
             value={sortOption}
             onChange={(e) =>
-              setSortOption(
-                e.target.value as 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc'
-              )
+              setSortOption(e.target.value as 'price-asc' | 'price-desc' | 'size-asc' | 'size-desc')
             }
           >
             <option value="price-asc">Price: Low to High</option>
@@ -336,20 +312,13 @@ export default function LabGrownCatalogPage() {
         <div className={styles.catalogGrid}>
           {filtered.map((d) => (
             <div
-              className={`${styles.catalogCard} ${
-                selected.includes(d.StoneId) ? styles.selectedCard : ''
-              }`}
+              className={`${styles.catalogCard} ${selected.includes(d.StoneId) ? styles.selectedCard : ''}`}
               key={d.StoneId}
               style={{
-  border: selected.includes(d.StoneId)
-    ? '2px solid #0070f3'
-    : '1px solid #ccc',
-}}
-
+                border: selected.includes(d.StoneId) ? '2px solid #0070f3' : '1px solid #ccc',
+              }}
               onClick={() => {
-                if (d.VideoURL) {
-                  setActiveVideoUrl(d.VideoURL);
-                }
+                router.push(`/diamond/${encodeURIComponent(d.StoneId)}?type=lab`);
               }}
             >
               {/* Select for comparison */}
@@ -375,7 +344,6 @@ export default function LabGrownCatalogPage() {
                 <span>{d.StoneId}</span>
               </div>
 
-              {/* Shape icon */}
               <div className="imageContainer">
                 <Image
                   src={shapeIcon[d.Shape ?? ''] || '/default.png'}
@@ -387,33 +355,15 @@ export default function LabGrownCatalogPage() {
               </div>
 
               <div className="cardContent">
-                {/* Size & Shape */}
-                <p>
-                  {(parseFloat(d.Size ?? '0')).toFixed(2)}ct ({d.Shape})
-                </p>
+                <p>{(parseFloat(d.Size ?? '0')).toFixed(2)}ct ({d.Shape})</p>
 
-                {/* Color & Clarity (bigger line) */}
-                <p
-                  style={{
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    margin: '4px 0',
-                    textAlign: 'center',
-                  }}
-                >
+                <p style={{ fontSize: '0.95rem', fontWeight: 600, margin: '4px 0', textAlign: 'center' }}>
                   <InfoPopup text={d.Color ?? ''} label="Color" valueMap={colorMap} />
                   {' · '}
                   <InfoPopup text={d.Clarity ?? ''} label="Clarity" valueMap={clarityMap} />
                 </p>
 
-                {/* Details (small) */}
-                <div
-                  style={{
-                    fontSize: '0.65rem',
-                    lineHeight: '1.3',
-                    textAlign: 'center',
-                  }}
-                >
+                <div style={{ fontSize: '0.65rem', lineHeight: '1.3', textAlign: 'center' }}>
                   <p>
                     <span
                       onClick={(e) => {
@@ -426,6 +376,7 @@ export default function LabGrownCatalogPage() {
                     </span>{' '}
                     ({d.Measurement ?? ''} mm)
                   </p>
+
                   <p>
                     D
                     <InfoPopup
@@ -444,32 +395,21 @@ export default function LabGrownCatalogPage() {
                       }}
                     />
                   </p>
+
                   <p>
                     <InfoPopup text={d.Cut ?? ''} label="Cut" valueMap={gradeMap} />,{' '}
                     <InfoPopup text={d.Polish ?? ''} label="Polish" valueMap={gradeMap} />,{' '}
                     <InfoPopup text={d.Symm ?? ''} label="Symmetry" valueMap={gradeMap} />,{' '}
-                    <InfoPopup
-                      text={d.Fluorescence ?? ''}
-                      label="Fluorescence"
-                      valueMap={fluorescenceMap}
-                    />
+                    <InfoPopup text={d.Fluorescence ?? ''} label="Fluorescence" valueMap={fluorescenceMap} />
                   </p>
                 </div>
 
                 {d.MRP && d.OfferPrice && (
                   <p>
-                    <span
-                      style={{
-                        textDecoration: 'line-through',
-                        color: '#888',
-                        marginRight: '0.5rem',
-                      }}
-                    >
+                    <span style={{ textDecoration: 'line-through', color: '#888', marginRight: '0.5rem' }}>
                       ₹{Math.round(d.MRP)}
                     </span>
-                    <span style={{ color: '#c00', fontWeight: 'bold' }}>
-                      ₹{Math.round(d.OfferPrice)}
-                    </span>
+                    <span style={{ color: '#c00', fontWeight: 'bold' }}>₹{Math.round(d.OfferPrice)}</span>
                   </p>
                 )}
               </div>
@@ -478,10 +418,7 @@ export default function LabGrownCatalogPage() {
                 onClick={(e) => {
                   e.stopPropagation();
                   const msg = `I am interested in your Product ID ${d.StoneId}.`;
-                  window.open(
-                    `https://wa.me/919023130944?text=${encodeURIComponent(msg)}`,
-                    '_blank'
-                  );
+                  window.open(`https://wa.me/919023130944?text=${encodeURIComponent(msg)}`, '_blank');
                 }}
                 style={{
                   marginTop: '0.5rem',
@@ -498,66 +435,6 @@ export default function LabGrownCatalogPage() {
             </div>
           ))}
         </div>
-
-        {/* Embedded video/webpage viewer */}
-        {activeVideoUrl && (
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.6)',
-              zIndex: 1000,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '1rem',
-            }}
-            onClick={() => setActiveVideoUrl(null)}
-          >
-            <div
-              style={{
-                background: '#000',
-                borderRadius: '8px',
-                maxWidth: '900px',
-                width: '100%',
-                maxHeight: '80vh',
-                padding: '0.5rem',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div style={{ textAlign: 'right', marginBottom: '0.25rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveVideoUrl(null)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#fff',
-                    fontSize: '1rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  ✕ Close
-                </button>
-              </div>
-              <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
-                <iframe
-                  src={activeVideoUrl}
-                  title="Diamond Video"
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    border: 'none',
-                  }}
-                  allowFullScreen
-                />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       <TrustInfoStrip />
