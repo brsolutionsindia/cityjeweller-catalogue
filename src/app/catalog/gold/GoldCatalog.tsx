@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react';
 import { ref, get } from 'firebase/database';
 import { db } from '../../../firebaseConfig';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import styles from '../../page.module.css';
 import PageLayout from '../../components/PageLayout';
 import OfferBar from '../../components/OfferBar';
-import SkuSummaryModal from '../../components/SkuSummaryModal';
 import { computeAdjustedPrice } from '../utils';
 
 interface ProductCard {
@@ -18,30 +18,23 @@ interface ProductCard {
   remarksLower: string;
 }
 
-
 function extractSkuType(id: string): string | null {
-  // Normalize
   const up = id.toUpperCase();
 
-  // Case A: code at start e.g. "RG101"
   let m = up.match(/^([A-Z]{2})(?=\d)/);
   if (m) return m[1];
 
-  // Case B: code after hyphen e.g. "2665-RG101", "8165-NK009"
   m = up.match(/[-_ ]([A-Z]{2})(?=\d)/);
   if (m) return m[1];
 
-  // Case C: fallback — two letters between separators (before next non-digit)
   m = up.match(/(?:^|[-_ ])([A-Z]{2})(?:\D|$)/);
   return m ? m[1] : null;
 }
-
 
 export default function GoldCatalog() {
   const [goldRate, setGoldRate] = useState('Loading...');
   const [rateDate, setRateDate] = useState('');
   const [products, setProducts] = useState<ProductCard[]>([]);
-  const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
 
@@ -71,39 +64,39 @@ export default function GoldCatalog() {
     async function loadGoldItems() {
       setLoading(true);
 
-      // Step 1: Get all gold SKUs from index
       const goldRef = ref(db, 'Global SKU/SKU/indices/tags/gold');
       const goldSnap = await get(goldRef);
+
       if (!goldSnap.exists()) {
         setProducts([]);
         setLoading(false);
         return;
       }
+
       const goldIds = Object.keys(goldSnap.val());
 
-      // Step 2: Load SKU + Image data
       const [skuSnap, imgSnap] = await Promise.all([
         get(ref(db, 'Global SKU/SKU')),
         get(ref(db, 'Global SKU/Images'))
       ]);
+
       const skuData = skuSnap.val() || {};
       const imgData = imgSnap.val() || {};
 
-      // Step 3: Filter by type + sub + search
       const filtered: ProductCard[] = [];
       for (const id of goldIds) {
         if (!skuData[id]) continue;
+
         const r = (skuData[id].remarks || '').toLowerCase();
         const price = computeAdjustedPrice(skuData[id].grTotalPrice);
         const image = imgData?.[id]?.Primary || '/product-placeholder.jpg';
         const idLower = id.toLowerCase();
 
         if (typeFilter) {
-  const desired = typeFilter.toUpperCase();   // e.g. "RG"
-  const actual  = extractSkuType(id);         // parse from SKU ID
-  if (actual !== desired) continue;
-}
-
+          const desired = typeFilter.toUpperCase();
+          const actual = extractSkuType(id);
+          if (actual !== desired) continue;
+        }
 
         if (subFilter && !r.includes(subFilter)) continue;
         if (searchParam && !r.includes(searchParam) && !idLower.includes(searchParam)) continue;
@@ -127,10 +120,10 @@ export default function GoldCatalog() {
   const CatalogGrid = ({ list }: { list: ProductCard[] }) => (
     <section className={styles.catalogGrid}>
       {list.map((p) => (
-        <div
+        <Link
           key={p.id}
+          href={`/catalog/${encodeURIComponent(p.id)}`}
           className={styles.catalogCard}
-          onClick={() => setSelectedSku(p.id)}
         >
           <Image
             src={p.image}
@@ -143,7 +136,7 @@ export default function GoldCatalog() {
             ₹{typeof p.price === 'number' ? p.price.toLocaleString('en-IN') : p.price}
           </p>
           <h3 className={styles.catalogCode}>{p.id}</h3>
-        </div>
+        </Link>
       ))}
     </section>
   );
@@ -151,21 +144,25 @@ export default function GoldCatalog() {
   // --- Mangalsutra special split ---
   const mangalsutraSections = (() => {
     if (typeFilter !== 'MG') return null;
+
     const pendant: ProductCard[] = [];
     const stringOnly: ProductCard[] = [];
     const pure: ProductCard[] = [];
+
     for (const p of products) {
       const r = p.remarksLower;
       if (r.includes('pendant')) pendant.push(p);
       else if (r.includes('string')) stringOnly.push(p);
       else pure.push(p);
     }
+
     return { pendant, stringOnly, pure };
   })();
 
   return (
     <PageLayout>
       <OfferBar goldRate={goldRate} rateDate={rateDate} />
+
       <section>
         <h1>{heading}</h1>
         <p className={styles.itemCount}>{products.length} item(s)</p>
@@ -187,10 +184,6 @@ export default function GoldCatalog() {
           <CatalogGrid list={products} />
         )}
       </section>
-
-      {selectedSku && (
-        <SkuSummaryModal skuId={selectedSku} onClose={() => setSelectedSku(null)} />
-      )}
     </PageLayout>
   );
 }

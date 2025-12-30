@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react';
 import { ref, get } from 'firebase/database';
 import { db } from '../../../firebaseConfig';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import styles from '../../page.module.css';
 import PageLayout from '../../components/PageLayout';
 import OfferBar from '../../components/OfferBar';
-import SkuSummaryModal from '../../components/SkuSummaryModal';
 import { computeAdjustedPrice } from '../utils';
 
 interface RawSkuData {
@@ -24,7 +24,6 @@ type ProductCard = {
 };
 
 // --- Helper: extract 2–3 letter type code (RG, ER, MG, etc.) from SKU ID ---
-// Supports forms like "RG101", "2665-RG101", "8165_NK009"
 function extractSkuType(id: string): string | null {
   const up = id.toUpperCase();
   let m = up.match(/^([A-Z]{2,3})(?=\d)/);
@@ -39,10 +38,8 @@ function extractSkuType(id: string): string | null {
 const extractUrl = (val: unknown): string => {
   if (!val) return '';
   const str = String(val).trim();
-
   const match = str.match(/HYPERLINK\("(.+?)"/);
   if (match?.[1]) return match[1];
-
   if (str.startsWith('http')) return str;
   return '';
 };
@@ -51,7 +48,6 @@ export default function DiamondCatalog() {
   const [rate, setRate] = useState('Loading...');
   const [rateDate, setRateDate] = useState('');
   const [products, setProducts] = useState<ProductCard[]>([]);
-  const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Video modal state
@@ -61,8 +57,8 @@ export default function DiamondCatalog() {
   const [videoMessage, setVideoMessage] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
-  const typeFilter = (searchParams?.get?.('type') ?? '').toUpperCase(); // e.g. RG, MG
-  const subFilter = (searchParams?.get?.('sub') ?? '').toLowerCase();   // e.g. pendant, string, antique
+  const typeFilter = (searchParams?.get?.('type') ?? '').toUpperCase();
+  const subFilter = (searchParams?.get?.('sub') ?? '').toLowerCase();
   const searchParam = (searchParams?.get?.('search') ?? '').toLowerCase();
 
   const heading = (() => {
@@ -73,9 +69,8 @@ export default function DiamondCatalog() {
     return 'Diamond Collection';
   })();
 
-  // --- Load rate/date (keeping your existing paths) ---
+  // --- Load rate/date ---
   useEffect(() => {
-    // If you have a dedicated diamond rate path, change these two refs
     import('firebase/database').then(({ ref, onValue }) => {
       const rateRef = ref(db, 'Global SKU/Rates/Gold 22kt');
       const dateRef = ref(db, 'Global SKU/Rates/Date');
@@ -89,25 +84,25 @@ export default function DiamondCatalog() {
     async function loadDiamond() {
       setLoading(true);
 
-      // 1) Get the diamond index: /Global SKU/SKU/indices/tags/diamond
       const diamondRef = ref(db, 'Global SKU/SKU/indices/tags/diamond');
       const diamondSnap = await get(diamondRef);
+
       if (!diamondSnap.exists()) {
         setProducts([]);
         setLoading(false);
         return;
       }
-      const diamondIds = Object.keys(diamondSnap.val()); // SKU IDs
 
-      // 2) Load SKU and Image data
+      const diamondIds = Object.keys(diamondSnap.val());
+
       const [skuSnap, imgSnap] = await Promise.all([
         get(ref(db, 'Global SKU/SKU')),
         get(ref(db, 'Global SKU/Images')),
       ]);
+
       const skuData = skuSnap.val() || {};
       const imgData = imgSnap.val() || {};
 
-      // 3) Build + filter
       const filtered: ProductCard[] = [];
       for (const id of diamondIds) {
         const rec: RawSkuData = skuData[id];
@@ -116,16 +111,13 @@ export default function DiamondCatalog() {
         const remarksLower = (rec.remarks || '').toLowerCase();
         const idLower = id.toLowerCase();
 
-        // type (parse from SKU ID)
         if (typeFilter) {
           const actual = extractSkuType(id);
           if (actual !== typeFilter) continue;
         }
 
-        // sub (keyword in remarks)
         if (subFilter && !remarksLower.includes(subFilter)) continue;
 
-        // search (in id or remarks)
         if (searchParam && !idLower.includes(searchParam) && !remarksLower.includes(searchParam))
           continue;
 
@@ -137,7 +129,6 @@ export default function DiamondCatalog() {
         });
       }
 
-      // 4) Sort by price asc
       filtered.sort((a, b) => {
         const pa = typeof a.price === 'number' ? a.price : 0;
         const pb = typeof b.price === 'number' ? b.price : 0;
@@ -166,11 +157,8 @@ export default function DiamondCatalog() {
     return { pendant, stringOnly, mangalsutraPure };
   })();
 
-  const handleCardClick = async (skuId: string) => {
-    // Keep existing summary modal behaviour
-    setSelectedSku(skuId);
-
-    // Open video modal & load video from NaturalDiamonds node
+  // --- Video modal loader (kept) ---
+  const openVideoModal = async (skuId: string) => {
     setVideoSkuId(skuId);
     setVideoLoading(true);
     setVideoUrl(null);
@@ -179,15 +167,13 @@ export default function DiamondCatalog() {
     try {
       const videoRef = ref(db, `Global SKU/NaturalDiamonds/${skuId}/Video`);
       const snap = await get(videoRef);
+
       if (!snap.exists()) {
         setVideoMessage('Enquire Now to get Video');
       } else {
         const url = extractUrl(snap.val());
-        if (url) {
-          setVideoUrl(url);
-        } else {
-          setVideoMessage('Enquire Now to get Video');
-        }
+        if (url) setVideoUrl(url);
+        else setVideoMessage('Enquire Now to get Video');
       }
     } catch (err) {
       console.error('Error loading video URL for', skuId, err);
@@ -204,26 +190,28 @@ export default function DiamondCatalog() {
     setVideoLoading(false);
   };
 
-  const CatalogGrid = ({ list }: { list: ProductCard[] }) => (
-    <section className={styles.catalogGrid}>
-      {list.map((item) => (
-        <div
-          key={item.id}
-          className={styles.catalogCard}
-          onClick={() => handleCardClick(item.id)}
-        >
-          <Image
-            src={item.image}
-            alt={item.id}
-            width={200}
-            height={200}
-            className={styles.catalogImage}
-          />
-          <p className={styles.catalogPrice}>
-            ₹{typeof item.price === 'number' ? item.price.toLocaleString('en-IN') : item.price}
-          </p>
-          <h3 className={styles.catalogCode}>Code: {item.id}</h3>
-        </div>
+const CatalogGrid = ({ list }: { list: ProductCard[] }) => (
+  <section className={styles.catalogGrid}>
+    {list.map((item) => (
+      <Link
+        key={item.id}
+        href={`/catalog/${encodeURIComponent(item.id)}`}
+        className={styles.catalogCard}
+        style={{ textDecoration: 'none', color: 'inherit' }}
+      >
+        <Image
+          src={item.image}
+          alt={item.id}
+          width={200}
+          height={200}
+          className={styles.catalogImage}
+        />
+        <p className={styles.catalogPrice}>
+          ₹{typeof item.price === 'number' ? item.price.toLocaleString('en-IN') : item.price}
+        </p>
+        <h3 className={styles.catalogCode}>Code: {item.id}</h3>
+      </Link>
+      
       ))}
     </section>
   );
@@ -240,21 +228,18 @@ export default function DiamondCatalog() {
           <p>Loading...</p>
         ) : mgSections ? (
           <>
-            {/* Mangalsutra (neither "pendant" nor "string") */}
             <h2 className={styles.subheading}>
               <span className={styles.sectionTitle}>Mangalsutra Section</span>{' '}
               <span className={styles.itemCountSmall}>({mgSections.mangalsutraPure.length})</span>
             </h2>
             <CatalogGrid list={mgSections.mangalsutraPure} />
 
-            {/* Pendant */}
             <h2 className={styles.subheading}>
               <span className={styles.sectionTitle}>Pendant Section</span>{' '}
               <span className={styles.itemCountSmall}>({mgSections.pendant.length})</span>
             </h2>
             <CatalogGrid list={mgSections.pendant} />
 
-            {/* String */}
             <h2 className={styles.subheading}>
               <span className={styles.sectionTitle}>String Section</span>{' '}
               <span className={styles.itemCountSmall}>({mgSections.stringOnly.length})</span>
@@ -265,10 +250,6 @@ export default function DiamondCatalog() {
           <CatalogGrid list={products} />
         )}
       </section>
-
-      {selectedSku && (
-        <SkuSummaryModal skuId={selectedSku} onClose={() => setSelectedSku(null)} />
-      )}
 
       {/* Embedded video/webpage viewer for NaturalDiamonds/<SKU>/Video */}
       {videoSkuId && (
@@ -348,7 +329,10 @@ export default function DiamondCatalog() {
                   type="button"
                   onClick={() => {
                     const msg = `I am interested in your Product ID ${videoSkuId}. Please share the video link.`;
-                    window.open(`https://wa.me/919023130944?text=${encodeURIComponent(msg)}`, '_blank');
+                    window.open(
+                      `https://wa.me/919023130944?text=${encodeURIComponent(msg)}`,
+                      '_blank'
+                    );
                   }}
                   style={{
                     padding: '0.4rem 0.9rem',

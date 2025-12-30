@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation';
 type Props = {
   skuId: string;
   onClose: () => void;
+  fullPage?: boolean; // ✅ ADD
 };
 
 type SkuData = {
@@ -15,7 +16,7 @@ type SkuData = {
   goldPurety: number;
   grTotalPrice: number;
   goldPrice?: string;
-  GoldRateUnit?: string; // ✅ ADD THIS LINE
+  GoldRateUnit?: string;
 
   labour?: string;
   labourUnit?: string;
@@ -44,13 +45,13 @@ type SkuData = {
   NetUnit?: string;
 };
 
-const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose }) => {
+const SkuSummaryModal: React.FC<Props> = ({ skuId, onClose, fullPage = false }) => {
   const [skuData, setSkuData] = useState<SkuData | null>(null);
   const [imageUrl, setImageUrl] = useState('/product-placeholder.jpg');
   const [goldRate, setGoldRate] = useState<number>(0);
 
-const searchParams = useSearchParams();
-const ratti = parseFloat(searchParams?.get?.('ratti') ?? '1');
+  const searchParams = useSearchParams();
+  const ratti = parseFloat(searchParams?.get?.('ratti') ?? '1');
 
   const formatINR = (value?: string | number) => {
     const num = Number(value || 0);
@@ -58,45 +59,43 @@ const ratti = parseFloat(searchParams?.get?.('ratti') ?? '1');
   };
 
   useEffect(() => {
-    if (skuId) {
-      const fetchData = async () => {
-        try {
-          const skuRef = ref(db, `Global SKU/SKU/${skuId}`);
-          const skuSnap = await get(skuRef);
-          if (skuSnap.exists()) {
-            setSkuData(skuSnap.val());
-            const goldRatePerGram = parseFloat(skuSnap.val().goldRatePerGram || '0');
-            setGoldRate(goldRatePerGram);
-          }
+    if (!skuId) return;
 
-          const imgRef = ref(db, `Global SKU/Images/${skuId}/Primary`);
-          const imgSnap = await get(imgRef);
-          const url = imgSnap.val();
-          if (url && typeof url === 'string' && url.startsWith('http')) {
-            setImageUrl(url);
-          }
-        } catch (error) {
-          console.error('Error fetching SKU data:', error);
+    const fetchData = async () => {
+      try {
+        const skuRef = ref(db, `Global SKU/SKU/${skuId}`);
+        const skuSnap = await get(skuRef);
+        if (skuSnap.exists()) {
+          setSkuData(skuSnap.val());
+          const goldRatePerGram = parseFloat(skuSnap.val().goldRatePerGram || '0');
+          setGoldRate(goldRatePerGram);
         }
-      };
-      fetchData();
-    }
+
+        const imgRef = ref(db, `Global SKU/Images/${skuId}/Primary`);
+        const imgSnap = await get(imgRef);
+        const url = imgSnap.val();
+        if (url && typeof url === 'string' && url.startsWith('http')) setImageUrl(url);
+      } catch (error) {
+        console.error('Error fetching SKU data:', error);
+      }
+    };
+
+    fetchData();
   }, [skuId]);
 
   const summary = useMemo(() => {
-  if (!skuData) return null;
-  const gross = parseFloat(String(skuData.gross || '0'));
-  const net = parseFloat(String(skuData.net || '0'));
-  const goldPrice = parseFloat(String(skuData.goldPrice || '0'));
-  const onlyStone = goldPrice === 0;
-  const noStone = gross === net;
-  const NetUnit = skuData.NetUnit || '';
-  const containsD = NetUnit.includes('S1');
-  const containsSt = NetUnit.includes('S2');
-  const isSilver = (skuData?.GoldRateUnit || '').toUpperCase().includes('SIL');
-  return { gross, net, goldPrice, onlyStone, noStone, containsD, containsSt, isSilver };
-}, [skuData]);
-
+    if (!skuData) return null;
+    const gross = parseFloat(String(skuData.gross || '0'));
+    const net = parseFloat(String(skuData.net || '0'));
+    const goldPrice = parseFloat(String(skuData.goldPrice || '0'));
+    const onlyStone = goldPrice === 0;
+    const noStone = gross === net;
+    const NetUnit = skuData.NetUnit || '';
+    const containsD = NetUnit.includes('S1');
+    const containsSt = NetUnit.includes('S2');
+    const isSilver = (skuData?.GoldRateUnit || '').toUpperCase().includes('SIL');
+    return { gross, net, goldPrice, onlyStone, noStone, containsD, containsSt, isSilver };
+  }, [skuData]);
 
   const parsedMrp = useMemo(() => {
     const parsed = parseFloat(String(skuData?.grTotalPrice ?? '0'));
@@ -105,19 +104,46 @@ const ratti = parseFloat(searchParams?.get?.('ratti') ?? '1');
 
   if (!skuData || !summary) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-40 px-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto relative flex flex-col">
-        <div className="pb-32 px-4">
-          <button className="absolute top-3 right-4 text-gray-500 hover:text-red-500 text-xl" onClick={onClose}>✕</button>
+  // ✅ Wrapper classes depend on mode
+  const wrapperClass = fullPage
+    ? 'w-full'
+    : 'fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-40 px-4';
 
+  return (
+    <div className={wrapperClass}>
+      <div
+        className={
+          fullPage
+            ? 'bg-white rounded-2xl shadow-sm w-full overflow-hidden flex flex-col border border-gray-200'
+            : 'bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto relative flex flex-col'
+        }
+      >
+        {/* ✅ Top bar (only show close X in modal mode) */}
+        {!fullPage && (
+          <button
+            className="absolute top-3 right-4 text-gray-500 hover:text-red-500 text-xl"
+            onClick={onClose}
+          >
+            ✕
+          </button>
+        )}
+
+        <div className={fullPage ? 'px-4 py-4' : 'pb-32 px-4'}>
           {/* Product Image */}
           <div className="mb-4 text-center">
-            <Image src={imageUrl} alt="SKU" width={280} height={280} className="rounded-lg border mx-auto" />
+            <Image
+              src={imageUrl}
+              alt="SKU"
+              width={280}
+              height={280}
+              className="rounded-lg border mx-auto"
+            />
           </div>
 
-          {/* Sticky Enquiry Button */}
-          <div className="sticky bottom-0 bg-white pt-4 pb-2 flex justify-center z-10">
+          {/* Sticky Enquiry Button
+              ✅ In fullPage, keep it but not as "sticky inside modal overlay".
+              ✅ On mobile, you can make it sticky to viewport later if you want. */}
+          <div className={fullPage ? 'bg-white pt-2 pb-2 flex justify-center' : 'sticky bottom-0 bg-white pt-4 pb-2 flex justify-center z-10'}>
             <a
               href={`https://wa.me/919023130944?text=${encodeURIComponent(
                 `Hi, I am interested in your jewellery item - ${skuId}. Please confirm its availability and payment details.`
@@ -134,9 +160,8 @@ const ratti = parseFloat(searchParams?.get?.('ratti') ?? '1');
           </div>
 
           {/* Price */}
-          <div className="text-center mb-4">
+          <div className="text-center mb-4 mt-3">
             <div className="flex items-center justify-center gap-4">
-{/* Price Info */}
               <div>
                 <div className="text-2xl font-bold text-green-700">{formatINR(parsedMrp)}</div>
                 <div className="text-sm text-gray-500 italic">Taxes Extra</div>
@@ -144,87 +169,82 @@ const ratti = parseFloat(searchParams?.get?.('ratti') ?? '1');
             </div>
           </div>
 
-{/* Divider */}      
           <hr className="my-4" />
 
           {/* Product Details */}
           <div className="text-sm text-gray-700">
             <div className="font-semibold text-base text-gray-800 mb-4">🔍 Product Details</div>
+
             <div className="grid grid-cols-2 gap-y-1">
-  <div><strong>Item Code:</strong> {skuId}</div>
-  <div className="text-right"></div>
+              <div><strong>Item Code:</strong> {skuId}</div>
+              <div className="text-right"></div>
 
-{skuData.gross && parseFloat(String(skuData.gross)) > 0 && (
-  <>
-    <div><strong>Gross Weight:</strong> {skuData.gross} gm</div>
-    <div className="text-right"></div>
-  </>
-)}
+              {skuData.gross && parseFloat(String(skuData.gross)) > 0 && (
+                <>
+                  <div><strong>Gross Weight:</strong> {skuData.gross} gm</div>
+                  <div className="text-right"></div>
+                </>
+              )}
 
+              {/* Skip detailed breakdown if it's silver */}
+              {!summary.isSilver && (
+                <>
+                  {skuData.goldPrice && parseFloat(skuData.goldPrice) > 0 && (
+                    <>
+                      <div><strong>Net Weight:</strong> {skuData.net} gm ({skuData.goldPurety}kt) × {formatINR(goldRate)}</div>
+                      <div className="text-right">= {formatINR(skuData.goldPrice)}</div>
+                    </>
+                  )}
 
-  {/* Skip detailed breakdown if it's silver */}
-  {!summary.isSilver && (
-    <>
-      {skuData.goldPrice && parseFloat(skuData.goldPrice) > 0 && (
-        <>
-          <div><strong>Net Weight:</strong> {skuData.net} gm ({skuData.goldPurety}kt) × {formatINR(goldRate)}</div>
-          <div className="text-right">= {formatINR(skuData.goldPrice)}</div>
-        </>
-      )}
+                  {summary.containsD && skuData.stone1 && parseFloat(skuData.stone1) > 0 && (
+                    <>
+                      <div><strong>Diamond:</strong> {skuData.stone1} {skuData.St1Unit} × {skuData.stone1Rate} {skuData.St1RateUnit}</div>
+                      <div className="text-right">= {formatINR(skuData.stone1Price)}</div>
+                    </>
+                  )}
 
-      {summary.containsD && skuData.stone1 && parseFloat(skuData.stone1) > 0 && (
-        <>
-          <div><strong>Diamond:</strong> {skuData.stone1} {skuData.St1Unit} × {skuData.stone1Rate} {skuData.St1RateUnit}</div>
-          <div className="text-right">= {formatINR(skuData.stone1Price)}</div>
-        </>
-      )}
+                  {summary.containsSt && skuData.stone2 && parseFloat(skuData.stone2) > 0 && (
+                    <>
+                      <div><strong>Stone:</strong> {skuData.stone2} {skuData.St2Unit} × {skuData.stone2Rate} {skuData.St2RateUnit}</div>
+                      <div className="text-right">= {formatINR(skuData.stone2Price)}</div>
+                    </>
+                  )}
 
-      {summary.containsSt && skuData.stone2 && parseFloat(skuData.stone2) > 0 && (
-        <>
-          <div><strong>Stone:</strong> {skuData.stone2} {skuData.St2Unit} × {skuData.stone2Rate} {skuData.St2RateUnit}</div>
-          <div className="text-right">= {formatINR(skuData.stone2Price)}</div>
-        </>
-      )}
+                  {skuData.labourPrice && parseFloat(skuData.labourPrice) > 0 && (
+                    <>
+                      <div><strong>Making Charges:</strong></div>
+                      <div className="text-right">= {formatINR(skuData.labourPrice)}</div>
+                    </>
+                  )}
 
-      {skuData.labourPrice && parseFloat(skuData.labourPrice) > 0 && (
-        <>
-          <div><strong>Making Charges:</strong></div>
-          <div className="text-right">= {formatINR(skuData.labourPrice)}</div>
-        </>
-      )}
+                  {skuData.polishPrice && parseFloat(skuData.polishPrice) > 0 && (
+                    <>
+                      <div><strong>Polish:</strong></div>
+                      <div className="text-right">{formatINR(skuData.polishPrice)}</div>
+                    </>
+                  )}
 
-      {skuData.polishPrice && parseFloat(skuData.polishPrice) > 0 && (
-        <>
-          <div><strong>Polish:</strong></div>
-          <div className="text-right">{formatINR(skuData.polishPrice)}</div>
-        </>
-      )}
-
-      {skuData.miscPrice && parseFloat(skuData.miscPrice) > 0 && (
-        <>
-          <div><strong>Misc:</strong></div>
-          <div className="text-right">{formatINR(skuData.miscPrice)}</div>
-        </>
-      )}
-    </>
-  )}
-</div>
-
-
+                  {skuData.miscPrice && parseFloat(skuData.miscPrice) > 0 && (
+                    <>
+                      <div><strong>Misc:</strong></div>
+                      <div className="text-right">{formatINR(skuData.miscPrice)}</div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
           {/* Highlights */}
-          <div className="text-center mb-4">
+          <div className="text-center mt-5">
             <div className="flex items-center justify-center gap-4">
-{/* Certified Diamonds Logo - Left */}
-{!summary.isSilver && summary.containsD && skuData.stone1 && parseFloat(skuData.stone1) > 0 && (
-  <Image src="/certified_diamonds.png" alt="Certified Diamonds" width={64} height={64} className="object-contain" />
-)}
+              {!summary.isSilver && summary.containsD && skuData.stone1 && parseFloat(skuData.stone1) > 0 && (
+                <Image src="/certified_diamonds.png" alt="Certified Diamonds" width={64} height={64} className="object-contain" />
+              )}
 
-{/* BIS Logo - Right */}
-{!summary.isSilver && skuData.goldPrice && parseFloat(skuData.goldPrice) > 0 && (
-  <Image src="/bis.png" alt="BIS Hallmark" width={64} height={64} className="object-contain" />
-)}
+              {!summary.isSilver && skuData.goldPrice && parseFloat(skuData.goldPrice) > 0 && (
+                <Image src="/bis.png" alt="BIS Hallmark" width={64} height={64} className="object-contain" />
+              )}
             </div>
           </div>
         </div>
