@@ -61,11 +61,13 @@ const extractUrl = (val: unknown): string => {
 
 
 export default function DiamondDetailPage() {
-  const params = useParams<{ stoneId: string }>();
+  const params = useParams(); // ✅ can be null in types
   const router = useRouter();
   const qp = useSearchParams();
 
-  const stoneId = decodeURIComponent(params.stoneId || '');
+const stoneIdParam = (params?.stoneId as string | undefined) ?? '';
+const stoneId = decodeURIComponent(stoneIdParam);
+
   const hintedType = (qp.get('type') || '').toLowerCase() as DiamondSource | '';
 
   const [diamond, setDiamond] = useState<Diamond | null>(null);
