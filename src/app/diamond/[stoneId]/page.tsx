@@ -7,7 +7,7 @@ import { db } from '@/firebaseConfig';
 
 import PageLayout from '@/app/components/PageLayout';
 import TrustInfoStrip from '@/app/components/TrustInfoStrip';
-import shapeIcon from '@/assets/shapeIcons';
+import shapeIcon from '../../../../assets/shapeIcons';
 import Image from 'next/image';
 
 import styles from './DiamondDetail.module.css';
@@ -37,14 +37,28 @@ type Diamond = {
 
 type DiamondSource = 'lab' | 'natural';
 
+type RawDiamond = Diamond & { 'Video URL'?: string };
+
 const extractUrl = (val: unknown): string => {
   if (!val) return '';
   const str = String(val).trim();
-  const match = str.match(/HYPERLINK\("(.+?)"/);
+
+  // Excel-style: HYPERLINK("https://...")
+  const match = str.match(/HYPERLINK\("(.+?)"/i);
   if (match?.[1]) return match[1];
-  if (str.startsWith('http')) return str;
+
+  // If it already contains http(s)
+  if (str.startsWith('http://') || str.startsWith('https://')) return str;
+
+  // If it starts with www, upgrade to https
+  if (str.startsWith('www.')) return `https://${str}`;
+
+  // If it looks like a URL but missing protocol (basic check)
+  if (str.includes('.') && !str.includes(' ')) return `https://${str}`;
+
   return '';
 };
+
 
 export default function DiamondDetailPage() {
   const params = useParams<{ stoneId: string }>();
@@ -69,7 +83,8 @@ export default function DiamondDetailPage() {
 
       const tryRead = async (node: string) => {
         const snap = await get(ref(db, node + '/' + stoneId));
-        return snap.exists() ? (snap.val() as Diamond) : null;
+        return snap.exists() ? (snap.val() as RawDiamond) : null;
+
       };
 
       try {
@@ -126,11 +141,19 @@ export default function DiamondDetailPage() {
     };
   }, [stoneId, hintedType]);
 
-  const normalize = (d: Diamond): Diamond => ({
+const normalize = (d: RawDiamond): Diamond => {
+  const videoCandidate =
+    d.VideoURL ??
+    d.Video ??
+    (d as any)['Video URL']; // IMPORTANT for Lab data
+
+  return {
     ...d,
     StoneId: d.StoneId || stoneId,
-    VideoURL: extractUrl(d.VideoURL || d.Video),
-  });
+    VideoURL: extractUrl(videoCandidate),
+  };
+};
+
 
   const title = useMemo(() => {
     if (!diamond) return 'Diamond Details';
@@ -286,9 +309,6 @@ export default function DiamondDetailPage() {
                     </button>
                   </div>
 
-                  <div className={styles.smallNote}>
-                    Tip: share this page with your customer — it’s a dedicated link for this stone.
-                  </div>
                 </div>
 
                 <div className={styles.specCard}>

@@ -29,13 +29,27 @@
   line-height: 1.2;
 }
 
+/* ✅ GRID FIXES */
 .grid {
   display: grid;
   grid-template-columns: 1.5fr 1fr;
   gap: 1rem;
+  align-items: start; /* important: prevents weird overlap behavior */
 }
 
 .media, .sidebar { min-width: 0; }
+
+/* ✅ Make the whole sidebar sticky on desktop (not the price card) */
+.sidebar {
+  position: sticky;
+  top: 90px;            /* adjust if your header differs */
+  align-self: start;
+  height: fit-content;
+  z-index: 2;
+}
+
+/* Keep cards normal flow inside sidebar */
+.priceCard { position: static; }
 
 .mediaTop {
   display: grid;
@@ -128,14 +142,15 @@
   font-weight: 800;
 }
 
+/* ✅ Cards: solid background + safe stacking */
 .priceCard, .specCard {
   border: 1px solid #efefef;
   background: #fff;
   border-radius: 18px;
   padding: 0.9rem;
+  position: relative;
+  z-index: 1;
 }
-
-.priceCard { position: sticky; top: 90px; }
 
 .priceTop {
   display: flex;
@@ -229,7 +244,7 @@
   padding: 0.6rem 0.75rem;
   gap: 0.75rem;
   align-items: center;
-  z-index: 999;
+  z-index: 999; /* keep only this high */
 }
 
 .mobilePrice { font-weight: 1000; font-size: 1.05rem; }
@@ -246,7 +261,10 @@
 /* Responsive */
 @media (max-width: 980px) {
   .grid { grid-template-columns: 1fr; }
-  .priceCard { position: static; }
+
+  /* ✅ disable sidebar sticky on mobile/tablet so it never overlays */
+  .sidebar { position: static; top: auto; }
+
   .videoBox { height: 420px; }
   .mediaTop { grid-template-columns: 180px 1fr; }
 }
@@ -256,4 +274,7 @@
   .keyLine { grid-template-columns: 1fr 1fr; }
   .videoBox { height: 320px; }
   .mobileSticky { display: flex; }
+
+  /* ✅ important: prevent bottom bar from covering content */
+  .page { padding-bottom: 6.5rem; }
 }
