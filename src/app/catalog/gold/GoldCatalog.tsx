@@ -163,6 +163,15 @@ export default function GoldCatalog() {
     <PageLayout>
       <OfferBar goldRate={goldRate} rateDate={rateDate} />
 
+      {subFilter === 'name' && (
+        <div className={styles.topCtaRow}>
+          <Link href="/design/name-pendant" className={styles.designYourselfBtn}>
+            Design Yourself
+          </Link>
+        </div>
+      )}
+
+
       <section>
         <h1>{heading}</h1>
         <p className={styles.itemCount}>{products.length} item(s)</p>

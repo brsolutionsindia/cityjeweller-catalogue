@@ -1419,3 +1419,29 @@ position: relative;
     padding: 1rem 0.9rem;
   }
 }
+
+
+.topCtaRow{
+  display:flex;
+  justify-content:flex-end;
+  margin: 10px 0 6px;
+}
+
+.designYourselfBtn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 800;
+  text-decoration:none;
+  background: #0b7;
+  color: #fff;
+  border: 1px solid rgba(0,0,0,0);
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.designYourselfBtn:hover{
+  transform: translateY(-1px);
+  opacity: 0.95;
+}
