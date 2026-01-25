@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ref, get } from 'firebase/database';
 import { db } from '../../../firebaseConfig';
+import { useParams } from "next/navigation";
 
 type TeamData = {
   name?: string;
@@ -29,62 +30,63 @@ function toDirectDriveUrl(url: string): string {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function TeamPage({ params }: any) {
-  const { slug } = params;
+export default function TeamPage() {
+  const params = useParams(); // ✅ safest for client component
+  const slug = params?.slug;
   const [data, setData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchTeam = async () => {
       try {
-        const slugLower = String(slug).toLowerCase();
+        const slugLower =
+          Array.isArray(slug) ? String(slug[0]).toLowerCase() : String(slug || "").toLowerCase();
 
-        // Read all /Teams once
-        const snap = await get(ref(db, '/Teams'));
+        console.log("slugLower =", slugLower);
+
+        if (!slugLower) {
+          setData(null);
+          return;
+        }
+
+        // ✅ read direct
+        const snap = await get(ref(db, `/Teams/${slugLower}`));
+
+        console.log("snap.exists =", snap.exists());
 
         if (!snap.exists()) {
           setData(null);
-          setLoading(false);
           return;
         }
 
-        const allTeams = snap.val() as Record<string, TeamData | string>;
+        const value = snap.val() as TeamData | string;
+        console.log("raw value =", value);
 
-        // Find key whose name matches slug ignoring case
-        const matchingKey = Object.keys(allTeams).find(
-          (key) => key.toLowerCase() === slugLower
-        );
-
-        if (!matchingKey) {
-          setData(null);
-          setLoading(false);
-          return;
-        }
-
-        const value = allTeams[matchingKey];
         let teamData: TeamData;
 
-        if (typeof value === 'string') {
-          const url = toDirectDriveUrl(value);
+        if (typeof value === "string") {
+          const url = toDirectDriveUrl(value.trim());
           teamData = {
-            name: matchingKey,
+            name: slugLower,
             photoUrl: url,
-            title: 'Authorized Consultant',
+            title: "Authorized Consultant",
             isAuthorized: true,
           };
         } else {
-          const rawUrl = value.photoUrl;
+          const rawUrl = typeof value.photoUrl === "string" ? value.photoUrl.trim() : "";
           const finalUrl = rawUrl ? toDirectDriveUrl(rawUrl) : undefined;
+
           teamData = {
-            name: value.name || matchingKey,
             ...value,
+            name: value.name || slugLower,
             photoUrl: finalUrl,
           };
         }
 
+        console.log("final teamData =", teamData);
         setData(teamData);
       } catch (err) {
-        console.error('Error fetching team data', err);
+        console.error("Error fetching team data", err); // <-- THIS will reveal permission denied etc.
         setData(null);
       } finally {
         setLoading(false);

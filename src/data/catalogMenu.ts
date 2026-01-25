@@ -23,9 +23,9 @@ export const goldCollections: CatalogItem[] = [
   { label: 'Personalized', image: '/gold-personalized.png', link: '/catalog/gold?sub=name'},
   { label: 'Hybrid', image: '/gold-hybrid.png', link: '/catalog/gold?sub=rubber'},
   { label: 'Kundan', image: '/gold-kundan.png', link: '/catalog/gold?sub=kundan'},
+  { label: 'Temple', image: '/gold-temple.png', link: '/catalog/gold?sub=temple'},
   { label: 'Bridal', image: '/gold-bridal.png', link: '/catalog/gold?sub=bridal'},
   { label: 'Multi Tone', image: '/gold-multitone.png', link: '/catalog/gold?sub=tone', disabled: true },
-  { label: 'Temple', image: '/gold-temple.png', link: '/catalog/gold?sub=temple', disabled: true },
 ];
 
 
