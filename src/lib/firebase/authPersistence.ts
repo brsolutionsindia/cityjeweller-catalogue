@@ -1,4 +1,3 @@
-// src/lib/firebase/authPersistence.ts
 "use client";
 
 import { auth } from "@/firebaseConfig";

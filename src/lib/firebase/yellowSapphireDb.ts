@@ -1,5 +1,3 @@
-// src/lib/firebase/yellowSapphireDb.ts
-
 import {
   get,
   ref as dbRef,

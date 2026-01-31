@@ -1,5 +1,3 @@
-// src/lib/yellowSapphire/options.ts
-
 export type Choice = {
   value: string;
   label: string;
