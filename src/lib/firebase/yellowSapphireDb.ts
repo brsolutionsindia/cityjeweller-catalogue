@@ -18,6 +18,9 @@ import {
 import { db, storage } from "./firebaseClient"; // ✅ keep only ONE firebase client
 import type { MediaItem, YellowSapphireListing } from "@/lib/yellowSapphire/types";
 
+const PUBLIC_LISTING_NODE = (skuId: string) =>
+  `GlobalSKU/YellowSapphires/${skuId}`;
+
 const SUBMISSION_NODE = (gst: string) => `GST/${gst}/Submissions/YellowSapphires`;
 const SUPPLIER_INDEX = (gst: string, uid: string) =>
   `GST/${gst}/Indexes/YellowSapphiresSubmissions/BySupplier/${uid}`;
@@ -266,4 +269,9 @@ export async function deleteSubmission(params: {
 export async function getSupplierDefaults(gst: string, supplierUid: string) {
   const s = await get(dbRef(db, `GST/${gst}/SupplierDefaults/YellowSapphires/${supplierUid}`));
   return s.exists() ? s.val() : null;
+}
+
+export async function getListing(skuId: string) {
+  const snap = await get(dbRef(db, PUBLIC_LISTING_NODE(skuId)));
+  return (snap.val() as YellowSapphireListing | null) ?? null;
 }

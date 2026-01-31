@@ -43,10 +43,11 @@ export default function Page() {
   if (busy) return <div className="p-6">Loading...</div>;
   if (!data) return <div className="p-6">Listing not found.</div>;
 
-  const media = [
-    ...(data.media?.images || []).map((m) => ({ ...m, kind: "image" as const })),
-    ...(data.media?.videos || []).map((m) => ({ ...m, kind: "video" as const })),
-  ].sort((a, b) => a.createdAt - b.createdAt);
+const media = [
+  ...(data.media?.images || []).map((m) => ({ ...m, kind: "image" as const })),
+  ...(data.media?.videos || []).map((m) => ({ ...m, kind: "video" as const })),
+].sort((a: any, b: any) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -72,7 +73,7 @@ export default function Page() {
       {/* Media gallery */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {media.map((m) => (
-          <div key={m.path} className="rounded-2xl border overflow-hidden bg-white shadow-sm">
+          <div key={(m as any).storagePath || (m as any).path || m.url} className="rounded-2xl border overflow-hidden bg-white shadow-sm">
             {m.kind === "image" ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={m.url} alt={data.skuId} className="w-full h-64 object-cover" />
