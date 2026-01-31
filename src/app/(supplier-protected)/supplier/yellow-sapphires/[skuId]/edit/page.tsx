@@ -9,10 +9,11 @@ import type { YellowSapphireListing } from "@/lib/yellowSapphire/types";
 
 function Inner() {
   const { uid, gst, loading } = useSupplierSession();
-  const params = useParams<{ skuId: string }>();
-  const router = useRouter();
+  const params = useParams();
+const rawSkuId = typeof params?.skuId === "string" ? params.skuId : "";
+const skuId = decodeURIComponent(rawSkuId);
 
-  const skuId = decodeURIComponent(params.skuId);
+  const router = useRouter();
 
   const [initial, setInitial] = useState<YellowSapphireListing | null>(null);
   const [busy, setBusy] = useState(true);
