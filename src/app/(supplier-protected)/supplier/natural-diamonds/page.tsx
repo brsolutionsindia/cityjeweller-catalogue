@@ -67,7 +67,7 @@ export default function SupplierDashboard() {
 
   const rows = useMemo(() => skuIds.map(k => [k, items[k]] as const), [skuIds, items]);
 
-  const goEdit = (key: string) => router.push(`/supplier/edit/${key}`);
+  const goEdit = (key: string) => router.push(`/supplier/natural-diamonds/edit/${key}`);
 
   const saveEdit = async () => {
     if (!editingKey || !fn) return;
@@ -114,7 +114,7 @@ export default function SupplierDashboard() {
         <div className="flex items-center gap-2">
           <button
             className="border px-3 py-1 rounded"
-            onClick={() => router.push('/supplier/new')}
+            onClick={() => router.push('/supplier/natural-diamonds/new')}
             title="Add new item"
           >
             + Add

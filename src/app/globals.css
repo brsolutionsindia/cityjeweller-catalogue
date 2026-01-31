@@ -22,56 +22,20 @@
   }
 }
 
-/* 4. Base Styles */
-html {
-  scroll-behavior: smooth;
-  scroll-padding-top: 120px; /* Adjust to your navbar height */
-}
+/* ✅ Put base styles inside Tailwind base layer so utilities can override */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 120px;
+  }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans, Arial, sans-serif);
-}
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans, Arial, sans-serif);
+  }
 
-/* 5. Ensure all text remains visible (esp. in modules) */
-main,
-section,
-div,
-h1,
-h2,
-h3,
-p,
-span,
-a,
-button,
-label,
-select {
-  color: var(--foreground);
-}
-
-/* 6. Optional Override for Specific Elements */
-.main,
-.navbar,
-.offerBanner,
-.testimonials,
-.footer,
-.testimonialCards,
-.navLinks li,
-.bookGoldBtn {
-  color: var(--foreground) !important;
-}
-
-/* 7. Reinforce link visibility */
-a {
-  color: var(--foreground);
-  text-decoration: none;
-}
-
-/* 8. Override for mobile if needed */
-@media (max-width: 768px) {
-  body,
-  html,
+  /* ✅ DO NOT force color on a/button. Let Tailwind classes decide. */
   main,
   section,
   div,
@@ -79,20 +43,30 @@ a {
   h2,
   h3,
   p,
-  span {
-    color: var(--foreground) !important;
+  span,
+  label,
+  select {
+    color: inherit;
+  }
+
+  /* ✅ Links inherit by default, but Tailwind can override */
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button {
+    color: inherit;
   }
 }
 
 /* 9. Optional: ensure light mode appearance */
 @media (prefers-color-scheme: dark) {
-:root {
+  :root {
     --background: #ffffff;
     --foreground: #111111;
   }
   body {
     color-scheme: light;
   }
-
-  /* If you want to *actually* support dark UI, replace light values above instead of forcing light mode */
 }
