@@ -38,26 +38,38 @@ export const SHAPES: Choice[] = [
   { value: "ROUND", label: "Round", img: imgOrPlaceholder("/supplier/ys/shapes/round.png", "Round") },
   { value: "EMERALD", label: "Emerald", img: imgOrPlaceholder("/supplier/ys/shapes/emerald.png", "Emerald") },
   { value: "PEAR", label: "Pear", img: imgOrPlaceholder("/supplier/ys/shapes/pear.png", "Pear") },
-  { value: "RADIANT", label: "Radiant", img: imgOrPlaceholder("/supplier/ys/shapes/radiant.png", "Radiant") },
+  { value: "MARQUISE", label: "Marquise", img: imgOrPlaceholder("/supplier/ys/shapes/marquise.png", "Marquise") },
+  { value: "TRILLION", label: "Trillion", img: imgOrPlaceholder("/supplier/ys/shapes/trillion.png", "Trillion") },
+  { value: "Heart", label: "Heart", img: imgOrPlaceholder("/supplier/ys/shapes/heart.png", "Heart") },
+  { value: "CABOCHON", label: "Cabochon", img: imgOrPlaceholder("/supplier/ys/shapes/cabochon.png", "Cabochon") },
 ];
 
 // ✅ CLARITIES
 export const CLARITIES: Choice[] = [
   { value: NOT_DEFINED, label: "Not Defined", img: imgOrPlaceholder("/supplier/ys/common/not-defined.png", "Not Defined") },
+  { value: "EYE CLEAN", label: "Eye Clean", img: imgOrPlaceholder("/supplier/ys/clarity/eye-clean.png", "Eye Clean") },
+  { value: "SLIGHTLY INCLUDED", label: "Slightly Included", img: imgOrPlaceholder("/supplier/ys/clarity/slightly-included.png", "Slightly Included") },
+  { value: "HEAVILY INCLUDED", label: "Heavily Included", img: imgOrPlaceholder("/supplier/ys/clarity/heavily-included.png", "Heavily Included") },
+];
 
-  { value: "VVS", label: "VVS", img: imgOrPlaceholder("/supplier/ys/clarity/vvs.png", "VVS") },
-  { value: "VS", label: "VS", img: imgOrPlaceholder("/supplier/ys/clarity/vs.png", "VS") },
-  { value: "SI", label: "SI", img: imgOrPlaceholder("/supplier/ys/clarity/si.png", "SI") },
-  { value: "I", label: "I", img: imgOrPlaceholder("/supplier/ys/clarity/i.png", "I") },
+// ✅ TRANSPARENCY
+export const TRANSPARENCY: Choice[] = [
+  { value: NOT_DEFINED, label: "Not Defined", img: imgOrPlaceholder("/supplier/ys/common/not-defined.png", "Not Defined") },
+  { value: "TRANSLUCENT", label: "Translucent", img: imgOrPlaceholder("/supplier/ys/transparency/translucent.png", "Translucent") },
+  { value: "SEMI TRANSPARENT", label: "Semi Transparent", img: imgOrPlaceholder("/supplier/ys/transparency/semi-transparent.png", "Semi Transparent") },
+  { value: "OPAQUE", label: "Opaque", img: imgOrPlaceholder("/supplier/ys/transparency/opaque.png", "Opaque") },
 ];
 
 // ✅ COLORS
 export const COLORS: Choice[] = [
   { value: NOT_DEFINED, label: "Not Defined", img: imgOrPlaceholder("/supplier/ys/common/not-defined.png", "Not Defined") },
 
-  { value: "LIGHT_YELLOW", label: "Light Yellow", img: imgOrPlaceholder("/supplier/ys/colors/light-yellow.png", "Light Yellow") },
-  { value: "MEDIUM_YELLOW", label: "Medium Yellow", img: imgOrPlaceholder("/supplier/ys/colors/medium-yellow.png", "Medium Yellow") },
-  { value: "VIVID_YELLOW", label: "Vivid Yellow", img: imgOrPlaceholder("/supplier/ys/colors/vivid-yellow.png", "Vivid Yellow") },
+  { value: "LEMON_YELLOW", label: "Lemon Yellow", img: imgOrPlaceholder("/supplier/ys/colors/lemon-yellow.png", "Lemon Yellow") },
+  { value: "GOLDEN_YELLOW", label: "Golden Yellow", img: imgOrPlaceholder("/supplier/ys/colors/golden-yellow.png", "Golden Yellow") },
+  { value: "CANARY_YELLOW", label: "Canary Yellow", img: imgOrPlaceholder("/supplier/ys/colors/canary-yellow.png", "Canary Yellow") },
+  { value: "BASRA_YELLOW", label: "Basra Yellow", img: imgOrPlaceholder("/supplier/ys/colors/basra-yellow.png", "Basra Yellow") },
+  { value: "HONEY_YELLOW", label: "Honey Yellow", img: imgOrPlaceholder("/supplier/ys/colors/honey-yellow.png", "Honey Yellow") },
+  { value: "CHAMPAGNE_YELLOW", label: "Champagne Yellow", img: imgOrPlaceholder("/supplier/ys/colors/champagne-yellow.png", "Champagne Yellow") },
 ];
 
 export const TREATMENTS = [NOT_DEFINED, "Heated", "Unheated", "Diffused"];
