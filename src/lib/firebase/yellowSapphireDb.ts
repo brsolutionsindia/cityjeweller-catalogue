@@ -15,11 +15,10 @@ import {
   deleteObject,
 } from "firebase/storage";
 
-import { db, storage } from "./firebaseClient"; // ✅ keep only ONE firebase client
+import { db, storage } from "./firebaseClient";
 import type { MediaItem, YellowSapphireListing } from "@/lib/yellowSapphire/types";
 
-const PUBLIC_LISTING_NODE = (skuId: string) =>
-  `GlobalSKU/YellowSapphires/${skuId}`;
+const PUBLIC_LISTING_NODE = (skuId: string) => `GlobalSKU/YellowSapphires/${skuId}`;
 
 const SUBMISSION_NODE = (gst: string) => `GST/${gst}/Submissions/YellowSapphires`;
 const SUPPLIER_INDEX = (gst: string, uid: string) =>
@@ -52,7 +51,6 @@ function makeMediaFileName(
 
 /* -------------------- utils -------------------- */
 
-// ✅ Avoid RTDB update() failing due to undefined anywhere
 function stripUndefinedDeep<T>(obj: T): T {
   if (Array.isArray(obj)) return obj.map(stripUndefinedDeep) as any;
   if (obj && typeof obj === "object") {
@@ -66,7 +64,6 @@ function stripUndefinedDeep<T>(obj: T): T {
   return obj;
 }
 
-// ✅ Supplier defaults snapshot (safe nulls)
 const pickSupplierDefaults = (data: any) =>
   stripUndefinedDeep({
     ratePerCaratInr: data?.ratePerCaratInr ?? null,
@@ -82,7 +79,6 @@ const pickSupplierDefaults = (data: any) =>
 
 /* -------------------- storage helpers -------------------- */
 
-// ✅ Delete a single storage object (used by "Remove" button in UI)
 export async function deleteMediaObject(storagePath: string) {
   if (!storagePath) return;
   await deleteObject(sRef(storage, storagePath));
@@ -152,11 +148,12 @@ export async function uploadMediaBatch(
   if (!gst) throw new Error("GST is required for upload.");
 
   const uploaded: MediaItem[] = [];
-const basePath = `GlobalSKU/YellowSapphires/${skuId}`;
-const folder = kind === "VID" ? "videos" : "images";
+  const basePath = `GlobalSKU/YellowSapphires/${skuId}`;
+  const folder = kind === "VID" ? "videos" : "images";
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
+
     const fileName = makeMediaFileName(skuId, kind, i + 1, file);
     const storagePath = `${basePath}/${folder}/${fileName}`;
     const storageRef = sRef(storage, storagePath);
@@ -165,21 +162,19 @@ const folder = kind === "VID" ? "videos" : "images";
       const task = uploadBytesResumable(storageRef, file, {
         contentType: file.type || undefined,
       });
-
-      task.on(
-        "state_changed",
-        undefined,
-        reject,
-        () => resolve()
-      );
+      task.on("state_changed", undefined, reject, () => resolve());
     });
 
     const url = await getDownloadURL(storageRef);
 
+    // ✅ No "as any" — proper TS fields
     uploaded.push({
       url,
       type: kind === "VID" ? "video" : "image",
-      ...( { storagePath } as any ),
+      storagePath,
+      fileName,
+      contentType: file.type || undefined,
+      createdAt: Date.now(),
     });
   }
 
@@ -270,6 +265,8 @@ export async function getSupplierDefaults(gst: string, supplierUid: string) {
   const s = await get(dbRef(db, `GST/${gst}/SupplierDefaults/YellowSapphires/${supplierUid}`));
   return s.exists() ? s.val() : null;
 }
+
+/* -------------------- public listing -------------------- */
 
 export async function getListing(skuId: string) {
   const snap = await get(dbRef(db, PUBLIC_LISTING_NODE(skuId)));
