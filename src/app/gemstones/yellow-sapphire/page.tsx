@@ -113,7 +113,8 @@ function Card({ item }: { item: PublicYellowSapphire }) {
 export default function YellowSapphireListingPage() {
   const router = useRouter();
   const pathname = usePathname();
-  const sp = useSearchParams();
+  const spUnsafe = useSearchParams();
+  const sp = spUnsafe ?? new URLSearchParams();
 
   const [all, setAll] = useState<PublicYellowSapphire[]>([]);
   const [loading, setLoading] = useState(true);
