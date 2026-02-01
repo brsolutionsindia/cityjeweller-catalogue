@@ -5,7 +5,7 @@ import { SupplierProvider, useSupplierSession } from "@/lib/firebase/supplierCon
 import YellowSapphireForm from "@/components/supplier/YellowSapphireForm";
 import { deleteSubmission, getSubmission, saveSubmission } from "@/lib/firebase/yellowSapphireDb";
 import { useParams, useRouter } from "next/navigation";
-import type { YellowSapphireListing } from "@/lib/yellowSapphire/types";
+import type { YellowSapphireSubmission } from "@/lib/yellowSapphire/types";
 
 function Inner() {
   const { uid, gst, loading } = useSupplierSession();
@@ -15,7 +15,7 @@ const skuId = decodeURIComponent(rawSkuId);
 
   const router = useRouter();
 
-  const [initial, setInitial] = useState<YellowSapphireListing | null>(null);
+  const [initial, setInitial] = useState<YellowSapphireSubmission | null>(null);
   const [busy, setBusy] = useState(true);
 
   useEffect(() => {
