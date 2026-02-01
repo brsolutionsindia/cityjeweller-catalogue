@@ -245,11 +245,11 @@ export async function deleteSubmission(params: {
   const vids = submission?.media?.videos || [];
 
   for (const m of imgs) {
-  const p = (m as any).storagePath;
+  const p = m.storagePath;
   if (p) mediaPaths.push(p);
 }
 for (const m of vids) {
-  const p = (m as any).storagePath;
+  const p = m.storagePath;
   if (p) mediaPaths.push(p);
 }
 
@@ -283,21 +283,22 @@ export async function getListing(skuId: string) {
 
 export type PublicYellowSapphire = YellowSapphireListing & { id: string };
 
-function normalizeArray<T>(v: any): T[] {
+function normalizeArray(v: unknown): MediaItem[] {
   if (!v) return [];
-  if (Array.isArray(v)) return v.filter(Boolean);
-  if (typeof v === "object") return Object.values(v).filter(Boolean);
+  if (Array.isArray(v)) return v.filter(Boolean) as MediaItem[];
+  if (typeof v === "object") return Object.values(v as Record<string, unknown>).filter(Boolean) as MediaItem[];
   return [];
 }
 
+
 export function getPrimaryImageUrl(item: YellowSapphireListing | null | undefined): string | null {
-  const imgs = normalizeArray<MediaItem>(item?.media?.images);
+  const imgs = normalizeArray(item?.media?.images);
   const first = imgs[0];
   return first?.url || item?.media?.thumbUrl || null;
 }
 
 export function getAllMedia(item: YellowSapphireListing | null | undefined): MediaItem[] {
-  const imgs = normalizeArray<MediaItem>(item?.media?.images);
+  const vids = normalizeArray(item?.media?.videos);
   const vids = normalizeArray<MediaItem>(item?.media?.videos);
   return [...imgs, ...vids].filter((m) => !!m?.url);
 }
