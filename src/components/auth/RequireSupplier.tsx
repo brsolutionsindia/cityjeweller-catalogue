@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/firebaseConfig";
@@ -12,13 +12,21 @@ export default function RequireSupplier({ children }: { children: React.ReactNod
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
-      if (!u) return router.replace("/login");
-      if (isAdminUid(u.uid)) return router.replace("/admin/dashboard");
+      if (!u) {
+        router.replace("/login");
+        return;
+      }
+      if (isAdminUid(u.uid)) {
+        router.replace("/admin/dashboard");
+        return;
+      }
       setOk(true);
     });
+
     return () => unsub();
   }, [router]);
 
   if (!ok) return <div className="p-6">Checking access...</div>;
+
   return <>{children}</>;
 }
