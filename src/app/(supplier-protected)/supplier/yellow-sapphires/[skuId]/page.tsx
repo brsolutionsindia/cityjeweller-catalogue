@@ -100,10 +100,7 @@ export default function Page() {
           <div><span className="text-gray-500">Certified:</span> <b>{data.certified}</b></div>
           <div><span className="text-gray-500">Treatment:</span> <b>{data.treatmentStatus}</b></div>
           <div><span className="text-gray-500">Origin:</span> <b>{data.origin}</b></div>
-          <div><span className="text-gray-500">Luster:</span> <b>{data.luster}</b></div>
-          {data.stoneLocalCode && (
-            <div><span className="text-gray-500">Stone Code:</span> <b>{data.stoneLocalCode}</b></div>
-          )}
+          <div><span className="text-gray-500">Luster:</span> <b>{data.luster}</b></div>          
         </div>
 
         {data.remarks && (
