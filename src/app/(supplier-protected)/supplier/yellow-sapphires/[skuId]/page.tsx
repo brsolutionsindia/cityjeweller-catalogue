@@ -96,7 +96,7 @@ export default function Page() {
         <div className="grid sm:grid-cols-2 gap-4 text-sm">
           <div><span className="text-gray-500">Weight:</span> <b>{data.weightCarat} ct</b></div>
           <div><span className="text-gray-500">Measurement:</span> <b>{data.measurementMm}</b></div>
-          <div><span className="text-gray-500">Rate/Carat:</span> <b>₹{data.ratePerCaratInr}</b></div>
+          <div><span className="text-gray-500">Rate/Carat:</span> <b>₹{data.baseRatePerCaratInr}</b></div>
           <div><span className="text-gray-500">Certified:</span> <b>{data.certified}</b></div>
           <div><span className="text-gray-500">Treatment:</span> <b>{data.treatmentStatus}</b></div>
           <div><span className="text-gray-500">Origin:</span> <b>{data.origin}</b></div>
