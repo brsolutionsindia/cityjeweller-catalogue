@@ -6,7 +6,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/firebaseConfig";
 import { isAdminUid } from "@/lib/auth/admin";
 
-export default function RequireSupplier({ children }: { children: React.ReactNode }) {
+export default function RequireSupplier({ children }: { children?: React.ReactNode }) {
   const router = useRouter();
   const [ok, setOk] = useState(false);
 
@@ -28,5 +28,5 @@ export default function RequireSupplier({ children }: { children: React.ReactNod
 
   if (!ok) return <div className="p-6">Checking access...</div>;
 
-  return <>{children}</>;
+  return <>{children ?? null}</>;
 }
