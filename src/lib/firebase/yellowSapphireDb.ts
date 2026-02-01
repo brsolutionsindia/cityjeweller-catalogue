@@ -298,10 +298,11 @@ export function getPrimaryImageUrl(item: YellowSapphireListing | null | undefine
 }
 
 export function getAllMedia(item: YellowSapphireListing | null | undefined): MediaItem[] {
+  const imgs = normalizeArray(item?.media?.images);
   const vids = normalizeArray(item?.media?.videos);
-  const vids = normalizeArray<MediaItem>(item?.media?.videos);
   return [...imgs, ...vids].filter((m) => !!m?.url);
 }
+
 
 /** Prefer stored publicRatePerCaratInr (already computed by admin pipeline) */
 export function getPublicPricePerCaratInr(item: YellowSapphireListing | null | undefined): number | null {
@@ -330,21 +331,4 @@ export async function fetchAllPublicListings(): Promise<PublicYellowSapphire[]> 
     id,
     ...(value || ({} as YellowSapphireListing)),
   }));
-}
-
-/**
- * If later you add carat field (carat / caratWeight / weightCarat),
- * this will start showing totals automatically.
- */
-export function getCarat(item: YellowSapphireListing | null | undefined): number | null {
-  const v = (item as any)?.carat ?? (item as any)?.caratWeight ?? (item as any)?.weightCarat;
-  const n = typeof v === "number" ? v : typeof v === "string" ? parseFloat(v) : NaN;
-  return Number.isFinite(n) ? n : null;
-}
-
-export function getEstTotalPriceInr(item: YellowSapphireListing | null | undefined): number | null {
-  const ppc = getPricePerCaratInr(item);
-  const carat = getCarat(item);
-  if (ppc == null || carat == null) return null;
-  return Math.round(ppc * carat);
 }
