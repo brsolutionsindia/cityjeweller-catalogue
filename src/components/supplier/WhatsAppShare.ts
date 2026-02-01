@@ -1,22 +1,60 @@
-import type { YellowSapphireListing } from "@/lib/yellowSapphire/types";
+// src/components/supplier/WhatsAppShare.ts
 
-export function buildWhatsAppMessage(items: YellowSapphireListing[]) {
+import type {
+  YellowSapphireSubmission,
+  YellowSapphireListing,
+} from "@/lib/yellowSapphire/types";
+
+type ShareItem = Pick<
+  YellowSapphireSubmission,
+  | "skuId"
+  | "shapeCut"
+  | "color"
+  | "clarity"
+  | "weightCarat"
+  | "ratePerCaratInr"
+  | "measurementMm"
+  | "origin"
+  | "certified"
+  | "treatmentStatus"
+  | "luster"
+  | "remarks"
+  | "media"
+  | "status"
+>;
+
+// ✅ Allow both (since Listing is a subset-ish of fields we use)
+export function buildWhatsAppMessage(items: ShareItem[]) {
   const lines: string[] = [];
-  lines.push("Yellow Sapphire Listings:");
+
+  lines.push(`Yellow Sapphire Listing(s): ${items.length}`);
+  lines.push("");
 
   items.forEach((it, idx) => {
-    const link = `https://cityjeweller.in/catalog/yellow-sapphire/${encodeURIComponent(it.skuId)}`;
-    const row =
-      `${idx + 1}) ${it.skuId} | ${it.weightCarat} ct | ${it.shapeCut} | ${it.color} | ₹${it.ratePerCaratInr}/ct`;
-    lines.push(row);
-    lines.push(link);
-    lines.push(""); // spacer
+    const thumb =
+      it.media?.thumbUrl ||
+      it.media?.images?.[0]?.url ||
+      it.media?.videos?.[0]?.url ||
+      "";
+
+    lines.push(`${idx + 1}) SKU: ${it.skuId}`);
+    lines.push(`• ${it.shapeCut} • ${it.color} • ${it.clarity} • ${it.weightCarat} ct`);
+    lines.push(`• Rate/ct: ₹${it.ratePerCaratInr}`);
+    if (it.measurementMm) lines.push(`• Measurement: ${it.measurementMm}`);
+    if (it.origin) lines.push(`• Origin: ${it.origin}`);
+    if (it.certified) lines.push(`• Certified: ${it.certified}`);
+    if (it.treatmentStatus) lines.push(`• Treatment: ${it.treatmentStatus}`);
+    if (it.luster) lines.push(`• Luster: ${it.luster}`);
+    if (it.status) lines.push(`• Status: ${it.status}`);
+    if (it.remarks) lines.push(`• Remarks: ${it.remarks}`);
+    if (thumb) lines.push(`• Media: ${thumb}`);
+    lines.push("");
   });
 
   return lines.join("\n");
 }
 
 export function openWhatsAppShare(text: string) {
-  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-  window.open(url, "_blank");
+  const link = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(link, "_blank", "noopener,noreferrer");
 }
