@@ -4,14 +4,14 @@ import React, { useEffect, useMemo, useState } from "react";
 import { SupplierProvider, useSupplierSession } from "@/lib/firebase/supplierContext";
 import { get, ref } from "firebase/database";
 import { db } from "@/lib/firebase/firebaseClient";
-import type { YellowSapphireListing } from "@/lib/yellowSapphire/types";
+import type { YellowSapphireSubmission } from "@/lib/yellowSapphire/types";
 import { deleteSubmission, getSubmission } from "@/lib/firebase/yellowSapphireDb";
 import { buildWhatsAppMessage, openWhatsAppShare } from "@/components/supplier/WhatsAppShare";
 import Link from "next/link";
 
 function Inner() {
   const { uid, gst, loading, refresh } = useSupplierSession();
-  const [items, setItems] = useState<YellowSapphireListing[]>([]);
+  const [items, setItems] = useState<YellowSapphireSubmission[]>([]);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
 
@@ -41,7 +41,10 @@ function Inner() {
         skuIds.map(async (sku) => (await getSubmission(gst, sku)) || null)
       );
 
-      const cleaned = fetched.filter(Boolean) as YellowSapphireListing[];
+      const cleaned = fetched.filter(
+  (x): x is YellowSapphireSubmission => Boolean(x)
+);
+
 
       const toNum = (v: any) => (typeof v === "number" ? v : Number(v || 0));
       cleaned.sort((a, b) => toNum(b.updatedAt) - toNum(a.updatedAt));
