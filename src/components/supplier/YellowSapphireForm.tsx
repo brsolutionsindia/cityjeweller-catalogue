@@ -14,14 +14,18 @@ import {
   ORIGINS,
   NOT_DEFINED,
 } from "@/lib/yellowSapphire/options";
-import type { MediaItem, YellowSapphireListing } from "@/lib/yellowSapphire/types";
+import type {
+  MediaItem,
+  YellowSapphireSubmission,
+} from "@/lib/yellowSapphire/types";
 
 type Props = {
   mode: "create" | "edit";
   skuId: string;
-  initial?: Partial<YellowSapphireListing>;
-  onSubmit: (data: Partial<YellowSapphireListing>) => Promise<void>;
+  initial?: Partial<YellowSapphireSubmission>;
+  onSubmit: (data: Partial<YellowSapphireSubmission>) => Promise<void>;
 };
+
 
 export default function YellowSapphireForm({ mode, skuId, initial, onSubmit }: Props) {
   const [saving, setSaving] = useState(false);
@@ -81,7 +85,7 @@ export default function YellowSapphireForm({ mode, skuId, initial, onSubmit }: P
 
     setSaving(true);
     try {
-      const payload: Partial<YellowSapphireListing> = {
+      const payload: Partial<YellowSapphireSubmission> = {
         stoneLocalCode: stoneLocalCode.trim() || undefined,
 
         shapeCut,

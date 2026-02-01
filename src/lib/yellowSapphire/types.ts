@@ -74,3 +74,4 @@ export type YellowSapphireListing = {
   createdAt?: any;
   updatedAt?: any;
 };
+
