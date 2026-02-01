@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { PublicListingStatus } from "@/lib/yellowSapphire/types";
 import {
@@ -92,7 +92,9 @@ function Card({ item }: { item: PublicYellowSapphire }) {
         <div className="mt-3 space-y-1 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-600">Carat</span>
-            <span className="font-medium">{Number.isFinite(item.weightCarat) ? item.weightCarat.toFixed(2) : "—"}</span>
+            <span className="font-medium">
+              {Number.isFinite(item.weightCarat) ? item.weightCarat.toFixed(2) : "—"}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Price/ct</span>
@@ -110,7 +112,39 @@ function Card({ item }: { item: PublicYellowSapphire }) {
   );
 }
 
+/**
+ * ✅ Wrapper required by Next.js:
+ * useSearchParams() must be inside a Suspense boundary.
+ */
 export default function YellowSapphireListingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-7xl px-4 py-8">
+          <div className="rounded-2xl border bg-white p-8 text-center text-gray-700">
+            Loading…
+          </div>
+          <div className="mt-6 grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-3">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border bg-white shadow-sm overflow-hidden">
+                <div className="aspect-square bg-gray-100 animate-pulse" />
+                <div className="p-4 space-y-2">
+                  <div className="h-3 w-2/3 bg-gray-100 animate-pulse rounded" />
+                  <div className="h-3 w-1/2 bg-gray-100 animate-pulse rounded" />
+                  <div className="h-8 w-full bg-gray-100 animate-pulse rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      }
+    >
+      <YellowSapphireListingInner />
+    </Suspense>
+  );
+}
+
+function YellowSapphireListingInner() {
   const router = useRouter();
   const pathname = usePathname();
   const spUnsafe = useSearchParams();
@@ -132,7 +166,10 @@ export default function YellowSapphireListingPage() {
   const maxCarat = clampNum(sp.get("maxCarat"));
   const sort = (sp.get("sort") as SortKey) ?? "newest";
   const page = Math.max(1, parseInt(sp.get("page") ?? "1", 10) || 1);
-  const pageSize = Math.min(48, Math.max(12, parseInt(sp.get("pageSize") ?? "24", 10) || 24));
+  const pageSize = Math.min(
+    48,
+    Math.max(12, parseInt(sp.get("pageSize") ?? "24", 10) || 24)
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -190,15 +227,17 @@ export default function YellowSapphireListingPage() {
     if (minCarat != null) list = list.filter((x) => x.weightCarat >= minCarat);
     if (maxCarat != null) list = list.filter((x) => x.weightCarat <= maxCarat);
 
-    if (minPriceCt != null) list = list.filter((x) => (x.publicRatePerCaratInr ?? 0) >= minPriceCt);
-    if (maxPriceCt != null) list = list.filter((x) => (x.publicRatePerCaratInr ?? Infinity) <= maxPriceCt);
+    if (minPriceCt != null)
+      list = list.filter((x) => (x.publicRatePerCaratInr ?? 0) >= minPriceCt);
+    if (maxPriceCt != null)
+      list = list.filter((x) => (x.publicRatePerCaratInr ?? Infinity) <= maxPriceCt);
 
     const byNum = (a: number, b: number) => a - b;
 
     list.sort((a, b) => {
       switch (sort) {
         case "newest":
-          return (Number(b.approvedAt || b.createdAt || 0) - Number(a.approvedAt || a.createdAt || 0));
+          return Number(b.approvedAt || b.createdAt || 0) - Number(a.approvedAt || a.createdAt || 0);
         case "baseRateAsc":
           return byNum(a.baseRatePerCaratInr, b.baseRatePerCaratInr);
         case "baseRateDesc":
@@ -212,16 +251,35 @@ export default function YellowSapphireListingPage() {
         case "caratDesc":
           return byNum(b.weightCarat, a.weightCarat);
         case "totalAsc":
-          return byNum(getTotalPriceInr(a) ?? Number.POSITIVE_INFINITY, getTotalPriceInr(b) ?? Number.POSITIVE_INFINITY);
+          return byNum(
+            getTotalPriceInr(a) ?? Number.POSITIVE_INFINITY,
+            getTotalPriceInr(b) ?? Number.POSITIVE_INFINITY
+          );
         case "totalDesc":
-          return byNum(getTotalPriceInr(b) ?? Number.NEGATIVE_INFINITY, getTotalPriceInr(a) ?? Number.NEGATIVE_INFINITY);
+          return byNum(
+            getTotalPriceInr(b) ?? Number.NEGATIVE_INFINITY,
+            getTotalPriceInr(a) ?? Number.NEGATIVE_INFINITY
+          );
         default:
           return 0;
       }
     });
 
     return list;
-  }, [all, q, certified, clarity, color, luster, status, minPriceCt, maxPriceCt, minCarat, maxCarat, sort]);
+  }, [
+    all,
+    q,
+    certified,
+    clarity,
+    color,
+    luster,
+    status,
+    minPriceCt,
+    maxPriceCt,
+    minCarat,
+    maxCarat,
+    sort,
+  ]);
 
   const total = filteredSorted.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -232,17 +290,26 @@ export default function YellowSapphireListingPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
       <div className="text-sm text-gray-600">
-        <Link href="/gemstones" className="hover:underline">Gemstones</Link> / Yellow Sapphire
+        <Link href="/gemstones" className="hover:underline">
+          Gemstones
+        </Link>{" "}
+        / Yellow Sapphire
       </div>
 
       <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="text-2xl font-semibold">Yellow Sapphire (Pukhraj)</div>
-          <div className="text-sm text-gray-600">{loading ? "Loading…" : `${total.toLocaleString("en-IN")} items`}</div>
+          <div className="text-sm text-gray-600">
+            {loading ? "Loading…" : `${total.toLocaleString("en-IN")} items`}
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2 items-center">
-          <select value={sort} onChange={(e) => updateQuery({ sort: e.target.value })} className="rounded-xl border bg-white px-3 py-2 text-sm">
+          <select
+            value={sort}
+            onChange={(e) => updateQuery({ sort: e.target.value })}
+            className="rounded-xl border bg-white px-3 py-2 text-sm"
+          >
             <option value="newest">Newest</option>
             <option value="publicRateAsc">Price/ct: Low → High</option>
             <option value="publicRateDesc">Price/ct: High → Low</option>
@@ -254,7 +321,11 @@ export default function YellowSapphireListingPage() {
             <option value="baseRateDesc">Base/ct: High → Low</option>
           </select>
 
-          <select value={pageSize} onChange={(e) => updateQuery({ pageSize: e.target.value })} className="rounded-xl border bg-white px-3 py-2 text-sm">
+          <select
+            value={pageSize}
+            onChange={(e) => updateQuery({ pageSize: e.target.value })}
+            className="rounded-xl border bg-white px-3 py-2 text-sm"
+          >
             <option value="12">12 / page</option>
             <option value="24">24 / page</option>
             <option value="36">36 / page</option>
@@ -280,40 +351,80 @@ export default function YellowSapphireListingPage() {
 
             <div className="mt-4">
               <div className="text-xs font-medium text-gray-600">Status</div>
-              <select value={status} onChange={(e) => updateQuery({ status: e.target.value })} className="mt-2 w-full rounded-xl border bg-white px-3 py-2 text-sm">
-                {opts.status.map((v) => <option key={v} value={v}>{v}</option>)}
+              <select
+                value={status}
+                onChange={(e) => updateQuery({ status: e.target.value })}
+                className="mt-2 w-full rounded-xl border bg-white px-3 py-2 text-sm"
+              >
+                {opts.status.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div className="mt-4">
               <div className="text-xs font-medium text-gray-600">Certified</div>
-              <select value={certified} onChange={(e) => updateQuery({ certified: e.target.value })} className="mt-2 w-full rounded-xl border bg-white px-3 py-2 text-sm">
+              <select
+                value={certified}
+                onChange={(e) => updateQuery({ certified: e.target.value })}
+                className="mt-2 w-full rounded-xl border bg-white px-3 py-2 text-sm"
+              >
                 <option value="">All</option>
-                {opts.certified.map((v) => <option key={v} value={v}>{v}</option>)}
+                {opts.certified.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div className="mt-4">
               <div className="text-xs font-medium text-gray-600">Clarity</div>
-              <select value={clarity} onChange={(e) => updateQuery({ clarity: e.target.value })} className="mt-2 w-full rounded-xl border bg-white px-3 py-2 text-sm">
+              <select
+                value={clarity}
+                onChange={(e) => updateQuery({ clarity: e.target.value })}
+                className="mt-2 w-full rounded-xl border bg-white px-3 py-2 text-sm"
+              >
                 <option value="">All</option>
-                {opts.clarity.map((v) => <option key={v} value={v}>{v}</option>)}
+                {opts.clarity.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div className="mt-4">
               <div className="text-xs font-medium text-gray-600">Color</div>
-              <select value={color} onChange={(e) => updateQuery({ color: e.target.value })} className="mt-2 w-full rounded-xl border bg-white px-3 py-2 text-sm">
+              <select
+                value={color}
+                onChange={(e) => updateQuery({ color: e.target.value })}
+                className="mt-2 w-full rounded-xl border bg-white px-3 py-2 text-sm"
+              >
                 <option value="">All</option>
-                {opts.color.map((v) => <option key={v} value={v}>{v.replaceAll("_", " ")}</option>)}
+                {opts.color.map((v) => (
+                  <option key={v} value={v}>
+                    {v.replaceAll("_", " ")}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div className="mt-4">
               <div className="text-xs font-medium text-gray-600">Luster</div>
-              <select value={luster} onChange={(e) => updateQuery({ luster: e.target.value })} className="mt-2 w-full rounded-xl border bg-white px-3 py-2 text-sm">
+              <select
+                value={luster}
+                onChange={(e) => updateQuery({ luster: e.target.value })}
+                className="mt-2 w-full rounded-xl border bg-white px-3 py-2 text-sm"
+              >
                 <option value="">All</option>
-                {opts.luster.map((v) => <option key={v} value={v}>{v}</option>)}
+                {opts.luster.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -322,7 +433,9 @@ export default function YellowSapphireListingPage() {
                 <div className="text-xs font-medium text-gray-600">Min Carat</div>
                 <input
                   value={minCarat ?? ""}
-                  onChange={(e) => updateQuery({ minCarat: e.target.value ? Number(e.target.value) : null })}
+                  onChange={(e) =>
+                    updateQuery({ minCarat: e.target.value ? Number(e.target.value) : null })
+                  }
                   inputMode="decimal"
                   className="mt-2 w-full rounded-xl border px-3 py-2 text-sm"
                   placeholder="1.00"
@@ -332,7 +445,9 @@ export default function YellowSapphireListingPage() {
                 <div className="text-xs font-medium text-gray-600">Max Carat</div>
                 <input
                   value={maxCarat ?? ""}
-                  onChange={(e) => updateQuery({ maxCarat: e.target.value ? Number(e.target.value) : null })}
+                  onChange={(e) =>
+                    updateQuery({ maxCarat: e.target.value ? Number(e.target.value) : null })
+                  }
                   inputMode="decimal"
                   className="mt-2 w-full rounded-xl border px-3 py-2 text-sm"
                   placeholder="10.00"
@@ -345,7 +460,9 @@ export default function YellowSapphireListingPage() {
                 <div className="text-xs font-medium text-gray-600">Min Price/ct</div>
                 <input
                   value={minPriceCt ?? ""}
-                  onChange={(e) => updateQuery({ minPpc: e.target.value ? Number(e.target.value) : null })}
+                  onChange={(e) =>
+                    updateQuery({ minPpc: e.target.value ? Number(e.target.value) : null })
+                  }
                   inputMode="numeric"
                   className="mt-2 w-full rounded-xl border px-3 py-2 text-sm"
                   placeholder="25000"
@@ -355,7 +472,9 @@ export default function YellowSapphireListingPage() {
                 <div className="text-xs font-medium text-gray-600">Max Price/ct</div>
                 <input
                   value={maxPriceCt ?? ""}
-                  onChange={(e) => updateQuery({ maxPpc: e.target.value ? Number(e.target.value) : null })}
+                  onChange={(e) =>
+                    updateQuery({ maxPpc: e.target.value ? Number(e.target.value) : null })
+                  }
                   inputMode="numeric"
                   className="mt-2 w-full rounded-xl border px-3 py-2 text-sm"
                   placeholder="100000"
@@ -364,7 +483,11 @@ export default function YellowSapphireListingPage() {
             </div>
 
             <button
-              onClick={() => router.replace(`${pathname}?sort=${encodeURIComponent(sort)}&pageSize=${encodeURIComponent(pageSize)}`)}
+              onClick={() =>
+                router.replace(
+                  `${pathname}?sort=${encodeURIComponent(sort)}&pageSize=${encodeURIComponent(pageSize)}`
+                )
+              }
               className="mt-5 w-full rounded-xl border px-4 py-2 text-sm font-medium hover:bg-gray-50"
             >
               Clear filters
