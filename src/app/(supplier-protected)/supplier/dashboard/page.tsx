@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
+import Link from "next/link";
 import { useEffect } from "react";
 import { ensureAuthPersistence } from "@/lib/firebase/authPersistence";
+import RequireSupplier from "@/components/auth/RequireSupplier";
 
-export default function SupplierDashboardHome() {
-  // ✅ Hooks must be INSIDE the component
+function SupplierDashboardHome() {
   useEffect(() => {
     ensureAuthPersistence();
   }, []);
@@ -26,5 +26,13 @@ export default function SupplierDashboardHome() {
         </Link>
       </div>
     </main>
+  );
+}
+
+export default function Page() {
+  return (
+    <RequireSupplier>
+      <SupplierDashboardHome />
+    </RequireSupplier>
   );
 }

@@ -1,10 +1,5 @@
 export type SubmissionStatus = "PENDING" | "APPROVED" | "REJECTED";
-
-export type PublicListingStatus =
-  | "AVAILABLE"
-  | "HOLD"
-  | "SOLD"
-  | "HIDDEN";
+export type PublicListingStatus = "AVAILABLE" | "HOLD" | "SOLD" | "HIDDEN";
 
 export type MediaItem = {
   url: string;
@@ -33,7 +28,7 @@ export type YellowSapphireSubmission = {
 
   weightCarat: number;
   measurementMm: string;
-  ratePerCaratInr: number;
+  ratePerCaratInr: number; // supplier submitted base rate
   remarks?: string;
 
   media: {
@@ -42,13 +37,21 @@ export type YellowSapphireSubmission = {
     thumbUrl?: string;
   };
 
-  status: SubmissionStatus; // ✅ FIX
-  createdAt?: any;
+  status: SubmissionStatus;
+
+  // ✅ admin fields (NEW)
+  adminRemarks?: string;        // shown to supplier when REJECTED
+  adminMarginPct?: number;      // default 20
+  approvedAt?: any;
+  rejectedAt?: any;
   updatedAt?: any;
+  createdAt?: any;
 };
 
 export type YellowSapphireListing = {
   skuId: string;
+
+  stoneLocalCode?: string;
 
   shapeCut: string;
   clarity: string;
@@ -61,7 +64,12 @@ export type YellowSapphireListing = {
 
   weightCarat: number;
   measurementMm: string;
-  ratePerCaratInr: number;
+
+  // ✅ pricing
+  baseRatePerCaratInr: number;
+  marginPct: number;
+  publicRatePerCaratInr: number;
+
   remarks?: string;
 
   media: {
@@ -70,8 +78,9 @@ export type YellowSapphireListing = {
     thumbUrl?: string;
   };
 
-  status: PublicListingStatus; // ✅ FIX
-  createdAt?: any;
+  status: PublicListingStatus; // public availability state
+  approvedBy?: string;         // admin uid/email
+  approvedAt?: any;
   updatedAt?: any;
+  createdAt?: any;
 };
-

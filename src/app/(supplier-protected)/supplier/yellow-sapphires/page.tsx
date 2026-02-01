@@ -201,45 +201,80 @@ function Inner() {
               </div>
 
               <div className="flex-1 space-y-1">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="font-bold">{it.skuId}</div>
-                    <div className="text-xs text-gray-500">
-                      Approval: <b>{it.status}</b> • {it.shapeCut} • {it.color} • {it.clarity}
-                    </div>
-                  </div>
+  <div className="flex items-start justify-between gap-2">
+    <div>
+      <div className="font-bold">{it.skuId}</div>
 
-                  <input
-                    type="checkbox"
-                    checked={!!selected[it.skuId]}
-                    onChange={(e) =>
-                      setSelected((prev) => ({ ...prev, [it.skuId]: e.target.checked }))
-                    }
-                  />
-                </div>
+      <div className="text-xs text-gray-500">
+        Approval:{" "}
+        <b
+          className={
+            it.status === "APPROVED"
+              ? "text-green-700"
+              : it.status === "REJECTED"
+              ? "text-red-700"
+              : "text-yellow-700"
+          }
+        >
+          {it.status}
+        </b>{" "}
+        • {it.shapeCut} • {it.color} • {it.clarity}
+      </div>
+    </div>
 
-                <div className="text-sm">
-                  <b>{it.weightCarat}</b> ct • ₹<b>{it.ratePerCaratInr}</b>/ct
-                </div>
+    <input
+      type="checkbox"
+      checked={!!selected[it.skuId]}
+      onChange={(e) =>
+        setSelected((prev) => ({ ...prev, [it.skuId]: e.target.checked }))
+      }
+    />
+  </div>
 
-                <div className="text-xs text-gray-600">{it.measurementMm}</div>
+  <div className="text-sm">
+    <b>{it.weightCarat}</b> ct • ₹<b>{it.ratePerCaratInr}</b>/ct
+  </div>
 
-                <div className="flex items-center gap-2 pt-2">
-                  <Link
-                    href={`/supplier/yellow-sapphires/${encodeURIComponent(it.skuId)}/edit`}
-                    className="text-sm underline"
-                  >
-                    Edit
-                  </Link>
-                  <Link
-                    href={`/catalog/yellow-sapphire/${encodeURIComponent(it.skuId)}`}
-                    className="text-sm underline"
-                    target="_blank"
-                  >
-                    Public Page
-                  </Link>
-                </div>
-              </div>
+  <div className="text-xs text-gray-600">{it.measurementMm}</div>
+
+  {/* 🔴 Admin rejection remarks */}
+  {it.status === "REJECTED" && it.adminRemarks && (
+    <div className="mt-2 rounded-lg border border-red-300 bg-red-50 p-2 text-xs text-red-800">
+      <b>Admin remarks:</b> {it.adminRemarks}
+    </div>
+  )}
+
+  {/* 🟢 Approved badge */}
+  {it.status === "APPROVED" && (
+    <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-800">
+      ✔ Approved & Live
+    </div>
+  )}
+
+  <div className="flex items-center gap-2 pt-2">
+    {/* ✏️ Edit only if NOT approved */}
+    {it.status !== "APPROVED" && (
+      <Link
+        href={`/supplier/yellow-sapphires/${encodeURIComponent(it.skuId)}/edit`}
+        className="text-sm underline"
+      >
+        Edit
+      </Link>
+    )}
+
+    {/* 🌐 Public page only if approved */}
+    {it.status === "APPROVED" && (
+      <Link
+        href={`/catalog/yellow-sapphire/${encodeURIComponent(it.skuId)}`}
+        className="text-sm underline"
+        target="_blank"
+      >
+        Public Page
+      </Link>
+    )}
+  </div>
+</div>
+
             </div>
           ))}
         </div>
