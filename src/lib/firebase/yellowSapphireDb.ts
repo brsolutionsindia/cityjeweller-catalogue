@@ -21,7 +21,7 @@ import type {
 } from "@/lib/yellowSapphire/types";
 
 
-const PUBLIC_LISTING_NODE = (skuId: string) => `GlobalSKU/YellowSapphires/${skuId}`;
+const PUBLIC_LISTING_NODE = (skuId: string) => `Global SKU/YellowSapphires/${skuId}`;
 
 const SUBMISSION_NODE = (gst: string) => `GST/${gst}/Submissions/YellowSapphires`;
 const SUPPLIER_INDEX = (gst: string, uid: string) =>
@@ -151,7 +151,7 @@ export async function uploadMediaBatch(
   if (!gst) throw new Error("GST is required for upload.");
 
   const uploaded: MediaItem[] = [];
-  const basePath = `GlobalSKU/YellowSapphires/${skuId}`;
+  const basePath = `Global SKU/YellowSapphires/${skuId}`;
   const folder = kind === "VID" ? "videos" : "images";
 
   for (let i = 0; i < files.length; i++) {
