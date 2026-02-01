@@ -14,7 +14,12 @@ import {
 } from "firebase/storage";
 
 import { db, storage } from "./firebaseClient";
-import type { MediaItem, YellowSapphireListing } from "@/lib/yellowSapphire/types";
+import type {
+  MediaItem,
+  YellowSapphireListing,
+  YellowSapphireSubmission,
+} from "@/lib/yellowSapphire/types";
+
 
 const PUBLIC_LISTING_NODE = (skuId: string) => `GlobalSKU/YellowSapphires/${skuId}`;
 
@@ -183,14 +188,14 @@ export async function uploadMediaBatch(
 
 export async function getSubmission(gst: string, skuId: string) {
   const snap = await get(dbRef(db, `${SUBMISSION_NODE(gst)}/${skuId}`));
-  return (snap.val() as YellowSapphireListing | null) ?? null;
+  return (snap.val() as YellowSapphireSubmission | null) ?? null;
 }
 
 export async function saveSubmission(params: {
   skuId: string;
   gst: string;
   supplierUid: string;
-  data: Partial<YellowSapphireListing>;
+  data: Partial<YellowSapphireSubmission>;
 }) {
   const { skuId, gst, supplierUid, data } = params;
 
@@ -201,7 +206,7 @@ export async function saveSubmission(params: {
     skuId,
     gstNumber: gst,
     supplierUid,
-    status: "PENDING",
+    status: "PENDING", // supplier cannot override
     updatedAt: serverTimestamp(),
   });
 
@@ -225,6 +230,7 @@ export async function saveSubmission(params: {
   await update(dbRef(db), updates);
 }
 
+
 export async function deleteSubmission(params: {
   skuId: string;
   gst: string;
@@ -239,13 +245,13 @@ export async function deleteSubmission(params: {
   const vids = submission?.media?.videos || [];
 
   for (const m of imgs) {
-    const p = (m as any).storagePath || (m as any).path;
-    if (p) mediaPaths.push(p);
-  }
-  for (const m of vids) {
-    const p = (m as any).storagePath || (m as any).path;
-    if (p) mediaPaths.push(p);
-  }
+  const p = (m as any).storagePath;
+  if (p) mediaPaths.push(p);
+}
+for (const m of vids) {
+  const p = (m as any).storagePath;
+  if (p) mediaPaths.push(p);
+}
 
   await Promise.allSettled(
     mediaPaths.map((p) => (p ? deleteObject(sRef(storage, p)) : Promise.resolve()))
