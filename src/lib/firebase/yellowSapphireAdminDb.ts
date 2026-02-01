@@ -15,7 +15,7 @@ const SUBMISSION_NODE = (gst: string, skuId: string) =>
   `GST/${gst}/Submissions/YellowSapphires/${skuId}`;
 
 const ADMIN_QUEUE_NODE = (skuId: string) => `AdminQueue/YellowSapphires/${skuId}`;
-const PUBLIC_NODE = (skuId: string) => `GlobalSKU/YellowSapphires/${skuId}`;
+const PUBLIC_NODE = (skuId: string) => `Global SKU/YellowSapphires/${skuId}`;
 
 // ✅ read all pending queue items
 export async function getPendingYellowSapphireQueue() {

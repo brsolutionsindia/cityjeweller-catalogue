@@ -276,3 +276,74 @@ export async function getListing(skuId: string) {
   const snap = await get(dbRef(db, PUBLIC_LISTING_NODE(skuId)));
   return (snap.val() as YellowSapphireListing | null) ?? null;
 }
+
+/* -------------------- public listing: bulk read + helpers -------------------- */
+
+/* -------------------- public listing: bulk read + helpers -------------------- */
+
+export type PublicYellowSapphire = YellowSapphireListing & { id: string };
+
+function normalizeArray<T>(v: any): T[] {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.filter(Boolean);
+  if (typeof v === "object") return Object.values(v).filter(Boolean);
+  return [];
+}
+
+export function getPrimaryImageUrl(item: YellowSapphireListing | null | undefined): string | null {
+  const imgs = normalizeArray<MediaItem>(item?.media?.images);
+  const first = imgs[0];
+  return first?.url || item?.media?.thumbUrl || null;
+}
+
+export function getAllMedia(item: YellowSapphireListing | null | undefined): MediaItem[] {
+  const imgs = normalizeArray<MediaItem>(item?.media?.images);
+  const vids = normalizeArray<MediaItem>(item?.media?.videos);
+  return [...imgs, ...vids].filter((m) => !!m?.url);
+}
+
+/** Prefer stored publicRatePerCaratInr (already computed by admin pipeline) */
+export function getPublicPricePerCaratInr(item: YellowSapphireListing | null | undefined): number | null {
+  const p = item?.publicRatePerCaratInr;
+  return typeof p === "number" && Number.isFinite(p) ? p : null;
+}
+
+/** Total price = publicRatePerCaratInr * weightCarat */
+export function getTotalPriceInr(item: YellowSapphireListing | null | undefined): number | null {
+  const ppc = getPublicPricePerCaratInr(item);
+  const carat = item?.weightCarat;
+  if (ppc == null) return null;
+  if (typeof carat !== "number" || !Number.isFinite(carat)) return null;
+  return Math.round(ppc * carat);
+}
+
+/**
+ * Bulk fetch all public listings.
+ * Node: /Global SKU/YellowSapphires
+ */
+export async function fetchAllPublicListings(): Promise<PublicYellowSapphire[]> {
+  const snap = await get(dbRef(db, "Global SKU/YellowSapphires"));
+  if (!snap.exists()) return [];
+  const raw = snap.val() as Record<string, YellowSapphireListing>;
+  return Object.entries(raw).map(([id, value]) => ({
+    id,
+    ...(value || ({} as YellowSapphireListing)),
+  }));
+}
+
+/**
+ * If later you add carat field (carat / caratWeight / weightCarat),
+ * this will start showing totals automatically.
+ */
+export function getCarat(item: YellowSapphireListing | null | undefined): number | null {
+  const v = (item as any)?.carat ?? (item as any)?.caratWeight ?? (item as any)?.weightCarat;
+  const n = typeof v === "number" ? v : typeof v === "string" ? parseFloat(v) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+export function getEstTotalPriceInr(item: YellowSapphireListing | null | undefined): number | null {
+  const ppc = getPricePerCaratInr(item);
+  const carat = getCarat(item);
+  if (ppc == null || carat == null) return null;
+  return Math.round(ppc * carat);
+}
