@@ -32,7 +32,15 @@ function toDirectDriveUrl(url: string): string {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function TeamPage() {
   const params = useParams(); // ✅ safest for client component
-  const slug = params?.slug;
+  const rawSlug = params?.slug;
+
+const slug =
+  typeof rawSlug === "string"
+    ? rawSlug
+    : Array.isArray(rawSlug)
+    ? rawSlug[0]
+    : "";
+
   const [data, setData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
 
