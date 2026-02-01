@@ -21,7 +21,7 @@ export default function Page() {
 
   const rawSkuId = typeof params?.skuId === "string" ? params.skuId : "";
   const skuId = decodeURIComponent(rawSkuId);
-  const gst = search.get("gst") || "";
+  const gst = useMemo(() => search?.get("gst") ?? "", [search]);
 
   const [data, setData] = useState<YellowSapphireSubmission | null>(null);
   const [busy, setBusy] = useState(true);
