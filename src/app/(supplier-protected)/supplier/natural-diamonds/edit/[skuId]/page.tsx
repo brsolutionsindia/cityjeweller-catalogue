@@ -190,7 +190,7 @@ const skuId =
   // auth + supplier meta + fetch item
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) { router.replace('/supplier/login'); return; }
+      if (!u) { router.replace('/login'); return; }
       setUid(u.uid);
 
       const gstSnap = await get(ref(db, `User ID/${u.uid}/Shop GST`));

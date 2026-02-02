@@ -60,7 +60,7 @@ function Inner() {
     const run = async () => {
       if (loading) return;
       if (!uid) {
-        window.location.href = "/supplier/login";
+        window.location.href = "/login";
         return;
       }
       if (!gst) {

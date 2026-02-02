@@ -17,7 +17,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     try {
       await signOut(auth);
     } finally {
-      router.replace('/supplier/login');
+      router.replace('/login');
     }
   };
 

@@ -35,7 +35,7 @@ export default function SupplierDashboard() {
   // auth + GST load
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) { router.replace('/supplier/login'); return; }
+      if (!u) { router.replace('/login'); return; }
       setUid(u.uid);
 
       const gstSnap = await get(ref(db, `User ID/${u.uid}/Shop GST`));
@@ -99,7 +99,7 @@ export default function SupplierDashboard() {
   const logout = async () => {
     try {
       await signOut(auth);
-      router.replace('/supplier/login');
+      router.replace('/login');
     } catch (e) {
       console.error('Logout failed', e);
     }

@@ -71,7 +71,7 @@ export default function NewNaturalDiamond() {
   // auth + GST + read-only meta
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) { router.replace('/supplier/login'); return; }
+      if (!u) { router.replace('/login'); return; }
       setUid(u.uid);
 
       // GST

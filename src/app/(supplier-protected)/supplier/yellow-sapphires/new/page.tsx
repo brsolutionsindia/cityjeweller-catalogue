@@ -27,7 +27,7 @@ function Inner() {
       if (loading) return;
 
       if (!uid) {
-        window.location.href = "/supplier/login";
+        window.location.href = "/login";
         return;
       }
       if (!gst) {
