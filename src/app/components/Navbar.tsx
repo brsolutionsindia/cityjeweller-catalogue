@@ -147,7 +147,7 @@ export default function Navbar() {
 </li>
           <li><Link href="/compare-calculations">Compare</Link></li>
           <li><Link href="/#contact">Contact</Link></li>
-
+	  <li><Link href="/login">Login</Link></li>
 
 
 

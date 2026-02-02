@@ -1,26 +1,20 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { ref, onValue } from 'firebase/database';
-import { db } from '../firebaseConfig';
 import Image from 'next/image';
 import Link from 'next/link';
+
 import TrustInfoStrip from './components/TrustInfoStrip';
+import PageLayout from './components/PageLayout';
+import LiveRates from './components/LiveRates';
 
 import {
   diamondItems,
   goldItems,
-    goldCollections,
+  goldCollections,
   silverItems,
   gemstoneItems,
   cvdItems,
   miscItems,
   type CatalogItem,
 } from '../data/catalogMenu';
-
-import PageLayout from './components/PageLayout';
-import OfferBar from './components/OfferBar';
-import OfferBarSilver from './components/OfferBarSilver';
 
 import heroStyles from './hero.module.css';
 import productStyles from './product.module.css';
@@ -44,9 +38,7 @@ function Card({ item }: { item: CatalogItem }) {
   return (
     <div
       className={`${productStyles.productCardHorizontal} ${isDisabled ? productStyles.dimmed : ''}`}
-      key={item.label}
       aria-disabled={isDisabled}
-      // Fallback inline style in case some CSS is overridden
       style={isDisabled ? { opacity: 0.45, filter: 'grayscale(100%)' } : undefined}
     >
       {isDisabled ? inner : <Link href={item.link}>{inner}</Link>}
@@ -55,24 +47,13 @@ function Card({ item }: { item: CatalogItem }) {
 }
 
 export default function Home() {
-  const [goldRate, setGoldRate] = useState('Loading...');
-  const [rateDate, setRateDate] = useState('');
-  const [silverRate, setSilverRate] = useState('Loading...');
-
-  useEffect(() => {
-    const rateRef = ref(db, 'Global SKU/Rates/Gold 22kt');
-    const silRateRef = ref(db, 'Global SKU/Rates/Silver');
-    const dateRef = ref(db, 'Global SKU/Rates/Date');
-    onValue(rateRef, (s) => setGoldRate(s.val()));
-    onValue(dateRef, (s) => setRateDate(s.val()));
-    onValue(silRateRef, (s) => setSilverRate(s.val()));
-  }, []);
-
   const renderRow = (items: CatalogItem[]) => (
     <div className={productStyles.catalogContainer}>
       <div className={productStyles.catalogSlider}>
         <div className={productStyles.horizontalScroll}>
-          {items.map((item) => <Card key={item.label} item={item} />)}
+          {items.map((item) => (
+            <Card key={item.label} item={item} />
+          ))}
         </div>
       </div>
     </div>
@@ -80,22 +61,21 @@ export default function Home() {
 
   return (
     <PageLayout>
-      <OfferBar goldRate={goldRate} rateDate={rateDate} />
-      <OfferBarSilver silverRate={silverRate} rateDate={rateDate} />
+      {/* ✅ Client component: loads rates without turning the whole page client */}
+      <LiveRates />
 
-<section className={heroStyles.hero}>
-  <Link href="/catalog/solitaireRG">
-    <Image
-      src="/hero-banner.png"
-      alt="Jewellery Banner"
-      width={1200}
-      height={400}
-      className={heroStyles.heroImage}
-      priority
-    />
-  </Link>
-</section>
-
+      <section className={heroStyles.hero}>
+        <Link href="/catalog/solitaireRG">
+          <Image
+            src="/hero-banner.png"
+            alt="Jewellery Banner"
+            width={1200}
+            height={400}
+            className={heroStyles.heroImage}
+            priority
+          />
+        </Link>
+      </section>
 
       <section id="cvd" className={productStyles.catalogSection}>
         <h2 className={productStyles.sectionHeading}>Solitaires</h2>
@@ -131,9 +111,8 @@ export default function Home() {
         <h2 className={productStyles.sectionHeading}>Miscellaneous Items</h2>
         {renderRow(miscItems)}
       </section>
-{/* Global trust / info section (reusable across pages) */}
-      <TrustInfoStrip />
 
+      <TrustInfoStrip />
     </PageLayout>
   );
 }
