@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { get, ref } from "firebase/database";
-import { auth, db } from "./firebaseClient";
+import { auth, db } from "@/firebaseConfig";
 
 type SupplierSession = {
   user: User | null;

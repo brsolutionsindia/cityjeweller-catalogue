@@ -1,10 +1,10 @@
 import RequireAdmin from "@/components/auth/RequireAdmin";
-import AdminHome from "../page"; // OR your dashboard component
+import Dashboard from "../page"; // or render dashboard UI here
 
 export default function Page() {
   return (
     <RequireAdmin>
-      <AdminHome />
+      <div className="p-6">Admin Dashboard</div>
     </RequireAdmin>
   );
 }

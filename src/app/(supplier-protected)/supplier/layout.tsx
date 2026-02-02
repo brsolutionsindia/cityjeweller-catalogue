@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { SupplierProvider, useSupplierSession } from '@/lib/firebase/supplierContext';
 import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase/firebaseClient';
+import { auth } from '@/firebaseConfig';
 
 function Shell({ children }: { children: React.ReactNode }) {
   const { uid, gst, loading } = useSupplierSession();

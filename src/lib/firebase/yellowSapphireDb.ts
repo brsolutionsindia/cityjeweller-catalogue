@@ -13,7 +13,7 @@ import {
   deleteObject,
 } from "firebase/storage";
 
-import { db, storage } from "./firebaseClient";
+import { db, storage } from "@/firebaseConfig";
 import type {
   MediaItem,
   YellowSapphireListing,

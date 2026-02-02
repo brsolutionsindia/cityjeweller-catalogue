@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { SupplierProvider, useSupplierSession } from "@/lib/firebase/supplierContext";
 import { get, ref } from "firebase/database";
-import { db } from "@/lib/firebase/firebaseClient";
+import { db } from "@/firebaseConfig";
 import type { YellowSapphireSubmission } from "@/lib/yellowSapphire/types";
 import { deleteSubmission, getSubmission } from "@/lib/firebase/yellowSapphireDb";
 import { buildWhatsAppMessage, openWhatsAppShare } from "@/components/supplier/WhatsAppShare";

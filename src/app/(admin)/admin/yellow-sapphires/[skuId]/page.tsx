@@ -3,7 +3,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { auth } from "@/lib/firebase/firebaseClient";
+import { auth } from "@/firebaseConfig";
+
 import type { MediaItem, YellowSapphireSubmission } from "@/lib/yellowSapphire/types";
 import {
   approveYellowSapphire,
