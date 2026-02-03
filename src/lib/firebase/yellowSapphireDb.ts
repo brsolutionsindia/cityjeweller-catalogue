@@ -44,13 +44,14 @@ function cleanSku(skuId: string) {
 function makeMediaFileName(
   skuId: string,
   kind: "IMG" | "VID",
-  index1Based: number,
   file: File
 ) {
   const ext = extFromFile(file);
-  const nn = String(index1Based).padStart(2, "0");
-  return `${cleanSku(skuId)}_${kind}_${nn}.${ext}`;
+  const ts = Date.now();
+  const rnd = Math.random().toString(36).slice(2, 8);
+  return `${cleanSku(skuId)}_${kind}_${ts}_${rnd}.${ext}`;
 }
+
 
 /* -------------------- utils -------------------- */
 
@@ -157,7 +158,7 @@ export async function uploadMediaBatch(
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
 
-    const fileName = makeMediaFileName(skuId, kind, i + 1, file);
+    const fileName = makeMediaFileName(skuId, kind, file);
     const storagePath = `${basePath}/${folder}/${fileName}`;
     const storageRef = sRef(storage, storagePath);
 
