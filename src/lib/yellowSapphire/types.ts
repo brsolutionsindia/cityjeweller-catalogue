@@ -2,13 +2,25 @@ export type SubmissionStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type PublicListingStatus = "AVAILABLE" | "HOLD" | "SOLD" | "HIDDEN";
 
 export type MediaItem = {
-  url: string;
+  // URL becomes optional – you should NOT rely on it for public pages.
+  url?: string;
+
   type: "image" | "video";
-  storagePath?: string;
+
+  // storagePath is the real “primary key”
+  storagePath: string;
+
   fileName?: string;
   contentType?: string;
-  createdAt?: number;
+
+  createdAt?: number;  // when uploaded first time
+  updatedAt?: number;  // whenever admin/team overwrites the file
+
+  // ordering + primary selection
+  order: number;       // 0..n-1
+  isPrimary?: boolean; // only one true per images array (optional for videos)
 };
+
 
 export type YellowSapphireSubmission = {
   skuId: string;

@@ -3,9 +3,10 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   fetchAllPublicListings,
-  getPrimaryImageUrl,
+  getPrimaryImageItem,
   type PublicYellowSapphire,
 } from "@/lib/firebase/yellowSapphireDb";
+
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ function CategoryCard({
 }
 
 function FeaturedCard({ item }: { item: PublicYellowSapphire }) {
-  const img = getPrimaryImageUrl(item);
+  const img = getPrimaryImageItem(item)?.url || null;
   return (
     <Link
       href={`/gemstones/yellow-sapphire/${encodeURIComponent(item.id)}`}

@@ -1,3 +1,6 @@
+import { deleteMediaObject } from "@/lib/firebase/yellowSapphireDb";
+import type { MediaItem } from "@/lib/yellowSapphire/types";
+
 import { db } from "@/firebaseConfig";
 import {
   get,
@@ -145,4 +148,63 @@ export async function rejectYellowSapphire(params: {
   updatesObj[`${ADMIN_QUEUE_NODE(skuId)}/updatedAt`] = serverTimestamp();
 
   await update(dbRef(db), updatesObj);
+}
+
+
+function normalizeOrders(images: MediaItem[]) {
+  return images.map((m, i) => ({
+    ...m,
+    order: i,
+    isPrimary: i === 0, // cover is first
+  }));
+}
+
+function normalizeVideoOrders(videos: MediaItem[]) {
+  return videos.map((m, i) => ({
+    ...m,
+    order: i,
+    isPrimary: false,
+  }));
+}
+
+export async function removeSubmissionMediaItem(params: {
+  gst: string;
+  skuId: string;
+  kind: "IMG" | "VID";
+  index: number;
+  deleteFromStorage?: boolean;
+}) {
+  const { gst, skuId, kind, index, deleteFromStorage } = params;
+
+  const submission = await getYellowSapphireSubmission(gst, skuId);
+  if (!submission) throw new Error("Submission not found.");
+
+  const curImages = Array.isArray(submission.media?.images) ? submission.media.images : [];
+  const curVideos = Array.isArray(submission.media?.videos) ? submission.media.videos : [];
+
+  if (kind === "IMG") {
+    const target = curImages[index];
+    if (!target) throw new Error("Image not found at index.");
+
+    if (deleteFromStorage && target.storagePath) {
+      await deleteMediaObject(target.storagePath);
+    }
+
+    const nextImages = normalizeOrders(curImages.filter((_, i) => i !== index));
+    const thumbUrl = nextImages?.[0]?.url || "";
+
+    await updateSubmissionMedia({ gst, skuId, images: nextImages, videos: curVideos });
+    return { thumbUrl };
+  } else {
+    const target = curVideos[index];
+    if (!target) throw new Error("Video not found at index.");
+
+    if (deleteFromStorage && target.storagePath) {
+      await deleteMediaObject(target.storagePath);
+    }
+
+    const nextVideos = normalizeVideoOrders(curVideos.filter((_, i) => i !== index));
+    await updateSubmissionMedia({ gst, skuId, images: curImages, videos: nextVideos });
+    return {};
+  }
 }

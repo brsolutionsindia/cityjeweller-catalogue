@@ -65,7 +65,12 @@ export default function YellowSapphireForm({ mode, skuId, initial, onSubmit }: P
     }
   };
 
-  const thumbUrl = useMemo(() => (images?.[0]?.url || "").trim(), [images]);
+  const thumbUrl = useMemo(() => {
+    const sorted = [...images].sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
+    const primary = sorted.find((m) => m.isPrimary) || sorted[0];
+    return (primary?.url || "").trim();
+  }, [images]);
+
 
   const submit = async () => {
     // Only hard-require Carat + Rate
@@ -84,6 +89,16 @@ export default function YellowSapphireForm({ mode, skuId, initial, onSubmit }: P
     }
 
     setSaving(true);
+
+  const normalizedImages = [...images]
+    .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999))
+    .map((m, i) => ({ ...m, order: i, isPrimary: i === 0 }));
+
+  const normalizedVideos = [...videos]
+    .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999))
+    .map((m, i) => ({ ...m, order: i }));
+
+
     try {
       const payload: Partial<YellowSapphireSubmission> = {
         stoneLocalCode: stoneLocalCode.trim() || undefined,
@@ -104,8 +119,8 @@ export default function YellowSapphireForm({ mode, skuId, initial, onSubmit }: P
         measurementMm: meas || undefined,
 
         media: {
-          images,
-          videos,
+          images: normalizedImages,
+          videos: normalizedVideos,
           thumbUrl,
         },
 

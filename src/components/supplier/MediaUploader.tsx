@@ -421,7 +421,14 @@ export default function MediaUploader({
 
       // keep only correct media type
       const filtered = uploaded.filter((m) => (wantVideo ? m.type === "video" : m.type === "image"));
-      onChange([...items, ...filtered]);
+      const merged = [...items, ...filtered];
+      onChange(
+        merged.map((m, i) => ({
+          ...m,
+          order: i,
+          isPrimary: allowReorder ? i === 0 : m.isPrimary,
+        }))
+      );
     } catch (err) {
       console.error(err);
       alert("Upload failed. Please try again.");
@@ -457,7 +464,7 @@ export default function MediaUploader({
 
   const remove = async (m: MediaItem) => {
     // optimistic remove
-    onChange(items.filter((x) => x.url !== m.url));
+    onChange(items.filter((x) => x.storagePath !== m.storagePath));
 
     const storagePath = (m as any).storagePath || (m as any).path;
     if (storagePath) {
@@ -469,18 +476,26 @@ export default function MediaUploader({
     }
   };
 
+  const normalizeOrder = (arr: MediaItem[]) =>
+    arr.map((m, i) => ({
+      ...m,
+      order: i,
+      isPrimary: allowReorder ? i === 0 : m.isPrimary, // first image = primary
+    }));
+
   const move = (from: number, to: number) => {
     if (to < 0 || to >= items.length) return;
     const next = [...items];
     const [it] = next.splice(from, 1);
     next.splice(to, 0, it);
-    onChange(next);
+    onChange(normalizeOrder(next));
   };
 
   const setCover = (idx: number) => {
     if (!allowReorder) return;
     move(idx, 0);
   };
+
 
   // ---------- camera video recorder (no audio) ----------
   const openRecorder = async () => {
@@ -712,7 +727,7 @@ export default function MediaUploader({
           {items.map((m, idx) => {
             const isVideo = m.type === "video";
             return (
-              <div key={`${m.url}-${idx}`} className="rounded-xl border overflow-hidden bg-white">
+              <div key={`${m.storagePath}-${idx}`} className="rounded-xl border overflow-hidden bg-white">
                 <div className="relative">
                   {isVideo ? (
                     // eslint-disable-next-line jsx-a11y/media-has-caption

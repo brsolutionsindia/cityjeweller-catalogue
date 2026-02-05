@@ -171,15 +171,25 @@ export async function uploadMediaBatch(
 
     const url = await getDownloadURL(storageRef);
 
-    // ✅ No "as any" — proper TS fields
-    uploaded.push({
-      url,
-      type: kind === "VID" ? "video" : "image",
-      storagePath,
-      fileName,
-      contentType: file.type || undefined,
-      createdAt: Date.now(),
-    });
+const now = Date.now();
+
+uploaded.push({
+  // optional convenience url for supplier preview (fine to keep)
+  url,
+
+  type: kind === "VID" ? "video" : "image",
+  storagePath,
+  fileName,
+  contentType: file.type || undefined,
+
+  createdAt: now,
+  updatedAt: now,
+
+  // default ordering in the returned batch
+  order: i,                // caller will normalize to full list order later
+  isPrimary: i === 0 && kind === "IMG", // only first image in batch gets primary; caller will fix overall
+});
+
   }
 
   return uploaded;
@@ -292,16 +302,33 @@ function normalizeArray(v: unknown): MediaItem[] {
 }
 
 
-export function getPrimaryImageUrl(item: YellowSapphireListing | null | undefined): string | null {
-  const imgs = normalizeArray(item?.media?.images);
-  const first = imgs[0];
-  return first?.url || item?.media?.thumbUrl || null;
+export async function resolveUrlFromStoragePath(storagePath: string): Promise<string> {
+  const u = await getDownloadURL(sRef(storage, storagePath));
+  return u;
 }
 
-export function getAllMedia(item: YellowSapphireListing | null | undefined): MediaItem[] {
+export function sortMedia(items: MediaItem[]) {
+  return [...items].sort((a, b) => {
+    const ao = typeof a.order === "number" ? a.order : 9999;
+    const bo = typeof b.order === "number" ? b.order : 9999;
+    if (ao !== bo) return ao - bo;
+    return (a.createdAt || 0) - (b.createdAt || 0);
+  });
+}
+
+export function getPrimaryImageItem(item: YellowSapphireListing | null | undefined): MediaItem | null {
   const imgs = normalizeArray(item?.media?.images);
-  const vids = normalizeArray(item?.media?.videos);
-  return [...imgs, ...vids].filter((m) => !!m?.url);
+  if (!imgs.length) return null;
+  const sorted = sortMedia(imgs);
+
+  const primary = sorted.find((m) => m.isPrimary);
+  return primary || sorted[0] || null;
+}
+
+export function getAllMediaItems(item: YellowSapphireListing | null | undefined): MediaItem[] {
+  const imgs = sortMedia(normalizeArray(item?.media?.images));
+  const vids = sortMedia(normalizeArray(item?.media?.videos));
+  return [...imgs, ...vids];
 }
 
 
@@ -332,4 +359,47 @@ export async function fetchAllPublicListings(): Promise<PublicYellowSapphire[]> 
     id,
     ...(value || ({} as YellowSapphireListing)),
   }));
+}
+
+
+export async function overwriteMediaAtPath(params: {
+  storagePath: string;
+  file: File;
+  dbNodesToUpdate?: string[]; // ✅ multiple locations
+}) {
+  const { storagePath, file, dbNodesToUpdate } = params;
+
+  const storageRef = sRef(storage, storagePath);
+
+  await new Promise<void>((resolve, reject) => {
+    const task = uploadBytesResumable(storageRef, file, {
+      contentType: file.type || undefined,
+      cacheControl: "public,max-age=60",
+    });
+    task.on("state_changed", undefined, reject, () => resolve());
+  });
+
+  const newUrl = await getDownloadURL(storageRef);
+
+  // ✅ update all DB nodes (submission + public listing)
+  if (dbNodesToUpdate?.length) {
+    const updatesObj: Record<string, any> = {};
+    const now = Date.now();
+
+    for (const node of dbNodesToUpdate) {
+      updatesObj[`${node}/url`] = newUrl;
+      updatesObj[`${node}/updatedAt`] = now;
+      updatesObj[`${node}/contentType`] = file.type || null;
+    }
+
+    await update(dbRef(db), updatesObj);
+  }
+
+  return newUrl;
+}
+
+
+export async function getDownloadUrlForPath(storagePath: string): Promise<string> {
+  if (!storagePath) throw new Error("Missing storagePath");
+  return await getDownloadURL(sRef(storage, storagePath));
 }

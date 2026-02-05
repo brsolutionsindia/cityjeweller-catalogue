@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { getListing, getPrimaryImageUrl, getAllMedia } from "@/lib/firebase/yellowSapphireDb";
+import { getListing, getPrimaryImageItem, getAllMediaItems, resolveUrlFromStoragePath, sortMedia } from "@/lib/firebase/yellowSapphireDb";
 import type { YellowSapphireListing, MediaItem } from "@/lib/yellowSapphire/types";
 
 const WHATSAPP_NUMBER = "919023130944";
@@ -111,22 +111,52 @@ export default function YellowSapphireDetailPage() {
 
   const sku = item?.skuId || id || "—";
 
-  const gallery = useMemo(() => {
-    const all = getAllMedia(item);
-    return [
-      ...all.filter((m) => m.type === "image"),
-      ...all.filter((m) => m.type === "video"),
-    ];
+  const galleryItems = useMemo(() => {
+    const all = getAllMediaItems(item);
+    const imgs = sortMedia(all.filter((m) => m.type === "image"));
+    const vids = sortMedia(all.filter((m) => m.type === "video"));
+    return [...imgs, ...vids];
   }, [item]);
 
+const [resolved, setResolved] = useState<Array<{ type: "image" | "video"; url: string; key: string }>>([]);
+
+useEffect(() => {
+  let cancelled = false;
+
+  (async () => {
+    const mapped = await Promise.all(
+      galleryItems.map(async (m) => {
+        const baseUrl = m.url?.trim()
+          ? m.url
+          : await resolveUrlFromStoragePath(m.storagePath);
+
+        // cache-bust when admin overwrites
+        const v = m.updatedAt || m.createdAt || 0;
+        const withV = v ? `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}v=${v}` : baseUrl;
+
+        return { type: m.type, url: withV, key: m.storagePath };
+      })
+    );
+
+    if (!cancelled) setResolved(mapped);
+  })();
+
+  return () => {
+    cancelled = true;
+  };
+}, [galleryItems]);
+
+
   // Ensure primary image is included as first (if not already)
-  const primary = getPrimaryImageUrl(item);
-  const derivedGallery = useMemo(() => {
-    if (!primary) return gallery;
-    const hasPrimary = gallery.some((m) => m.type === "image" && m.url === primary);
-    if (hasPrimary) return gallery;
-    return [{ type: "image", url: primary } as MediaItem, ...gallery];
-  }, [primary, gallery]);
+  const primaryItem = useMemo(() => getPrimaryImageItem(item), [item]);
+
+  useEffect(() => {
+    // if primary is not first in UI, you can force it to first by reordering galleryItems.
+    // But since galleryItems sorts by order and primary should be order 0, you normally don't need this.
+  }, [primaryItem]);
+
+  const derivedGallery = resolved; // resolved already ordered
+
 
   // keep active index valid
   useEffect(() => {
@@ -396,7 +426,7 @@ export default function YellowSapphireDetailPage() {
               <div className="mt-4 grid grid-cols-5 gap-2 sm:grid-cols-6">
                 {derivedGallery.slice(0, 12).map((m, idx) => (
                   <ThumbSelectable
-                    key={`${m.type}-${m.url}-${idx}`}
+                    key={`${m.key}-${idx}`}
                     sku={sku}
                     m={m}
                     idx={idx}
