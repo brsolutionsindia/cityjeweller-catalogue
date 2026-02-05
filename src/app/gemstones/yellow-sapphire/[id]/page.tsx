@@ -7,6 +7,12 @@ import { useParams } from "next/navigation";
 import { getListing, getPrimaryImageItem, getAllMediaItems, resolveUrlFromStoragePath, sortMedia } from "@/lib/firebase/yellowSapphireDb";
 import type { YellowSapphireListing, MediaItem } from "@/lib/yellowSapphire/types";
 
+type ResolvedMedia = {
+  type: "image" | "video";
+  url: string;
+  key: string; // stable unique id for React keys
+};
+
 const WHATSAPP_NUMBER = "919023130944";
 
 const HELP_BANNER_SRC = "/brand/gemstone-help-banner.png";
@@ -118,23 +124,27 @@ export default function YellowSapphireDetailPage() {
     return [...imgs, ...vids];
   }, [item]);
 
-const [resolved, setResolved] = useState<Array<{ type: "image" | "video"; url: string; key: string }>>([]);
+const [resolved, setResolved] = useState<ResolvedMedia[]>([]);
 
 useEffect(() => {
   let cancelled = false;
 
   (async () => {
-    const mapped = await Promise.all(
-      galleryItems.map(async (m) => {
+    const mapped: ResolvedMedia[] = await Promise.all(
+      galleryItems.map(async (m, idx) => {
         const baseUrl = m.url?.trim()
           ? m.url
           : await resolveUrlFromStoragePath(m.storagePath);
 
-        // cache-bust when admin overwrites
         const v = m.updatedAt || m.createdAt || 0;
-        const withV = v ? `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}v=${v}` : baseUrl;
+        const withV = v
+          ? `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}v=${v}`
+          : baseUrl;
 
-        return { type: m.type, url: withV, key: m.storagePath };
+        // IMPORTANT: key must never be empty
+        const key = (m.storagePath || m.url || `${m.type}-${idx}`).trim();
+
+        return { type: m.type, url: withV, key };
       })
     );
 
@@ -661,7 +671,7 @@ function ThumbSelectable({
   videoPoster,
 }: {
   sku: string;
-  m: MediaItem;
+  m: ResolvedMedia;   // ✅ change here
   idx: number;
   active: boolean;
   onClick: () => void;
