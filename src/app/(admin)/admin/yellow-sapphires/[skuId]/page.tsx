@@ -216,7 +216,11 @@ export default function Page() {
           <div className="font-medium">Images</div>
           <div className="grid md:grid-cols-2 gap-3">
             {images.map((m, idx) => (
-              <div key={(m.storagePath || m.url) + idx} className="rounded-2xl border p-3 flex gap-3">
+              <div
+                key={`${m.storagePath ?? m.url ?? "media"}-${idx}`}
+                className="rounded-2xl border p-3 flex gap-3"
+              >
+
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={withBust(m)} alt="img" className="w-28 h-20 rounded-xl object-cover border" />
 
@@ -295,7 +299,10 @@ export default function Page() {
           <div className="font-medium mt-6">Videos</div>
           <div className="grid md:grid-cols-2 gap-3">
             {videos.map((m, idx) => (
-              <div key={(m.storagePath || m.url) + idx} className="rounded-2xl border p-3 flex gap-3">
+              <div
+                key={`${m.storagePath ?? m.url ?? "media"}-${idx}`}
+                className="rounded-2xl border p-3 flex gap-3"
+              >
                 {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                 <video src={withBust(m)} controls className="w-28 h-20 rounded-xl object-cover border" />
 
