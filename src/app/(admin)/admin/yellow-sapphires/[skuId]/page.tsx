@@ -411,7 +411,7 @@ export default function Page() {
     setBusy(true);
     try {
       // Update DB media item updatedAt so UI can bust cache
-      const dbNodeToUpdate =
+      const dbNode =
         kind === "IMG"
           ? `GST/${gst}/Submissions/YellowSapphires/${skuId}/media/images/${idx}`
           : `GST/${gst}/Submissions/YellowSapphires/${skuId}/media/videos/${idx}`;
@@ -419,8 +419,9 @@ export default function Page() {
       const newUrl = await overwriteMediaAtPath({
         storagePath: target.storagePath,
         file,
-        dbNodeToUpdate,
+        dbNodesToUpdate: [dbNode],
       });
+
 
       // Update local state instantly
       const now = Date.now();
