@@ -4,6 +4,8 @@ import React, { useMemo, useState } from "react";
 import ImageChoiceGrid from "./ImageChoiceGrid";
 import ChoiceTabs from "./ChoiceTabs";
 import MediaUploader from "./MediaUploader";
+import { uploadMediaBatch, deleteMediaObject } from "@/lib/firebase/yellowSapphireDb";
+
 import {
   SHAPES,
   CLARITIES,
@@ -164,23 +166,30 @@ export default function YellowSapphireForm({ mode, skuId, initial, onSubmit }: P
         <div className="text-lg font-semibold">Media</div>
 
         <MediaUploader
-  skuId={skuId}
-  label="Photos"
-  accept="image/*"
-  kind="IMG"
-  items={images}
-  onChange={setImages}
-  allowReorder
-/>
+          skuId={skuId}
+          label="Photos"
+          accept="image/*"
+          kind="IMG"
+          mediaType="image"
+          items={images}
+          onChange={setImages}
+          allowReorder
+          uploadFn={uploadMediaBatch}
+          deleteFn={deleteMediaObject}
+        />
 
         <MediaUploader
-  skuId={skuId}
-  label="Videos"
-  accept="video/*"
-  kind="VID"
-  items={videos}
-  onChange={setVideos}
-/>
+          skuId={skuId}
+          label="Videos"
+          accept="video/*"
+          kind="VID"
+          mediaType="video"
+          items={videos}
+          onChange={setVideos}
+          uploadFn={uploadMediaBatch}
+          deleteFn={deleteMediaObject}
+        />
+
       </div>
 
       {/* Core */}

@@ -1,0 +1,78 @@
+export type Nature = "NATURAL" | "ARTIFICIAL";
+export type GJType =
+  | "BRACELET"
+  | "STRING"
+  | "NECKLACE"
+  | "EARRINGS"
+  | "RING"
+  | "PENDANT"
+  | "SET";
+
+export type GJStatus = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED";
+
+export type TagCategory = "colors" | "stones" | "styles" | "types";
+
+export type MediaKind = "IMG" | "VID";
+
+export type MediaItem = {
+  id: string;
+  kind: MediaKind;
+  url: string; // download URL
+  storagePath: string; // Firebase Storage path
+  order: number;
+  width?: number;
+  height?: number;
+  durationSec?: number; // for video
+  thumbUrl?: string; // optional for video thumb
+  createdAt?: number; // ms
+};
+
+export type TagMap = Partial<Record<TagCategory, string[]>>;
+
+export type GemstoneJewellerySubmission = {
+  skuId: string;
+
+  gst: string;
+  supplierUid: string;
+
+  status: GJStatus;
+  createdAt?: number; // ms
+  updatedAt?: number; // ms
+
+  // core
+  nature: Nature;
+  type: GJType;
+
+  // stone naming
+  stoneName?: string; // e.g. "Amethyst", "Pearl", "Aventurine"
+  lookName?: string;  // for artificial: "Ruby Look", "Emerald Look" etc
+
+  // optional descriptors
+  material?: string;  // Thread / Silver / Alloy / Elastic / Adjustable
+  closure?: string;   // Hook / Adjustable / Elastic
+  beadSizeMm?: number;
+  lengthInch?: number;
+  weightGm?: number;
+
+  // pricing
+  mrp?: number;
+  offerPrice?: number;
+  currency?: "INR";
+
+  // tags
+  tags: string[];     // flat list: ["red","pearl","dailywear"]
+  tagsByCategory?: TagMap;
+
+  // title
+  itemName: string;   // auto-generated but editable
+
+  // media (same management logic as Yellow Sapphire)
+  media: MediaItem[];
+
+  // admin moderation
+  adminNote?: string;       // internal
+  rejectionReason?: string; // shown to supplier
+
+  // visibility flags (optional for later)
+  featured?: boolean;
+};
