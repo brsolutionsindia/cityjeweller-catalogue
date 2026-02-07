@@ -189,7 +189,7 @@ function ImageCropperModal(props: {
   const [zoom, setZoom] = useState(1);
   const [cropPixels, setCropPixels] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
-  // 4:3 portrait => width:height = 3:4
+  // 3:4 portrait => width:height = 3:4
   const aspect = 3 / 4;
 
   useEffect(() => {
@@ -201,7 +201,7 @@ function ImageCropperModal(props: {
   }, [props.open]);
 
   return (
-    <ModalShell open={props.open} title="Crop Photo (4:3 Portrait)" onClose={props.onCancel}>
+    <ModalShell open={props.open} title="Crop Photo (3:4 Portrait)" onClose={props.onCancel}>
       {!props.imageUrl ? (
         <div className="text-sm text-gray-600">No image loaded.</div>
       ) : (
@@ -408,7 +408,13 @@ export default function MediaUploader<TMedia>({
   setOrder,
   setPrimary,
 }: Props<TMedia>) {
-  const { gst } = useSupplierSession();
+  const session = useSupplierSession();
+  const gst = session?.gst;
+
+  if (!gst) {
+    alert("Supplier session not ready. Please re-login.");
+    return;
+  }
 
   const camInputRef = useRef<HTMLInputElement | null>(null);
   const galInputRef = useRef<HTMLInputElement | null>(null);

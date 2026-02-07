@@ -1,3 +1,4 @@
+// src/app/(admin)/admin/gemstone-jewellery/page.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -14,6 +15,19 @@ type QueueItem = {
   updatedAt?: any;
 };
 
+const toNum = (v: any) => (typeof v === "number" ? v : Number(v || 0));
+
+const NO_THUMB =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>
+      <rect width='100%' height='100%' fill='#eee'/>
+      <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#666' font-size='14'>
+        No Thumb
+      </text>
+    </svg>`
+  );
+
 export default function Page() {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [busy, setBusy] = useState(true);
@@ -28,22 +42,42 @@ export default function Page() {
   }, [items, q]);
 
   useEffect(() => {
+    let alive = true;
+
     const run = async () => {
       setBusy(true);
       try {
         const obj = await getPendingGemstoneJewelleryQueue();
-        const arr = Object.values(obj || {}) as QueueItem[];
-        const toNum = (v: any) => (typeof v === "number" ? v : Number(v || 0));
+
+        // Firebase queue is an object keyed by skuId
+        const arr = Object.entries(obj || {}).map(([skuIdKey, raw]) => {
+          const it = (raw || {}) as Partial<QueueItem>;
+          return {
+            skuId: it.skuId || skuIdKey,
+            gstNumber: it.gstNumber || "",
+            supplierUid: it.supplierUid || "",
+            status: it.status || "PENDING",
+            thumbUrl: it.thumbUrl || "",
+            createdAt: it.createdAt,
+            updatedAt: it.updatedAt,
+          } as QueueItem;
+        });
+
         arr.sort(
           (a, b) =>
             toNum(b.updatedAt) - toNum(a.updatedAt) || toNum(b.createdAt) - toNum(a.createdAt)
         );
-        setItems(arr);
+
+        if (alive) setItems(arr);
       } finally {
-        setBusy(false);
+        if (alive) setBusy(false);
       }
     };
+
     run();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   return (
@@ -54,7 +88,9 @@ export default function Page() {
             ← Back to Admin
           </Link>
           <div className="text-2xl font-bold mt-1">Gemstone Jewellery Approvals</div>
-          <div className="text-xs text-gray-500 mt-1">{busy ? "Loading…" : `Pending: ${items.length}`}</div>
+          <div className="text-xs text-gray-500 mt-1">
+            {busy ? "Loading…" : `Pending: ${items.length}`}
+          </div>
         </div>
 
         <input
@@ -72,21 +108,14 @@ export default function Page() {
           {filtered.map((it) => (
             <Link
               key={it.skuId}
-              href={`/admin/gemstone-jewellery/${encodeURIComponent(it.skuId)}?gst=${encodeURIComponent(
-                it.gstNumber
-              )}`}
+              // ✅ NO gst query param needed because detail page reads gstNumber from queue
+              href={`/admin/gemstone-jewellery/${encodeURIComponent(it.skuId)}`}
               className="rounded-2xl border p-4 flex gap-4 hover:bg-slate-50"
             >
               <div className="w-24 h-24 rounded-xl border overflow-hidden bg-gray-50 flex-shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={
-                    it.thumbUrl ||
-                    "data:image/svg+xml;utf8," +
-                      encodeURIComponent(
-                        `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect width='100%' height='100%' fill='#eee'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#666' font-size='14'>No Thumb</text></svg>`
-                      )
-                  }
+                  src={it.thumbUrl || NO_THUMB}
                   alt={it.skuId}
                   className="w-full h-full object-cover"
                 />

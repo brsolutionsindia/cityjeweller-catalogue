@@ -1,3 +1,5 @@
+export type PriceMode = "MRP" | "WEIGHT";
+
 export type Nature = "NATURAL" | "ARTIFICIAL";
 export type GJType =
   | "BRACELET"
@@ -53,7 +55,9 @@ export type GemstoneJewellerySubmission = {
   beadSizeMm?: number;
   lengthInch?: number;
   weightGm?: number;
+  ratePerGm?: number;
 
+  priceMode?: PriceMode;
   // pricing
   mrp?: number;
   offerPrice?: number;
