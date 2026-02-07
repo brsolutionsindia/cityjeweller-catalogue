@@ -23,12 +23,14 @@ export default function NewGemstoneJewelleryPage() {
   const [form, setForm] = useState<GemstoneJewellerySubmission | null>(null);
   const [err, setErr] = useState<string>("");
 
-  // ✅ init only once per unique session identity
+  // ✅ normalize session values to STRING (never null)
+  const gst = useMemo(() => (session?.gst ?? "").trim(), [session?.gst]);
+  const uid = useMemo(() => (session?.uid ?? "").trim(), [session?.uid]);
+
+  // ✅ init only once per unique identity
   const initKey = useMemo(() => {
-    const gst = (session?.gst || "").trim();
-    const uid = (session?.uid || "").trim();
     return gst && uid ? `${gst}__${uid}` : "";
-  }, [session?.gst, session?.uid]);
+  }, [gst, uid]);
 
   const didInitKeyRef = useRef<string>("");
 
@@ -39,7 +41,7 @@ export default function NewGemstoneJewelleryPage() {
       return;
     }
 
-    // Avoid re-init for same session key (prevents dev double run + re-renders)
+    // Avoid re-init for same session key
     if (didInitKeyRef.current === initKey) return;
     didInitKeyRef.current = initKey;
 
@@ -50,28 +52,31 @@ export default function NewGemstoneJewelleryPage() {
       setBooting(true);
 
       try {
-        console.log("[GJ:new] session ready:", { gst: session!.gst, uid: session!.uid });
+        // ✅ gst/uid are guaranteed strings here
+        console.log("[GJ:new] session ready:", { gst, uid });
 
-        const { skuId } = await allocateGemstoneJewellerySku(session!.gst, session!.uid);
+        const { skuId } = await allocateGemstoneJewellerySku(gst, uid);
         console.log("[GJ:new] allocated skuId:", skuId);
 
         await createGemstoneJewellerySubmissionStub({
           skuId,
-          gstNumber: session!.gst,
-          supplierUid: session!.uid,
+          gstNumber: gst,
+          supplierUid: uid,
         });
         console.log("[GJ:new] stub created (or already existed):", skuId);
 
-        const defaults = await getSupplierDefaultsGemstoneJewellery(session!.gst, session!.uid);
+        const defaults = await getSupplierDefaultsGemstoneJewellery(gst, uid);
         console.log("[GJ:new] defaults:", defaults);
 
         const nature = (defaults?.nature as any) || "NATURAL";
         const type = (defaults?.type as any) || "BRACELET";
 
+        const now = Date.now();
+
         const base: GemstoneJewellerySubmission = {
           skuId,
-          gstNumber: session!.gst,
-          supplierUid: session!.uid,
+          gstNumber: gst,
+          supplierUid: uid,
 
           status: "DRAFT",
           nature,
@@ -85,7 +90,7 @@ export default function NewGemstoneJewelleryPage() {
           beadSizeMm: (defaults as any)?.beadSizeMm ?? undefined,
           lengthInch: (defaults as any)?.lengthInch ?? undefined,
 
-          // ✅ these fields exist only if you added them in types.ts (else remove)
+          // ✅ only include if defaults has them
           ...(defaults as any)?.priceMode ? { priceMode: (defaults as any).priceMode } : {},
           ...(defaults as any)?.ratePerGm ? { ratePerGm: (defaults as any).ratePerGm } : {},
           ...(defaults as any)?.weightGm ? { weightGm: (defaults as any).weightGm } : {},
@@ -103,8 +108,8 @@ export default function NewGemstoneJewelleryPage() {
           }),
           media: [],
           currency: "INR",
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
+          createdAt: now,
+          updatedAt: now,
         };
 
         if (alive) setForm(base);
@@ -119,8 +124,7 @@ export default function NewGemstoneJewelleryPage() {
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initKey]);
+  }, [initKey, gst, uid]);
 
   async function saveDraft() {
     if (!form) return;
@@ -153,15 +157,13 @@ export default function NewGemstoneJewelleryPage() {
     }
   }
 
-  // ✅ better boot UI + session visibility
   if (booting || !form) {
     return (
       <div className="p-6 space-y-3">
         <div className="text-lg font-semibold">Preparing new SKU…</div>
 
         <div className="text-sm text-gray-600">
-          Session: GST = <b>{session?.gst || "(not ready)"}</b> • UID ={" "}
-          <b>{session?.uid || "(not ready)"}</b>
+          Session: GST = <b>{gst || "(not ready)"}</b> • UID = <b>{uid || "(not ready)"}</b>
         </div>
 
         {err ? (
