@@ -28,6 +28,18 @@ images: {
     ];
   },
 
+
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        source: '/roseDayGifts',
+        destination: '/search?query=roseDay',
+      },
+    ]
+  },
+}
+
   // ❌ output: 'export' removed as you said
 };
 
