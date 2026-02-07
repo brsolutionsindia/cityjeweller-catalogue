@@ -309,28 +309,6 @@ export default function GemstoneJewelleryForm({ value, onChange, suggested, read
   setOrder={(m, order) => ({ ...m, order })}
 />
 
-
-
-        <MediaUploader
-          skuId={value.skuId}
-          label="Videos"
-                  accept="video/*"
-                  kind="VID"
-                  items={value.media.filter(m => m.kind === "VID").sort((a,b)=>a.order-b.order)}
-          onChange={(nextVids) => {
-            const imgs = value.media.filter(m => m.kind === "VID");
-            onChange({ ...value, media: [...nextImgs, ...vids] });
-          }}
-          allowReorder
-          uploadFn={uploadGemstoneJewelleryMediaBatch}
-          deleteFn={deleteGemstoneJewelleryMedia}
-          getUrl={(m) => m.url}
-          getStoragePath={(m) => m.storagePath}
-          isVideoItem={(m) => m.kind === "VID"}
-          setOrder={(m, order) => ({ ...m, order })}
-        />
-
-
         <div className="text-sm text-gray-600">
           Recommended: 1 white background photo (mandatory), 1 close-up, 1 lifestyle, 1 short video.
         </div>
