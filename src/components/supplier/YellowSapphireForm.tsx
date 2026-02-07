@@ -165,30 +165,38 @@ export default function YellowSapphireForm({ mode, skuId, initial, onSubmit }: P
       <div className="rounded-2xl border bg-white p-5 shadow-sm space-y-6">
         <div className="text-lg font-semibold">Media</div>
 
-        <MediaUploader
-          skuId={skuId}
-          label="Photos"
-          accept="image/*"
-          kind="IMG"
-          mediaType="image"
-          items={images}
-          onChange={setImages}
-          allowReorder
-          uploadFn={uploadMediaBatch}
-          deleteFn={deleteMediaObject}
-        />
+        <MediaUploader<MediaItem>
+  skuId={skuId}
+  label="Photos"
+  accept="image/*"
+  kind="IMG"
+  items={images}
+  onChange={(next) => setImages(next)}
+  allowReorder
+  uploadFn={uploadMediaBatch}
+  deleteFn={deleteMediaObject}
+  getUrl={(m) => m.url}
+  getStoragePath={(m) => m.storagePath}
+  isVideoItem={(m) => m.kind === "VID"}
+  setOrder={(m, order) => ({ ...m, order })}
+  setPrimary={(m, isPrimary) => ({ ...m, isPrimary })}
+/>
 
-        <MediaUploader
-          skuId={skuId}
-          label="Videos"
-          accept="video/*"
-          kind="VID"
-          mediaType="video"
-          items={videos}
-          onChange={setVideos}
-          uploadFn={uploadMediaBatch}
-          deleteFn={deleteMediaObject}
-        />
+<MediaUploader<MediaItem>
+  skuId={skuId}
+  label="Videos"
+  accept="video/*"
+  kind="VID"
+  items={videos}
+  onChange={(next) => setVideos(next)}
+  uploadFn={uploadMediaBatch}
+  deleteFn={deleteMediaObject}
+  getUrl={(m) => m.url}
+  getStoragePath={(m) => m.storagePath}
+  isVideoItem={(m) => m.kind === "VID"}
+  setOrder={(m, order) => ({ ...m, order })}
+/>
+
 
       </div>
 
