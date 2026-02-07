@@ -19,15 +19,26 @@ export type MediaKind = "IMG" | "VID";
 export type MediaItem = {
   id: string;
   kind: MediaKind;
-  url: string; // download URL
-  storagePath: string; // Firebase Storage path
+
+  url: string;          // download URL
+  storagePath: string;  // Firebase Storage path
   order: number;
+
   width?: number;
   height?: number;
+
   durationSec?: number; // for video
-  thumbUrl?: string; // optional for video thumb
-  createdAt?: number; // ms
+  thumbUrl?: string;    // optional for video thumb
+
+  // ✅ timestamps (ms)
+  createdAt?: number;
+  updatedAt?: number;
+
+  // ✅ optional metadata (helps UI + replace logic)
+  contentType?: string;            // e.g. "image/jpeg" / "video/mp4"
+  type?: "image" | "video";        // for backward-compat with older records (your asKind checks this)
 };
+
 
 export type TagMap = Partial<Record<TagCategory, string[]>>;
 

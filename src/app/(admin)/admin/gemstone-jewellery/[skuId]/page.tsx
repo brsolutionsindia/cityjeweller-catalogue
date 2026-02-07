@@ -116,8 +116,8 @@ export default function AdminGemstoneJewelleryDetail() {
         .filter((m) => asKind(m) === "VID")
         .sort((a, b) => (a?.order ?? 9999) - (b?.order ?? 9999));
 
-      setImages(imgs);
-      setVideos(vids);
+      setImages(normalizeMediaList(imgs as any, "IMG"));
+      setVideos(normalizeMediaList(vids as any, "VID"));
     } finally {
       setBusy(false);
     }
@@ -443,7 +443,12 @@ export default function AdminGemstoneJewelleryDetail() {
       await uploadBytesToExistingStoragePath(target.storagePath, file);
       const now = Date.now();
       const next = [...list];
-      next[idx] = { ...next[idx], url: target.url, updatedAt: now, contentType: file.type || target.contentType };
+      next[idx] = {
+        ...next[idx],
+        updatedAt: now,
+        contentType: file.type || target.contentType,
+      };
+
       if (kind === "IMG") setImages(next);
       else setVideos(next);
       alert("Replaced successfully.");
