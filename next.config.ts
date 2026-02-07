@@ -31,6 +31,11 @@ const nextConfig: NextConfig = {
         destination: "/search?query=roseDay",
         permanent: false,
       },
+      {
+        source: "/roseday",
+        destination: "/search?query=roseDay",
+        permanent: false,
+      },
 
     ];
   },
