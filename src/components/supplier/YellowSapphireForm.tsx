@@ -173,7 +173,7 @@ export default function YellowSapphireForm({ mode, skuId, initial, onSubmit }: P
   items={images}
   onChange={(next) => setImages(next)}
   allowReorder
-  uploadFn={uploadMediaBatch}
+  uploadFn={({ files, skuId, kind, gst }) => uploadMediaBatch(files, skuId, kind, gst)}
   deleteFn={deleteMediaObject}
   getUrl={(m) => m.url}
   getStoragePath={(m) => m.storagePath}
@@ -189,13 +189,14 @@ export default function YellowSapphireForm({ mode, skuId, initial, onSubmit }: P
   kind="VID"
   items={videos}
   onChange={(next) => setVideos(next)}
-  uploadFn={uploadMediaBatch}
+  uploadFn={({ files, skuId, kind, gst }) => uploadMediaBatch(files, skuId, kind, gst)}
   deleteFn={deleteMediaObject}
   getUrl={(m) => m.url}
   getStoragePath={(m) => m.storagePath}
   isVideoItem={(m) => m.kind === "VID"}
   setOrder={(m, order) => ({ ...m, order })}
 />
+
 
 
       </div>
