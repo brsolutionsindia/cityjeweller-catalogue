@@ -26,15 +26,11 @@ const nextConfig: NextConfig = {
         destination: "/catalog/gold?sub=name",
         permanent: true,
       },
-    ];
-  },
-
-  async rewrites() {
-    return [
       {
-        source: "/roseDayGifts",
+        source: "/roseDay",
         destination: "/search?query=roseDay",
       },
+
     ];
   },
 
