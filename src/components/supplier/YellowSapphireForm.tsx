@@ -175,8 +175,8 @@ export default function YellowSapphireForm({ mode, skuId, initial, onSubmit }: P
   allowReorder
   uploadFn={({ files, skuId, kind, gst }) => uploadMediaBatch(files, skuId, kind, gst)}
   deleteFn={deleteMediaObject}
-  getUrl={(m) => m.url}
-  getStoragePath={(m) => m.storagePath}
+  getUrl={(m) => m.url ?? ""}
+  getStoragePath={(m) => m.storagePath ?? ""}
   isVideoItem={(m) => m.kind === "VID"}
   setOrder={(m, order) => ({ ...m, order })}
   setPrimary={(m, isPrimary) => ({ ...m, isPrimary })}
@@ -191,11 +191,12 @@ export default function YellowSapphireForm({ mode, skuId, initial, onSubmit }: P
   onChange={(next) => setVideos(next)}
   uploadFn={({ files, skuId, kind, gst }) => uploadMediaBatch(files, skuId, kind, gst)}
   deleteFn={deleteMediaObject}
-  getUrl={(m) => m.url}
-  getStoragePath={(m) => m.storagePath}
+  getUrl={(m) => m.url ?? ""}
+  getStoragePath={(m) => m.storagePath ?? ""}
   isVideoItem={(m) => m.kind === "VID"}
   setOrder={(m, order) => ({ ...m, order })}
 />
+
 
 
 
