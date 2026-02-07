@@ -177,7 +177,7 @@ export default function YellowSapphireForm({ mode, skuId, initial, onSubmit }: P
   deleteFn={deleteMediaObject}
   getUrl={(m) => m.url ?? ""}
   getStoragePath={(m) => m.storagePath ?? ""}
-  isVideoItem={(m) => m.kind === "VID"}
+  isVideoItem={() => false}
   setOrder={(m, order) => ({ ...m, order })}
   setPrimary={(m, isPrimary) => ({ ...m, isPrimary })}
 />
@@ -193,7 +193,7 @@ export default function YellowSapphireForm({ mode, skuId, initial, onSubmit }: P
   deleteFn={deleteMediaObject}
   getUrl={(m) => m.url ?? ""}
   getStoragePath={(m) => m.storagePath ?? ""}
-  isVideoItem={(m) => m.kind === "VID"}
+  isVideoItem={() => true}
   setOrder={(m, order) => ({ ...m, order })}
 />
 
