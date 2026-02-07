@@ -24,6 +24,12 @@ function SupplierDashboardHome() {
           <div className="font-semibold">Yellow Sapphire</div>
           <div className="text-sm text-gray-600 mt-1">Photo-card form + media upload</div>
         </Link>
+
+        <Link href="/supplier/gemstone-jewellery" className="border rounded-xl p-5 hover:bg-gray-50">
+          <div className="font-semibold">Gemstone Jewellery</div>
+          <div className="text-sm text-gray-600 mt-1"> Strings • Bracelets • Fashion jewellery (non-gold)</div>
+        </Link>
+
       </div>
     </main>
   );

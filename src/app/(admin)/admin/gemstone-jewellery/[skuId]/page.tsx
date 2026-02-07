@@ -30,7 +30,7 @@ export default function AdminGemstoneJewelleryDetail() {
 
   async function approve() {
     // TODO: pass actual admin uid from your admin auth layer
-    await approveGemstoneJewellery({ gst: item.gst, skuId: item.skuId, adminUid: "ADMIN" });
+    await approveGemstoneJewellery({ gst: item.gstNumber, skuId: item.skuId, adminUid: "ADMIN" });
     alert("Approved & Published");
   }
 
@@ -48,7 +48,7 @@ export default function AdminGemstoneJewelleryDetail() {
         <div><b>Nature:</b> {item.nature}</div>
         <div><b>Type:</b> {item.type}</div>
         <div><b>Tags:</b> {(item.tags || []).map(t => `#${t}`).join(" ")}</div>
-        <div><b>Supplier:</b> {item.gst}</div>
+        <div><b>Supplier:</b> {item.gstNumber}</div>
       </div>
 
       <div className="flex gap-2">

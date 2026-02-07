@@ -32,7 +32,7 @@ export type TagMap = Partial<Record<TagCategory, string[]>>;
 export type GemstoneJewellerySubmission = {
   skuId: string;
 
-  gst: string;
+  gstNumber: string;
   supplierUid: string;
 
   status: GJStatus;

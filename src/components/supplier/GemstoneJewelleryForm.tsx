@@ -4,6 +4,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import type { GemstoneJewellerySubmission, Nature, GJType } from "@/lib/gemstoneJewellery/types";
 import { GJ_TYPES, generateItemName, normalizeTag, uniqTags } from "@/lib/gemstoneJewellery/options";
 import MediaUploader from "@/components/supplier/MediaUploader";
+import { uploadGemstoneJewelleryMediaBatch, deleteGemstoneJewelleryMedia } from "@/lib/firebase/gemstoneJewelleryDb";
+import type { MediaItem as GJMediaItem } from "@/lib/gemstoneJewellery/types";
+
 
 type Props = {
   value: GemstoneJewellerySubmission;
@@ -295,25 +298,40 @@ export default function GemstoneJewelleryForm({ value, onChange, suggested, read
           items={value.media.filter(m => m.kind === "IMG").sort((a,b)=>a.order-b.order)}
           onChange={(nextImgs) => {
             const vids = value.media.filter(m => m.kind === "VID");
-            // re-assign order
-            const normalized = nextImgs.map((m, i) => ({ ...m, order: i }));
-            setField("media", [...normalized, ...vids]);
+            onChange({ ...value, media: [...nextImgs, ...vids] });
           }}
           allowReorder
+
+          uploadFn={uploadGemstoneJewelleryMediaBatch}
+          deleteFn={deleteGemstoneJewelleryMedia}
+
+          getUrl={(m) => m.url}
+          getStoragePath={(m) => m.storagePath}
+          isVideoItem={(m) => m.kind === "VID"}
+          setOrder={(m, order) => ({ ...m, order })}
+          setPrimary={(m, isPrimary) => ({ ...m, isPrimary })}
         />
+
 
         <MediaUploader
           skuId={value.skuId}
           label="Videos"
-          accept="video/*"
-          kind="VID"
-          items={value.media.filter(m => m.kind === "VID").sort((a,b)=>a.order-b.order)}
+                  accept="video/*"
+                  kind="VID"
+                  items={value.media.filter(m => m.kind === "VID").sort((a,b)=>a.order-b.order)}
           onChange={(nextVids) => {
-            const imgs = value.media.filter(m => m.kind === "IMG");
-            const normalized = nextVids.map((m, i) => ({ ...m, order: i }));
-            setField("media", [...imgs, ...normalized]);
+            const imgs = value.media.filter(m => m.kind === "VID");
+            onChange({ ...value, media: [...nextImgs, ...vids] });
           }}
+          allowReorder
+          uploadFn={uploadGemstoneJewelleryMediaBatch}
+          deleteFn={deleteGemstoneJewelleryMedia}
+          getUrl={(m) => m.url}
+          getStoragePath={(m) => m.storagePath}
+          isVideoItem={(m) => m.kind === "VID"}
+          setOrder={(m, order) => ({ ...m, order })}
         />
+
 
         <div className="text-sm text-gray-600">
           Recommended: 1 white background photo (mandatory), 1 close-up, 1 lifestyle, 1 short video.

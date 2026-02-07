@@ -15,10 +15,7 @@ export default function SupplierGemstoneJewelleryHome() {
 
       {/* TODO: show supplier listings table (same as yellow-sapphires list) */}
       <div className="rounded-2xl border p-4 text-gray-600">
-        Hook this page to list submissions using your supplier index:
-        <div className="mt-2 font-mono text-sm">
-          GST/&lt;gst&gt;/Indexes/GemstoneJewellerySubmissions/BySupplier/&lt;uid&gt;
-        </div>
+        Check Listings here
       </div>
     </div>
   );

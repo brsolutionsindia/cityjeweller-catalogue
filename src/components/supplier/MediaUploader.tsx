@@ -1,21 +1,39 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { MediaItem } from "@/lib/yellowSapphire/types";
-import { uploadMediaBatch, deleteMediaObject } from "@/lib/firebase/yellowSapphireDb";
+export type UploadFn<T> = (params: {
+  gst: string;
+  skuId: string;
+  kind: "IMG" | "VID";
+  files: File[];
+}) => Promise<T[]>;
+
+export type DeleteFn = (storagePath: string) => Promise<void>;
+
 import { useSupplierSession } from "@/lib/firebase/supplierContext";
 
 import Cropper from "react-easy-crop";
 
-type Props = {
+type Props<TMedia> = {
   skuId: string;
-  label: string; // "Photos" / "Videos"
-  accept: string; // "image/*" or "video/*"
-  items: MediaItem[]; // controlled
-  onChange: (next: MediaItem[]) => void;
-  allowReorder?: boolean; // true for photos
+  label: string;
+  accept: string;
+  items: TMedia[];
+  onChange: (next: TMedia[]) => void;
+  allowReorder?: boolean;
   kind: "IMG" | "VID";
+
+  uploadFn: UploadFn<TMedia>;
+  deleteFn: DeleteFn;
+
+  // adapters so MediaUploader can work with any MediaItem shape
+  getUrl: (m: TMedia) => string;
+  getStoragePath: (m: TMedia) => string;
+  isVideoItem: (m: TMedia) => boolean;
+  setOrder: (m: TMedia, order: number) => TMedia;
+  setPrimary?: (m: TMedia, isPrimary: boolean) => TMedia; // optional (for images)
 };
+
 
 // ---------- helpers ----------
 function isImageAccept(accept: string) {
@@ -372,7 +390,7 @@ function VideoTrimModal(props: {
 }
 
 // ---------- main component ----------
-export default function MediaUploader({
+export default function MediaUploader<TMedia>({
   skuId,
   label,
   accept,
@@ -380,7 +398,16 @@ export default function MediaUploader({
   onChange,
   allowReorder,
   kind,
-}: Props) {
+
+  uploadFn,
+  deleteFn,
+
+  getUrl,
+  getStoragePath,
+  isVideoItem,
+  setOrder,
+  setPrimary,
+}: Props<TMedia>) {
   const { gst } = useSupplierSession();
 
   const camInputRef = useRef<HTMLInputElement | null>(null);
@@ -417,17 +444,17 @@ export default function MediaUploader({
   const uploadOneFile = async (file: File) => {
     setUploading(true);
     try {
-      const uploaded = await uploadMediaBatch([file], skuId, kind, gst!);
+      const uploaded = await uploadFn({ gst: gst!, skuId, kind, files: [file] });
+      const merged = [...items, ...uploaded];
 
-      // keep only correct media type
-      const filtered = uploaded.filter((m) => (wantVideo ? m.type === "video" : m.type === "image"));
-      const merged = [...items, ...filtered];
       onChange(
-        merged.map((m, i) => ({
-          ...m,
-          order: i,
-          isPrimary: allowReorder ? i === 0 : m.isPrimary,
-        }))
+        merged.map((m, i) => {
+          let next = setOrder(m, i);
+          if (allowReorder && kind === "IMG" && setPrimary) {
+            next = setPrimary(next, i === 0);
+          }
+          return next;
+        })
       );
     } catch (err) {
       console.error(err);
@@ -462,26 +489,30 @@ export default function MediaUploader({
     await uploadOneFile(f);
   };
 
-  const remove = async (m: MediaItem) => {
-    // optimistic remove
-    onChange(items.filter((x) => x.storagePath !== m.storagePath));
+  const remove = async (m: TMedia) => {
+    const storagePath = getStoragePath(m);
 
-    const storagePath = (m as any).storagePath || (m as any).path;
+    // optimistic remove
+    onChange(items.filter((x) => getStoragePath(x) !== storagePath));
+
     if (storagePath) {
       try {
-        await deleteMediaObject(storagePath);
+        await deleteFn(storagePath);
       } catch (e) {
         console.warn("Delete failed:", storagePath, e);
       }
     }
   };
 
-  const normalizeOrder = (arr: MediaItem[]) =>
-    arr.map((m, i) => ({
-      ...m,
-      order: i,
-      isPrimary: allowReorder ? i === 0 : m.isPrimary, // first image = primary
-    }));
+
+  const normalizeOrder = (arr: TMedia[]) =>
+    arr.map((m, i) => {
+      let next = setOrder(m, i);
+      if (allowReorder && kind === "IMG" && setPrimary) {
+        next = setPrimary(next, i === 0);
+      }
+      return next;
+    });
 
   const move = (from: number, to: number) => {
     if (to < 0 || to >= items.length) return;
@@ -495,6 +526,7 @@ export default function MediaUploader({
     if (!allowReorder) return;
     move(idx, 0);
   };
+
 
 
   // ---------- camera video recorder (no audio) ----------
@@ -725,16 +757,17 @@ export default function MediaUploader({
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {items.map((m, idx) => {
-            const isVideo = m.type === "video";
+            const isVideo = isVideoItem(m);
+            const url = getUrl(m);
+            const sp = getStoragePath(m);
+
             return (
-              <div key={`${m.storagePath}-${idx}`} className="rounded-xl border overflow-hidden bg-white">
+              <div key={`${sp}-${idx}`} className="rounded-xl border overflow-hidden bg-white">
                 <div className="relative">
                   {isVideo ? (
-                    // eslint-disable-next-line jsx-a11y/media-has-caption
-                    <video src={m.url} className="w-full h-28 object-cover" controls />
+                    <video src={url} className="w-full h-28 object-cover" controls />
                   ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={m.url} alt="media" className="w-full h-28 object-cover" />
+                    <img src={url} alt="media" className="w-full h-28 object-cover" />
                   )}
 
                   {!isVideo && allowReorder && idx === 0 && (
@@ -751,20 +784,10 @@ export default function MediaUploader({
 
                   {allowReorder && !isVideo && (
                     <>
-                      <button
-                        type="button"
-                        className="underline"
-                        onClick={() => move(idx, idx - 1)}
-                        disabled={idx === 0}
-                      >
+                      <button type="button" className="underline" onClick={() => move(idx, idx - 1)} disabled={idx === 0}>
                         ←
                       </button>
-                      <button
-                        type="button"
-                        className="underline"
-                        onClick={() => move(idx, idx + 1)}
-                        disabled={idx === items.length - 1}
-                      >
+                      <button type="button" className="underline" onClick={() => move(idx, idx + 1)} disabled={idx === items.length - 1}>
                         →
                       </button>
                       {idx !== 0 && (
@@ -778,6 +801,7 @@ export default function MediaUploader({
               </div>
             );
           })}
+
         </div>
       )}
     </div>

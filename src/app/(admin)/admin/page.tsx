@@ -4,10 +4,14 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import LogoutButton from "@/components/auth/LogoutButton";
 import { getPendingYellowSapphireQueue } from "@/lib/firebase/yellowSapphireAdminDb";
+import { getPendingGemstoneJewelleryQueue } from "@/lib/firebase/gemstoneJewelleryAdminDb";
+
 
 export default function Page() {
   const [ysPending, setYsPending] = useState<number>(0);
   const [busy, setBusy] = useState(true);
+  const [gjPending, setGjPending] = useState<number>(0);
+
 
   useEffect(() => {
     const run = async () => {
@@ -15,12 +19,16 @@ export default function Page() {
       try {
         const q = await getPendingYellowSapphireQueue();
         setYsPending(Object.keys(q || {}).length);
+
+        const gq = await getPendingGemstoneJewelleryQueue();
+        setGjPending(Object.keys(gq || {}).length);
       } finally {
         setBusy(false);
       }
     };
     run();
   }, []);
+
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -63,13 +71,20 @@ export default function Page() {
           <div className="mt-3 text-xs text-gray-500">Coming next.</div>
         </div>
 
-        {/* Others (placeholder) */}
-        <div className="rounded-2xl border bg-white p-5 shadow-sm opacity-60">
+        <Link
+          href="/admin/gemstone-jewellery"
+          className="rounded-2xl border bg-white p-5 shadow-sm hover:shadow transition"
+        >
           <div className="text-sm text-gray-500">Category</div>
-          <div className="text-xl font-semibold mt-1">Others</div>
-          <div className="mt-3 text-sm">Pending: <span className="font-bold">—</span></div>
-          <div className="mt-3 text-xs text-gray-500">Coming next.</div>
-        </div>
+          <div className="text-xl font-semibold mt-1">Gemstone Jewellery</div>
+          <div className="mt-3 text-sm">
+            Pending: <span className="font-bold">{gjPending}</span>
+          </div>
+          <div className="mt-3 text-xs text-gray-500">
+            Review tags, item name, media, approve/reject.
+          </div>
+        </Link>
+
       </div>
     </div>
   );

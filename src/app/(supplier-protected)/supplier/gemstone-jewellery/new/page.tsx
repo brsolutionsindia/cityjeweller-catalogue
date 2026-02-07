@@ -1,37 +1,78 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSupplierSession } from "@/lib/firebase/supplierContext";
 import GemstoneJewelleryForm from "@/components/supplier/GemstoneJewelleryForm";
 import type { GemstoneJewellerySubmission } from "@/lib/gemstoneJewellery/types";
 import { generateItemName } from "@/lib/gemstoneJewellery/options";
-import { upsertGemstoneJewellerySubmission, submitForApproval } from "@/lib/firebase/gemstoneJewelleryDb";
+import {
+  allocateGemstoneJewellerySku,
+  createGemstoneJewellerySubmissionStub,
+  upsertGemstoneJewellerySubmission,
+  submitForApproval,
+} from "@/lib/firebase/gemstoneJewelleryDb";
 
 export default function NewGemstoneJewelleryPage() {
   const session = useSupplierSession();
-  const skuId = useMemo(() => crypto.randomUUID(), []);
 
   const [saving, setSaving] = useState(false);
+  const [booting, setBooting] = useState(true);
 
-  const [form, setForm] = useState<GemstoneJewellerySubmission>(() => {
-    const base: GemstoneJewellerySubmission = {
-      skuId,
-      gst: session.gst,
-      supplierUid: session.uid,
-      status: "DRAFT",
-      nature: "NATURAL",
-      type: "BRACELET",
-      tags: [],
-      itemName: generateItemName({ nature: "NATURAL", type: "BRACELET", stoneName: "Gemstone", styleTags: [] }),
-      media: [],
-      currency: "INR",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+  const [form, setForm] = useState<GemstoneJewellerySubmission | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      if (!session?.gst || !session?.uid) return;
+
+      setBooting(true);
+      try {
+        // ✅ allocate SKU using GST code + per-supplier serial
+        const { skuId } = await allocateGemstoneJewellerySku(session.gst, session.uid);
+
+        // ✅ create stub so DB has the record early (same style as YellowSapphire)
+        await createGemstoneJewellerySubmissionStub({
+          skuId,
+          gstNumber: session.gst,
+          supplierUid: session.uid,
+        });
+
+        const base: GemstoneJewellerySubmission = {
+          skuId,
+          gstNumber: session.gst,
+          supplierUid: session.uid,
+
+          status: "DRAFT",
+          nature: "NATURAL",
+          type: "BRACELET",
+
+          tags: [],
+          itemName: generateItemName({
+            nature: "NATURAL",
+            type: "BRACELET",
+            stoneName: "Gemstone",
+            styleTags: [],
+          }),
+          media: [],
+          currency: "INR",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+
+        if (alive) setForm(base);
+      } finally {
+        if (alive) setBooting(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
     };
-    return base;
-  });
+  }, [session?.gst, session?.uid]);
 
   async function saveDraft() {
+    if (!form) return;
     setSaving(true);
     try {
       await upsertGemstoneJewellerySubmission(form);
@@ -42,14 +83,19 @@ export default function NewGemstoneJewelleryPage() {
   }
 
   async function sendForApproval() {
+    if (!form) return;
     setSaving(true);
     try {
       await upsertGemstoneJewellerySubmission(form);
-      await submitForApproval(form.gst, form.skuId, form.supplierUid);
+      await submitForApproval(form.gstNumber, form.skuId, form.supplierUid);
       alert("Submitted for approval");
     } finally {
       setSaving(false);
     }
+  }
+
+  if (booting || !form) {
+    return <div className="p-6">Preparing new SKU…</div>;
   }
 
   return (
@@ -69,7 +115,6 @@ export default function NewGemstoneJewelleryPage() {
       <GemstoneJewelleryForm
         value={form}
         onChange={setForm}
-        // suggested tags can be loaded later from Config/Tags
         suggested={{
           colors: ["red", "green", "blue", "yellow", "white", "black", "pink", "purple"],
           stones: ["pearl", "amethyst", "citrine", "ruby-look", "emerald-look"],

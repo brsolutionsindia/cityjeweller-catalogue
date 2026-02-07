@@ -12,12 +12,21 @@ const GLOBAL_TAG_INDEX = `Global SKU/Indexes/GemstoneJewellery/ByTag`;
 const GLOBAL_TYPE_INDEX = `Global SKU/Indexes/GemstoneJewellery/ByType`;
 const GLOBAL_NATURE_INDEX = `Global SKU/Indexes/GemstoneJewellery/ByNature`;
 
+/** ✅ Admin list page + dashboard counts */
+export async function getPendingGemstoneJewelleryQueue() {
+  const snap = await get(dbRef(db, ADMIN_QUEUE));
+  return (snap.val() as Record<string, any> | null) ?? null;
+}
+
+/** ✅ Load full submission using gstNumber stored in queue item */
 export async function getQueuedGemstoneJewellery(skuId: string) {
   const qSnap = await get(dbRef(db, `${ADMIN_QUEUE}/${skuId}`));
   if (!qSnap.exists()) return null;
 
-  const { gst } = qSnap.val() as { gst: string };
-  const sSnap = await get(dbRef(db, `${SUBMISSION_NODE(gst)}/${skuId}`));
+  const { gstNumber } = qSnap.val() as { gstNumber: string };
+  if (!gstNumber) return null;
+
+  const sSnap = await get(dbRef(db, `${SUBMISSION_NODE(gstNumber)}/${skuId}`));
   return sSnap.exists() ? (sSnap.val() as GemstoneJewellerySubmission) : null;
 }
 
@@ -25,15 +34,8 @@ function buildIndexUpdates(listing: GemstoneJewellerySubmission) {
   const tags = uniqTags(listing.tags || []).map(normalizeTag);
   const updates: Record<string, any> = {};
 
-  // tag indexes
-  for (const t of tags) {
-    updates[`${GLOBAL_TAG_INDEX}/${t}/${listing.skuId}`] = true;
-  }
-
-  // type index
+  for (const t of tags) updates[`${GLOBAL_TAG_INDEX}/${t}/${listing.skuId}`] = true;
   updates[`${GLOBAL_TYPE_INDEX}/${listing.type}/${listing.skuId}`] = true;
-
-  // nature index
   updates[`${GLOBAL_NATURE_INDEX}/${listing.nature}/${listing.skuId}`] = true;
 
   return updates;
@@ -43,7 +45,7 @@ export async function approveGemstoneJewellery(params: {
   gst: string;
   skuId: string;
   adminUid: string;
-  finalPatch?: Partial<GemstoneJewellerySubmission>; // admin can normalize name/tags
+  finalPatch?: Partial<GemstoneJewellerySubmission>;
 }) {
   const { gst, skuId, adminUid, finalPatch } = params;
 
@@ -54,7 +56,10 @@ export async function approveGemstoneJewellery(params: {
   const finalListing: GemstoneJewellerySubmission = {
     ...submission,
     ...(finalPatch || {}),
-    tags: uniqTags([...(submission.tags || []), ...((finalPatch?.tags as string[] | undefined) || [])]),
+    tags: uniqTags([
+      ...(submission.tags || []),
+      ...(((finalPatch?.tags as string[] | undefined) || [])),
+    ]),
     status: "APPROVED",
     updatedAt: Date.now(),
   };
@@ -64,13 +69,11 @@ export async function approveGemstoneJewellery(params: {
   // Publish
   updates[`${GLOBAL_NODE}/${skuId}`] = {
     ...finalListing,
-    // optional server timestamps
     _approvedAtServer: serverTimestamp(),
     approvedAt: Date.now(),
     approvedBy: adminUid,
   };
 
-  // Indexes
   Object.assign(updates, buildIndexUpdates(finalListing));
 
   // Update submission status
@@ -101,13 +104,11 @@ export async function rejectGemstoneJewellery(params: {
   updates[`${SUBMISSION_NODE(gst)}/${skuId}/rejectedBy`] = adminUid;
   updates[`${SUBMISSION_NODE(gst)}/${skuId}/_rejectedAtServer`] = serverTimestamp();
 
-  // Remove from queue
   updates[`${ADMIN_QUEUE}/${skuId}`] = null;
 
   await update(dbRef(db), updates);
 }
 
-// Optional utility if you ever need to unpublish
 export async function unpublishGemstoneJewellery(skuId: string) {
   await remove(dbRef(db, `${GLOBAL_NODE}/${skuId}`));
 }
