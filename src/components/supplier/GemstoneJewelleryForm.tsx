@@ -291,26 +291,24 @@ export default function GemstoneJewelleryForm({ value, onChange, suggested, read
         <div className="text-lg font-semibold">Media (crop / trim / reorder)</div>
 
         <MediaUploader
-          skuId={value.skuId}
-          label="Photos"
-          accept="image/*"
-          kind="IMG"
-          items={value.media.filter(m => m.kind === "IMG").sort((a,b)=>a.order-b.order)}
-          onChange={(nextImgs) => {
-            const vids = value.media.filter(m => m.kind === "VID");
-            onChange({ ...value, media: [...nextImgs, ...vids] });
-          }}
-          allowReorder
+  skuId={value.skuId}
+  label="Videos"
+  accept="video/*"
+  kind="VID"
+  items={value.media.filter((m) => m.kind === "VID").sort((a, b) => a.order - b.order)}
+  onChange={(nextVids) => {
+    const imgs = value.media.filter((m) => m.kind === "IMG");
+    onChange({ ...value, media: [...imgs, ...nextVids] });
+  }}
+  allowReorder
+  uploadFn={uploadGemstoneJewelleryMediaBatch}
+  deleteFn={deleteGemstoneJewelleryMedia}
+  getUrl={(m) => m.url}
+  getStoragePath={(m) => m.storagePath}
+  isVideoItem={(m) => m.kind === "VID"}
+  setOrder={(m, order) => ({ ...m, order })}
+/>
 
-          uploadFn={uploadGemstoneJewelleryMediaBatch}
-          deleteFn={deleteGemstoneJewelleryMedia}
-
-          getUrl={(m) => m.url}
-          getStoragePath={(m) => m.storagePath}
-          isVideoItem={(m) => m.kind === "VID"}
-          setOrder={(m, order) => ({ ...m, order })}
-          setPrimary={(m, isPrimary) => ({ ...m, isPrimary })}
-        />
 
 
         <MediaUploader
