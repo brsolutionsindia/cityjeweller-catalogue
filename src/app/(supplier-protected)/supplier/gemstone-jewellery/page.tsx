@@ -418,7 +418,7 @@ const session = useSupplierSession();
           gstNumber: gst,
           supplierUid: uid,
           skuId,
-          deleteMediaFromStorage: true,
+          deleteMedia: true,
         });
       }
       setSelected({});
