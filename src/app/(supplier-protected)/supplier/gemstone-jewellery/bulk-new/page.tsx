@@ -135,6 +135,9 @@ function CropModal(props: {
   if (!open || !file) return null;
 
   async function onCrop() {
+    const currentFile = file; // ✅ capture for TS narrowing
+    if (!currentFile) return;
+
     const c = canvasRef.current;
     if (!c) return;
 
@@ -143,12 +146,12 @@ function CropModal(props: {
     );
     if (!blob) return;
 
-    const out = new File([blob], file.name.replace(/\.(\w+)$/, "") + "_crop.jpg", {
-      type: "image/jpeg",
-    });
+    const baseName = currentFile.name.replace(/\.[^/.]+$/, "");
+    const out = new File([blob], `${baseName}_crop.jpg`, { type: "image/jpeg" });
 
     onDone({ file: out });
   }
+
 
   function onPointerDown(e: React.PointerEvent) {
     dragging.current = true;
