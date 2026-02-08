@@ -8,6 +8,7 @@ import { get, ref as dbRef } from "firebase/database";
 import type { GemstoneJewellerySubmission } from "@/lib/gemstoneJewellery/types";
 import { deleteGemstoneJewellerySubmission } from "@/lib/firebase/gemstoneJewelleryDb";
 
+
 const WHATSAPP_NUMBER = "919023130944"; // your number
 
 const SUBMISSION_NODE = (gst: string) => `GST/${gst}/Submissions/GemstoneJewellery`;
@@ -81,20 +82,59 @@ async function generatePdfForListings(params: {
   includePrices: boolean;
 }) {
   const { items, includePrices } = params;
-
   const { jsPDF } = await import("jspdf");
 
-  // helpers
-  async function urlToDataUrl(url: string): Promise<string | null> {
+  async function blobToDataUrl(blob: Blob): Promise<string> {
+    return await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  }
+
+  async function imageUrlToJpegDataUrl(url: string): Promise<string | null> {
     try {
+      // 1) fetch the image as blob (CORS must allow)
       const res = await fetch(url, { mode: "cors" });
       const blob = await res.blob();
-      return await new Promise<string>((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(String(r.result));
-        r.onerror = reject;
-        r.readAsDataURL(blob);
+
+      // If already jpeg, return as-is
+      if (blob.type === "image/jpeg") {
+        return await blobToDataUrl(blob);
+      }
+
+      // If png, jsPDF supports PNG too, but we standardize to JPEG for consistency
+      // For webp, conversion is mandatory for most jsPDF builds.
+      const imgUrl = URL.createObjectURL(blob);
+
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return reject(new Error("Canvas not supported"));
+            ctx.drawImage(img, 0, 0);
+            // convert to jpeg
+            resolve(canvas.toDataURL("image/jpeg", 0.9));
+          } catch (e) {
+            reject(e);
+          } finally {
+            URL.revokeObjectURL(imgUrl);
+          }
+        };
+        img.onerror = (e) => {
+          URL.revokeObjectURL(imgUrl);
+          reject(e);
+        };
+        img.src = imgUrl;
       });
+
+      return dataUrl;
     } catch {
       return null;
     }
@@ -105,7 +145,11 @@ async function generatePdfForListings(params: {
   const pageH = doc.internal.pageSize.getHeight();
 
   const today = new Date();
-  const dateStr = today.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  const dateStr = today.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 
   // Header
   doc.setFontSize(16);
@@ -114,13 +158,14 @@ async function generatePdfForListings(params: {
   doc.text(`Date: ${dateStr}`, 40, 64);
   doc.text(`Items: ${items.length}`, 40, 80);
 
-  // Grid config
-  const cols = 3;
+  // ✅ Grid config: 2 per row
+  const cols = 2;
   const margin = 36;
-  const gap = 14;
+  const gap = 16;
+
   const cardW = (pageW - margin * 2 - gap * (cols - 1)) / cols;
-  const imgH = 110;
-  const cardH = 170;
+  const imgH = 170;
+  const cardH = 260;
 
   let x = margin;
   let y = 100;
@@ -138,17 +183,22 @@ async function generatePdfForListings(params: {
 
     // card box
     doc.setDrawColor(220);
-    doc.roundedRect(x, y, cardW, cardH, 10, 10);
+    doc.roundedRect(x, y, cardW, cardH, 12, 12);
 
     // image
     if (thumb) {
-      const dataUrl = await urlToDataUrl(thumb);
-      if (dataUrl) {
+      const jpegDataUrl = await imageUrlToJpegDataUrl(thumb);
+      if (jpegDataUrl) {
         try {
-          doc.addImage(dataUrl, "JPEG", x + 10, y + 10, cardW - 20, imgH);
+          doc.addImage(jpegDataUrl, "JPEG", x + 10, y + 10, cardW - 20, imgH);
         } catch {
           // ignore image failures
         }
+      } else {
+        doc.setFontSize(9);
+        doc.setTextColor(140);
+        doc.text("Image blocked (CORS) / not fetchable", x + 12, y + 30);
+        doc.setTextColor(0);
       }
     } else {
       doc.setFontSize(9);
@@ -160,19 +210,19 @@ async function generatePdfForListings(params: {
     // SKU
     doc.setFontSize(10);
     doc.setTextColor(0);
-    doc.text(`SKU: ${it.skuId}`, x + 12, y + imgH + 28);
+    doc.text(`SKU: ${it.skuId}`, x + 12, y + imgH + 32);
 
-    // Name (truncate)
+    // Name (wrap into 2 lines max)
     doc.setFontSize(9);
     const name = String(it.itemName || "").trim() || "Untitled";
-    const clipped = name.length > 40 ? name.slice(0, 40) + "…" : name;
-    doc.text(clipped, x + 12, y + imgH + 44);
+    const lines = doc.splitTextToSize(name, cardW - 24);
+    doc.text(lines.slice(0, 2), x + 12, y + imgH + 50);
 
     // Price (optional)
     if (includePrices) {
       const p = pickSupplierPrice(it);
       doc.setFontSize(10);
-      doc.text(`Price: ${p !== null ? money(p) : "-"}`, x + 12, y + imgH + 64);
+      doc.text(`Price: ${p !== null ? money(p) : "-"}`, x + 12, y + imgH + 92);
     }
 
     // advance
@@ -189,6 +239,7 @@ async function generatePdfForListings(params: {
   const fileName = `GemstoneJewellery_${dateStr.replaceAll(" ", "_")}.pdf`;
   return { blob, fileName };
 }
+
 
 async function sharePdfToWhatsapp(params: { blob: Blob; fileName: string }) {
   const { blob, fileName } = params;
@@ -226,6 +277,9 @@ async function sharePdfToWhatsapp(params: { blob: Blob; fileName: string }) {
 
 export default function SupplierGemstoneJewelleryHome() {
     // share flow (2-step to satisfy "user gesture" requirement for navigator.share)
+const [filtersOpen, setFiltersOpen] = useState(false);
+const [sortOpen, setSortOpen] = useState(false);
+
     const [shareReady, setShareReady] = useState<{ blob: Blob; fileName: string } | null>(null);
     const [shareOpen, setShareOpen] = useState(false);
     const [shareBusy, setShareBusy] = useState(false);
@@ -513,6 +567,14 @@ const session = useSupplierSession();
           >
             + New Listing
           </Link>
+
+          <Link
+            href="/supplier/gemstone-jewellery/bulk-new"
+            className="px-4 py-2 rounded-xl border"
+          >
+            Bulk Upload
+          </Link>
+
         </div>
       </div>
 
@@ -526,7 +588,7 @@ const session = useSupplierSession();
       </div>
 
       {/* filters (supplier same as customers) */}
-      <div className="rounded-2xl border p-4 bg-white space-y-3">
+      <div className="hidden md:block rounded-2xl border p-4 bg-white space-y-3">
         <div className="flex items-center justify-between">
           <div className="font-semibold">Filters</div>
           <button className="text-xs underline text-gray-600" onClick={resetFilters}>
@@ -780,6 +842,145 @@ const session = useSupplierSession();
           })}
         </div>
       )}
+
+  {/* Mobile footer tabs */}
+  <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t bg-white">
+    <div className="flex">
+      <button
+        type="button"
+        className="flex-1 py-3 text-sm font-semibold"
+        onClick={() => { setSortOpen(false); setFiltersOpen(true); }}
+      >
+        Filters
+      </button>
+      <button
+        type="button"
+        className="flex-1 py-3 text-sm font-semibold border-l"
+        onClick={() => { setFiltersOpen(false); setSortOpen(true); }}
+      >
+        Sort
+      </button>
+    </div>
+  </div>
+
+  {/* add padding so list doesn't hide behind footer */}
+  <div className="md:hidden h-14" />
+
+  {/* Filters Sheet (mobile) */}
+  {filtersOpen && (
+    <div className="fixed inset-0 z-50 bg-black/40">
+      <div className="absolute bottom-0 left-0 right-0 rounded-t-2xl bg-white p-4 border shadow-xl max-h-[80vh] overflow-auto">
+        <div className="flex items-center justify-between">
+          <div className="text-lg font-semibold">Filters</div>
+          <button className="text-sm underline" onClick={() => setFiltersOpen(false)}>Close</button>
+        </div>
+
+        <div className="mt-3 space-y-3">
+          <div>
+            <div className="text-xs text-gray-500 mb-1">Search</div>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="w-full border rounded-xl px-3 py-2"
+              placeholder="SKU / name / stone..."
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Nature</div>
+              <select value={nature} onChange={(e) => setNature(e.target.value)} className="w-full border rounded-xl px-3 py-2">
+                <option value="ALL">All</option>
+                {meta.natures.map((x) => <option key={x} value={x}>{x}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Type</div>
+              <select value={type} onChange={(e) => setType(e.target.value)} className="w-full border rounded-xl px-3 py-2">
+                <option value="ALL">All</option>
+                {meta.types.map((x) => <option key={x} value={x}>{x}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Stone / Look</div>
+              <select value={stoneOrLook} onChange={(e) => setStoneOrLook(e.target.value)} className="w-full border rounded-xl px-3 py-2">
+                <option value="ALL">All</option>
+                {meta.stones.map((x) => <option key={x} value={x}>{x}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Material</div>
+              <select value={material} onChange={(e) => setMaterial(e.target.value)} className="w-full border rounded-xl px-3 py-2">
+                <option value="ALL">All</option>
+                {meta.materials.map((x) => <option key={x} value={x}>{x}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Min</div>
+              <input value={minP} onChange={(e) => setMinP(e.target.value)} className="w-full border rounded-xl px-3 py-2" placeholder="0" />
+            </div>
+
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Max</div>
+              <input value={maxP} onChange={(e) => setMaxP(e.target.value)} className="w-full border rounded-xl px-3 py-2" placeholder="50000" />
+            </div>
+
+            <div className="col-span-2">
+              <div className="text-xs text-gray-500 mb-1">Tag</div>
+              <select value={tag} onChange={(e) => setTag(e.target.value)} className="w-full border rounded-xl px-3 py-2">
+                <option value="ALL">All</option>
+                {meta.tags.map((x) => <option key={x} value={x}>#{x}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button className="flex-1 px-4 py-2 rounded-xl border" onClick={resetFilters} type="button">
+              Reset
+            </button>
+            <button className="flex-1 px-4 py-2 rounded-xl bg-black text-white" onClick={() => setFiltersOpen(false)} type="button">
+              Apply
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* Sort Sheet (mobile) */}
+  {sortOpen && (
+    <div className="fixed inset-0 z-50 bg-black/40">
+      <div className="absolute bottom-0 left-0 right-0 rounded-t-2xl bg-white p-4 border shadow-xl">
+        <div className="flex items-center justify-between">
+          <div className="text-lg font-semibold">Sort</div>
+          <button className="text-sm underline" onClick={() => setSortOpen(false)}>Close</button>
+        </div>
+
+        <div className="mt-3">
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as any)}
+            className="w-full border rounded-xl px-3 py-3"
+          >
+            {SORTS.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
+          </select>
+
+          <button
+            className="w-full mt-3 px-4 py-3 rounded-xl bg-black text-white"
+            onClick={() => setSortOpen(false)}
+            type="button"
+          >
+            Apply
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+
     </div>
   );
 }

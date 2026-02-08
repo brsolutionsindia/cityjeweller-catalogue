@@ -14,6 +14,14 @@ import {
   getSupplierDefaultsGemstoneJewellery,
 } from "@/lib/firebase/gemstoneJewelleryDb";
 
+// ✅ Predefined Hashtags (customer search)
+const SUGGESTED_TAGS = {
+  colors: ["red", "green", "blue", "yellow", "white", "black", "pink", "purple"],
+  stones: ["pearl", "amethyst", "citrine", "ruby-look", "emerald-look"],
+  styles: ["dailywear", "statement", "minimal", "temple", "boho", "bridal", "healing", "classic"],
+  types: ["bracelet", "string", "necklace", "earrings"],
+};
+
 export default function NewGemstoneJewelleryPage() {
   const session = useSupplierSession();
   const router = useRouter();
@@ -23,7 +31,6 @@ export default function NewGemstoneJewelleryPage() {
   const [form, setForm] = useState<GemstoneJewellerySubmission | null>(null);
   const [err, setErr] = useState<string>("");
 
-  // normalize session values to STRING (never null)
   const gst = useMemo(() => (session?.gst ?? "").trim(), [session?.gst]);
   const uid = useMemo(() => (session?.uid ?? "").trim(), [session?.uid]);
 
@@ -48,20 +55,15 @@ export default function NewGemstoneJewelleryPage() {
       setBooting(true);
 
       try {
-        console.log("[GJ:new] session ready:", { gst, uid });
-
         const { skuId } = await allocateGemstoneJewellerySku(gst, uid);
-        console.log("[GJ:new] allocated skuId:", skuId);
 
         await createGemstoneJewellerySubmissionStub({
           skuId,
           gstNumber: gst,
           supplierUid: uid,
         });
-        console.log("[GJ:new] stub created (or already existed):", skuId);
 
         const defaults = await getSupplierDefaultsGemstoneJewellery(gst, uid);
-        console.log("[GJ:new] defaults:", defaults);
 
         const nature = (defaults?.nature as any) || "NATURAL";
         const type = (defaults?.type as any) || "BRACELET";
@@ -80,7 +82,6 @@ export default function NewGemstoneJewelleryPage() {
           nature,
           type,
 
-          // store as null-safe; upsert will re-normalize anyway
           stoneName: stoneName,
           lookName: lookName,
 
@@ -168,9 +169,6 @@ export default function NewGemstoneJewelleryPage() {
         {err ? (
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
             <b>Init failed:</b> {err}
-            <div className="mt-2 text-xs text-red-700">
-              Open console logs: <b>[GJ:new]</b> lines will show exact failure step.
-            </div>
           </div>
         ) : (
           <div className="text-sm text-gray-500">
@@ -199,7 +197,13 @@ export default function NewGemstoneJewelleryPage() {
         </div>
       </div>
 
-      <GemstoneJewelleryForm value={form} onChange={setForm} readOnlyStatus={false} />
+      {/* ✅ Pass suggested tags so predefined hashtags show */}
+      <GemstoneJewelleryForm
+        value={form}
+        onChange={setForm}
+        readOnlyStatus={false}
+        suggested={SUGGESTED_TAGS}
+      />
     </div>
   );
 }

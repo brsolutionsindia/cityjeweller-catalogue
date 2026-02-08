@@ -522,12 +522,16 @@ export async function deleteGemstoneJewelleryDraft(params: {
 }
 
 
-/* -------------------- delete submission (draft/approved) -------------------- */
+/* -------------------- delete submission (draft/pending/rejected) -------------------- */
 export async function deleteGemstoneJewellerySubmission(params: {
   gstNumber: string;
   skuId: string;
   supplierUid: string;
   deleteMedia?: boolean; // default true
+
+  // ✅ NEW: only admin should set this true
+  alsoDeleteFromAdminQueue?: boolean; // default false
+  alsoDeleteFromGlobalSku?: boolean;  // default false
 }) {
   const gst = normalizeGstNumber(params.gstNumber);
   const { skuId, supplierUid } = params;
@@ -538,30 +542,54 @@ export async function deleteGemstoneJewellerySubmission(params: {
 
   const submissionPath = `${SUBMISSION_NODE(gst)}/${skuId}`;
 
-  // 1) Read submission once (for indexes + media paths)
+  // 1) Read submission once (for index removals + media paths)
   const snap = await get(dbRef(db, submissionPath));
   const sub = snap.exists() ? (snap.val() as GemstoneJewellerySubmission) : null;
 
+  // If it doesn't exist, treat as already deleted
+  if (!sub) {
+    // still try to clean supplier index (safe)
+    const updates: Record<string, any> = {};
+    updates[`${SUPPLIER_INDEX(gst, supplierUid)}/${skuId}`] = null;
+    await update(dbRef(db), stripUndefinedDeep(updates));
+    return true;
+  }
+
+  // ✅ Safety: prevent deleting someone else's SKU (client-side check)
+  if (String((sub as any).supplierUid || "") !== supplierUid) {
+    throw new Error("Not allowed: SKU does not belong to this supplier");
+  }
+
   // 2) Build multi-location delete updates (RTDB)
   const updates: Record<string, any> = {};
+
+  // ✅ always allowed paths (supplier-owned under GST)
   updates[submissionPath] = null;
   updates[`${SUPPLIER_INDEX(gst, supplierUid)}/${skuId}`] = null;
-  updates[`${ADMIN_QUEUE}/${skuId}`] = null;
 
-  // Remove from website
-  updates[`${GLOBAL_NODE}/${skuId}`] = null;
-  if (sub) Object.assign(updates, buildIndexRemovals(sub));
+  // ✅ remove any submission indexes (these are under GST => supplier allowed by your GST rules)
+  Object.assign(updates, buildIndexRemovals(sub));
+
+  // ❗ DO NOT delete AdminQueue / Global SKU for suppliers by default
+  // Only do it if you are calling this from an admin UI (or you updated rules accordingly)
+  if (params.alsoDeleteFromAdminQueue) {
+    updates[`${ADMIN_QUEUE}/${skuId}`] = null;
+  }
+
+  if (params.alsoDeleteFromGlobalSku) {
+    updates[`${GLOBAL_NODE}/${skuId}`] = null;
+  }
 
   await update(dbRef(db), stripUndefinedDeep(updates));
 
-  // 3) Delete media from Storage (best-effort; don't fail the whole delete)
+  // 3) Delete media from Storage (best-effort)
   const doDeleteMedia = params.deleteMedia !== false;
-  if (doDeleteMedia && sub) {
+  if (doDeleteMedia) {
     const media = safeArray<MediaItem>((sub as any).media);
     const paths = media.map((m: any) => String(m?.storagePath || "")).filter(Boolean);
-
     await Promise.allSettled(paths.map((p) => deleteGemstoneJewelleryMedia(p)));
   }
 
   return true;
 }
+

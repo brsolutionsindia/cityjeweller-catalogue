@@ -113,6 +113,16 @@ function Chip({
   );
 }
 
+function safeMedia(value: GemstoneJewellerySubmission) {
+  const arr = Array.isArray((value as any).media) ? ((value as any).media as any[]) : [];
+  return arr.map((m) => ({
+    ...m,
+    kind: m?.kind === "VID" ? "VID" : "IMG",   // default IMG
+    order: Number.isFinite(Number(m?.order)) ? Number(m.order) : 0,
+  }));
+}
+
+
 function Tabs({
   value,
   options,
@@ -165,6 +175,8 @@ export default function GemstoneJewelleryForm({
   readOnlyStatus,
 }: Props) {
   const [customTag, setCustomTag] = useState("");
+  const media = useMemo(() => safeMedia(value), [value]);
+
 
   const styleTags = useMemo(() => {
     return (value.tags || []).map(normalizeTag);
@@ -580,10 +592,10 @@ export default function GemstoneJewelleryForm({
           label="Photos"
           accept="image/*"
           kind="IMG"
-          items={value.media.filter((m) => m.kind === "IMG").sort((a, b) => a.order - b.order)}
+          items={media.filter((m) => m.kind === "IMG").sort((a, b) => a.order - b.order)}
           onChange={(nextImgs) => {
-            const vids = value.media.filter((m) => m.kind === "VID");
-            onChange({ ...value, media: [...nextImgs, ...vids] });
+            const vids = media.filter((m) => m.kind === "VID");
+            onChange({ ...value, media: [...nextImgs, ...vids] } as any);
           }}
           allowReorder
           uploadFn={uploadGemstoneJewelleryMediaBatch}
@@ -599,10 +611,10 @@ export default function GemstoneJewelleryForm({
           label="Videos"
           accept="video/*"
           kind="VID"
-          items={value.media.filter((m) => m.kind === "VID").sort((a, b) => a.order - b.order)}
+          items={media.filter((m) => m.kind === "VID").sort((a, b) => a.order - b.order)}
           onChange={(nextVids) => {
-            const imgs = value.media.filter((m) => m.kind === "IMG");
-            onChange({ ...value, media: [...imgs, ...nextVids] });
+            const imgs = media.filter((m) => m.kind === "IMG");
+            onChange({ ...value, media: [...imgs, ...nextVids] } as any);
           }}
           allowReorder
           uploadFn={uploadGemstoneJewelleryMediaBatch}
@@ -612,6 +624,7 @@ export default function GemstoneJewelleryForm({
           isVideoItem={(m) => m.kind === "VID"}
           setOrder={(m, order) => ({ ...m, order })}
         />
+
 
         <div className="text-sm text-gray-600">
           Recommended: 1 white background photo (mandatory), 1 close-up, 1 lifestyle, 1 short video.
