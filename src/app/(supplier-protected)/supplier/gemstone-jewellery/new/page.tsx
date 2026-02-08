@@ -23,11 +23,10 @@ export default function NewGemstoneJewelleryPage() {
   const [form, setForm] = useState<GemstoneJewellerySubmission | null>(null);
   const [err, setErr] = useState<string>("");
 
-  // ✅ normalize session values to STRING (never null)
+  // normalize session values to STRING (never null)
   const gst = useMemo(() => (session?.gst ?? "").trim(), [session?.gst]);
   const uid = useMemo(() => (session?.uid ?? "").trim(), [session?.uid]);
 
-  // ✅ init only once per unique identity
   const initKey = useMemo(() => {
     return gst && uid ? `${gst}__${uid}` : "";
   }, [gst, uid]);
@@ -35,13 +34,10 @@ export default function NewGemstoneJewelleryPage() {
   const didInitKeyRef = useRef<string>("");
 
   useEffect(() => {
-    // Wait until session is ready
     if (!initKey) {
       setBooting(true);
       return;
     }
-
-    // Avoid re-init for same session key
     if (didInitKeyRef.current === initKey) return;
     didInitKeyRef.current = initKey;
 
@@ -52,7 +48,6 @@ export default function NewGemstoneJewelleryPage() {
       setBooting(true);
 
       try {
-        // ✅ gst/uid are guaranteed strings here
         console.log("[GJ:new] session ready:", { gst, uid });
 
         const { skuId } = await allocateGemstoneJewellerySku(gst, uid);
@@ -73,6 +68,9 @@ export default function NewGemstoneJewelleryPage() {
 
         const now = Date.now();
 
+        const stoneName = (defaults as any)?.stoneName || "Gemstone";
+        const lookName = (defaults as any)?.lookName || null;
+
         const base: GemstoneJewellerySubmission = {
           skuId,
           gstNumber: gst,
@@ -82,35 +80,36 @@ export default function NewGemstoneJewelleryPage() {
           nature,
           type,
 
-          stoneName: defaults?.stoneName || "Gemstone",
-          lookName: defaults?.lookName || undefined,
-          material: (defaults as any)?.material || undefined,
-          closure: (defaults as any)?.closure || undefined,
+          // store as null-safe; upsert will re-normalize anyway
+          stoneName: stoneName,
+          lookName: lookName,
 
-          beadSizeMm: (defaults as any)?.beadSizeMm ?? undefined,
-          lengthInch: (defaults as any)?.lengthInch ?? undefined,
+          material: (defaults as any)?.material || null,
+          closure: (defaults as any)?.closure || null,
 
-          // ✅ only include if defaults has them
-          ...(defaults as any)?.priceMode ? { priceMode: (defaults as any).priceMode } : {},
-          ...(defaults as any)?.ratePerGm ? { ratePerGm: (defaults as any).ratePerGm } : {},
-          ...(defaults as any)?.weightGm ? { weightGm: (defaults as any).weightGm } : {},
+          beadSizeMm: (defaults as any)?.beadSizeMm ?? null,
+          lengthInch: (defaults as any)?.lengthInch ?? null,
 
-          mrp: (defaults as any)?.mrp ?? undefined,
-          offerPrice: (defaults as any)?.offerPrice ?? undefined,
+          priceMode: (defaults as any)?.priceMode ?? null,
+          ratePerGm: (defaults as any)?.ratePerGm ?? null,
+          weightGm: (defaults as any)?.weightGm ?? null,
+
+          mrp: (defaults as any)?.mrp ?? null,
+          offerPrice: (defaults as any)?.offerPrice ?? null,
 
           tags: [],
           itemName: generateItemName({
             nature,
             type,
-            stoneName: defaults?.stoneName || "Gemstone",
-            lookName: defaults?.lookName,
+            stoneName,
+            lookName: lookName || undefined,
             styleTags: [],
           }),
           media: [],
           currency: "INR",
           createdAt: now,
           updatedAt: now,
-        };
+        } as any;
 
         if (alive) setForm(base);
       } catch (e: any) {

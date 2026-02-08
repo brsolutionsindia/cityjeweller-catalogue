@@ -15,13 +15,17 @@ import {
 } from "firebase/storage";
 
 import type { GemstoneJewellerySubmission, MediaItem } from "@/lib/gemstoneJewellery/types";
-import { uniqTags } from "@/lib/gemstoneJewellery/options";
+import { uniqTags, normalizeTag } from "@/lib/gemstoneJewellery/options";
 
 /**
  * ✅ Fixes included:
  * - Firebase update() cannot contain undefined -> we sanitize deep (undefined -> null)
  * - stoneName/lookName/material/closure become null when empty (never undefined)
  * - Supplier defaults store uses nulls too
+ * - NEW: Supplier edit on APPROVED listing can auto trigger re-approval:
+ *   - status -> PENDING
+ *   - push AdminQueue
+ *   - remove from Global SKU + indexes (hide from website)
  */
 
 /* -------------------- DB nodes -------------------- */
@@ -31,6 +35,12 @@ const SUPPLIER_INDEX = (gstNumber: string, uid: string) =>
 const SUPPLIER_DEFAULTS = (gstNumber: string, uid: string) =>
   `GST/${gstNumber}/SupplierDefaults/GemstoneJewellery/${uid}`;
 const ADMIN_QUEUE = `AdminQueue/GemstoneJewellery`;
+
+// Published global
+const GLOBAL_NODE = `Global SKU/GemstoneJewellery`;
+const GLOBAL_TAG_INDEX = `Global SKU/Indexes/GemstoneJewellery/ByTag`;
+const GLOBAL_TYPE_INDEX = `Global SKU/Indexes/GemstoneJewellery/ByType`;
+const GLOBAL_NATURE_INDEX = `Global SKU/Indexes/GemstoneJewellery/ByNature`;
 
 // Storage – keep GlobalSKU like YellowSapphire
 const STORAGE_BASE = (skuId: string) => `GlobalSKU/GemstoneJewellery/${skuId}`;
@@ -113,10 +123,89 @@ function stripUndefinedDeep<T>(input: T): T {
   return input;
 }
 
+/** Safe build for removing website indexes */
+function buildIndexRemovals(listing: GemstoneJewellerySubmission) {
+  const tags = uniqTags(listing.tags || []).map(normalizeTag);
+  const updates: Record<string, any> = {};
+
+  for (const t of tags) updates[`${GLOBAL_TAG_INDEX}/${t}/${listing.skuId}`] = null;
+  if (listing.type) updates[`${GLOBAL_TYPE_INDEX}/${listing.type}/${listing.skuId}`] = null;
+  if (listing.nature) updates[`${GLOBAL_NATURE_INDEX}/${listing.nature}/${listing.skuId}`] = null;
+
+  return updates;
+}
+
 /* -------------------- common -------------------- */
 export async function deleteMediaObject(storagePath: string) {
   if (!storagePath) return;
   await deleteObject(sRef(storage, storagePath));
+}
+
+export async function deleteGemstoneJewelleryMedia(storagePath: string) {
+  if (!storagePath) return;
+  await deleteObject(sRef(storage, storagePath));
+}
+
+/* -------------------- NEW: supplier edit => reapproval + hide from website -------------------- */
+/**
+ * Call this after supplier edits an already-approved listing.
+ * - Sets submission status PENDING
+ * - Adds/updates AdminQueue item (admin sees it)
+ * - Removes Global SKU + indexes (so it disappears from website)
+ */
+export async function markGemstoneJewelleryForReapproval(params: {
+  gstNumber: string;
+  skuId: string;
+  supplierUid: string;
+  thumbUrl?: string;
+  reason?: string; // e.g. "SUPPLIER_EDITED"
+}) {
+  const gst = normalizeGstNumber(params.gstNumber);
+  if (!gst) throw new Error("Missing gstNumber");
+  if (!params.skuId) throw new Error("Missing skuId");
+  if (!params.supplierUid) throw new Error("Missing supplierUid");
+
+  const now = Date.now();
+  const submissionPath = `${SUBMISSION_NODE(gst)}/${params.skuId}`;
+
+  // Read current submission to remove indexes safely
+  const snap = await get(dbRef(db, submissionPath));
+  const sub = snap.exists() ? (snap.val() as GemstoneJewellerySubmission) : null;
+
+  // thumb fallback
+  let thumbUrl = params.thumbUrl || "";
+  if (!thumbUrl && sub) {
+    const imgs = sortByOrder(
+      safeArray<MediaItem>((sub as any).media).filter((m: any) => (m?.kind || (m?.type === "image" ? "IMG" : "")) === "IMG")
+    );
+    thumbUrl = (imgs?.[0] as any)?.url || "";
+  }
+
+  const updates: Record<string, any> = {};
+
+  // Mark pending
+  updates[`${submissionPath}/status`] = "PENDING";
+  updates[`${submissionPath}/updatedAt`] = now;
+  updates[`${submissionPath}/_updatedAtServer`] = serverTimestamp();
+
+  // Admin queue item
+  updates[`${ADMIN_QUEUE}/${params.skuId}`] = stripUndefinedDeep({
+    gstNumber: gst,
+    skuId: params.skuId,
+    supplierUid: params.supplierUid,
+    status: "PENDING",
+    thumbUrl,
+    updatedAt: now,
+    queuedAt: now,
+    reason: params.reason || "SUPPLIER_EDITED",
+    _queuedAtServer: serverTimestamp(),
+  });
+
+  // Remove from website
+  updates[`${GLOBAL_NODE}/${params.skuId}`] = null;
+  if (sub) Object.assign(updates, buildIndexRemovals(sub));
+
+  await update(dbRef(db), stripUndefinedDeep(updates));
 }
 
 /* -------------------- SKU allocator -------------------- */
@@ -159,15 +248,20 @@ export async function createGemstoneJewellerySubmissionStub(params: {
       supplierUid,
       status: "DRAFT",
       media: [],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      _createdAtServer: serverTimestamp(),
+      _updatedAtServer: serverTimestamp(),
     });
   });
 
   // ensure supplier index exists
-  await update(dbRef(db), stripUndefinedDeep({
-    [`${SUPPLIER_INDEX(gstNumberNorm, supplierUid)}/${skuId}`]: true,
-  }));
+  await update(
+    dbRef(db),
+    stripUndefinedDeep({
+      [`${SUPPLIER_INDEX(gstNumberNorm, supplierUid)}/${skuId}`]: true,
+    })
+  );
 
   return { skuId };
 }
@@ -196,7 +290,15 @@ export async function getSupplierDefaultsGemstoneJewellery(
 }
 
 /* -------------------- upsert submission -------------------- */
-export async function upsertGemstoneJewellerySubmission(input: GemstoneJewellerySubmission) {
+/**
+ * Upserts submission.
+ * If you pass `triggerReapprovalIfApproved: true`, then:
+ * - if existing status is APPROVED -> it will auto push to AdminQueue + remove from website.
+ */
+export async function upsertGemstoneJewellerySubmission(
+  input: GemstoneJewellerySubmission,
+  opts?: { triggerReapprovalIfApproved?: boolean }
+) {
   const now = Date.now();
 
   const gstNumber = normalizeGstNumber(input);
@@ -204,8 +306,19 @@ export async function upsertGemstoneJewellerySubmission(input: GemstoneJewellery
   if (!input.skuId) throw new Error("Missing skuId");
   if (!input.supplierUid) throw new Error("Missing supplierUid");
 
+  const submissionPath = `${SUBMISSION_NODE(gstNumber)}/${input.skuId}`;
+
+  // detect prior status
+  let priorStatus: string | null = null;
+  try {
+    const snap = await get(dbRef(db, submissionPath));
+    if (snap.exists()) priorStatus = String((snap.val() as any)?.status || "");
+  } catch {
+    priorStatus = null;
+  }
+
   // ✅ normalize media + kill undefineds
-  const mediaNorm = safeArray<MediaItem>(input.media).map((m, i) => {
+  const mediaNorm = safeArray<MediaItem>((input as any).media).map((m, i) => {
     const kind = (m as any).kind || ((m as any).type === "video" ? "VID" : "IMG");
     return stripUndefinedDeep({
       ...(m as any),
@@ -217,15 +330,13 @@ export async function upsertGemstoneJewellerySubmission(input: GemstoneJewellery
     }) as any;
   }) as any;
 
-  // ✅ CRITICAL: stoneName must never be undefined
-  // If nature=ARTIFICIAL then stoneName can be null, but not undefined.
   const cleaned: GemstoneJewellerySubmission = stripUndefinedDeep({
     ...input,
     gstNumber,
     tags: uniqTags(input.tags || []),
     updatedAt: now,
-    createdAt: input.createdAt ?? now,
-    currency: input.currency ?? "INR",
+    createdAt: (input as any).createdAt ?? now,
+    currency: (input as any).currency ?? "INR",
     media: mediaNorm,
 
     // normalize optional strings -> null
@@ -241,12 +352,10 @@ export async function upsertGemstoneJewellerySubmission(input: GemstoneJewellery
     mrp: numOrNull((input as any).mrp),
     offerPrice: numOrNull((input as any).offerPrice),
 
-    // if you added these fields
+    // pricing mode fields (optional)
     priceMode: (input as any).priceMode ?? null,
     ratePerGm: numOrNull((input as any).ratePerGm),
   }) as any;
-
-  const submissionPath = `${SUBMISSION_NODE(gstNumber)}/${cleaned.skuId}`;
 
   // ✅ sanitize payload before update()
   const payload = stripUndefinedDeep({
@@ -256,6 +365,7 @@ export async function upsertGemstoneJewellerySubmission(input: GemstoneJewellery
 
   await update(dbRef(db, submissionPath), payload);
 
+  // ensure supplier index exists
   await update(
     dbRef(db, SUPPLIER_INDEX(gstNumber, cleaned.supplierUid)),
     stripUndefinedDeep({ [cleaned.skuId]: true })
@@ -265,23 +375,40 @@ export async function upsertGemstoneJewellerySubmission(input: GemstoneJewellery
   await update(
     dbRef(db, SUPPLIER_DEFAULTS(gstNumber, cleaned.supplierUid)),
     stripUndefinedDeep({
-      nature: cleaned.nature ?? null,
-      type: cleaned.type ?? null,
-      stoneName: cleaned.stoneName ?? null,
-      lookName: cleaned.lookName ?? null,
-      material: cleaned.material ?? null,
-      closure: cleaned.closure ?? null,
-      beadSizeMm: cleaned.beadSizeMm ?? null,
-      lengthInch: cleaned.lengthInch ?? null,
+      nature: (cleaned as any).nature ?? null,
+      type: (cleaned as any).type ?? null,
+      stoneName: (cleaned as any).stoneName ?? null,
+      lookName: (cleaned as any).lookName ?? null,
+      material: (cleaned as any).material ?? null,
+      closure: (cleaned as any).closure ?? null,
+      beadSizeMm: (cleaned as any).beadSizeMm ?? null,
+      lengthInch: (cleaned as any).lengthInch ?? null,
       weightGm: (cleaned as any).weightGm ?? null,
       priceMode: (cleaned as any).priceMode ?? null,
       ratePerGm: (cleaned as any).ratePerGm ?? null,
-      mrp: cleaned.mrp ?? null,
-      offerPrice: cleaned.offerPrice ?? null,
+      mrp: (cleaned as any).mrp ?? null,
+      offerPrice: (cleaned as any).offerPrice ?? null,
       updatedAt: now,
       _updatedAtServer: serverTimestamp(),
     })
   );
+
+  // ✅ auto trigger reapproval if supplier edited an already approved listing
+  if (opts?.triggerReapprovalIfApproved && String(priorStatus || "").toUpperCase() === "APPROVED") {
+    // Best: use first image as thumb if available
+    const imgs = sortByOrder(
+      safeArray<MediaItem>((cleaned as any).media).filter((m: any) => (m?.kind || (m?.type === "image" ? "IMG" : "")) === "IMG")
+    );
+    const thumbUrl = (imgs?.[0] as any)?.url || "";
+
+    await markGemstoneJewelleryForReapproval({
+      gstNumber,
+      skuId: cleaned.skuId,
+      supplierUid: cleaned.supplierUid,
+      thumbUrl,
+      reason: "SUPPLIER_EDITED",
+    });
+  }
 
   return cleaned;
 }
@@ -304,12 +431,12 @@ export async function submitForApproval(gstNumber: string, skuId: string, suppli
   );
 
   const subSnap = await get(dbRef(db, submissionPath));
-  const sub = subSnap.val() as GemstoneJewellerySubmission | null;
+  const sub = subSnap.exists() ? (subSnap.val() as GemstoneJewellerySubmission) : null;
 
   const imgs = sortByOrder(
-    safeArray<MediaItem>(sub?.media).filter((m: any) => m?.kind === "IMG")
+    safeArray<MediaItem>((sub as any)?.media).filter((m: any) => (m?.kind || (m?.type === "image" ? "IMG" : "")) === "IMG")
   );
-  const thumbUrl = imgs?.[0]?.url || "";
+  const thumbUrl = (imgs?.[0] as any)?.url || "";
 
   await update(
     dbRef(db, `${ADMIN_QUEUE}/${skuId}`),
@@ -319,6 +446,7 @@ export async function submitForApproval(gstNumber: string, skuId: string, suppli
       supplierUid,
       status: "PENDING",
       thumbUrl,
+      reason: "SUPPLIER_SUBMITTED",
       queuedAt: now,
       updatedAt: now,
       _queuedAtServer: serverTimestamp(),
@@ -328,7 +456,7 @@ export async function submitForApproval(gstNumber: string, skuId: string, suppli
 
 /* -------------------- media upload -------------------- */
 export async function uploadGemstoneJewelleryMediaBatch(params: {
-  gst: string;
+  gst: string; // kept for compatibility
   skuId: string;
   kind: "IMG" | "VID";
   files: File[];
@@ -376,11 +504,6 @@ export async function uploadGemstoneJewelleryMediaBatch(params: {
   return uploaded;
 }
 
-export async function deleteGemstoneJewelleryMedia(storagePath: string) {
-  if (!storagePath) return;
-  await deleteObject(sRef(storage, storagePath));
-}
-
 /* -------------------- optional cleanup -------------------- */
 export async function deleteGemstoneJewelleryDraft(params: {
   gstNumber: string;
@@ -393,4 +516,52 @@ export async function deleteGemstoneJewelleryDraft(params: {
   await remove(dbRef(db, `${SUBMISSION_NODE(gst)}/${skuId}`));
   await remove(dbRef(db, `${SUPPLIER_INDEX(gst, supplierUid)}/${skuId}`));
   await remove(dbRef(db, `${ADMIN_QUEUE}/${skuId}`));
+
+  // Also remove from website if any
+  await remove(dbRef(db, `${GLOBAL_NODE}/${skuId}`));
+}
+
+
+/* -------------------- delete submission (draft/approved) -------------------- */
+export async function deleteGemstoneJewellerySubmission(params: {
+  gstNumber: string;
+  skuId: string;
+  supplierUid: string;
+  deleteMedia?: boolean; // default true
+}) {
+  const gst = normalizeGstNumber(params.gstNumber);
+  const { skuId, supplierUid } = params;
+
+  if (!gst) throw new Error("Missing gstNumber");
+  if (!skuId) throw new Error("Missing skuId");
+  if (!supplierUid) throw new Error("Missing supplierUid");
+
+  const submissionPath = `${SUBMISSION_NODE(gst)}/${skuId}`;
+
+  // 1) Read submission once (for indexes + media paths)
+  const snap = await get(dbRef(db, submissionPath));
+  const sub = snap.exists() ? (snap.val() as GemstoneJewellerySubmission) : null;
+
+  // 2) Build multi-location delete updates (RTDB)
+  const updates: Record<string, any> = {};
+  updates[submissionPath] = null;
+  updates[`${SUPPLIER_INDEX(gst, supplierUid)}/${skuId}`] = null;
+  updates[`${ADMIN_QUEUE}/${skuId}`] = null;
+
+  // Remove from website
+  updates[`${GLOBAL_NODE}/${skuId}`] = null;
+  if (sub) Object.assign(updates, buildIndexRemovals(sub));
+
+  await update(dbRef(db), stripUndefinedDeep(updates));
+
+  // 3) Delete media from Storage (best-effort; don't fail the whole delete)
+  const doDeleteMedia = params.deleteMedia !== false;
+  if (doDeleteMedia && sub) {
+    const media = safeArray<MediaItem>((sub as any).media);
+    const paths = media.map((m: any) => String(m?.storagePath || "")).filter(Boolean);
+
+    await Promise.allSettled(paths.map((p) => deleteGemstoneJewelleryMedia(p)));
+  }
+
+  return true;
 }
