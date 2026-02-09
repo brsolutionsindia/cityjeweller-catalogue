@@ -94,6 +94,7 @@ export default function AdminRudrakshaDetail() {
   const [rejectReason, setRejectReason] = useState("");
   const [images, setImages] = useState<MediaItem[]>([]);
   const [videos, setVideos] = useState<MediaItem[]>([]);
+  const [certificates, setCertificates] = useState<MediaItem[]>([]);
 
   const [marginPct, setMarginPct] = useState<number>(DEFAULT_MARGIN);
 
