@@ -1,8 +1,22 @@
+// src/components/supplier/RudrakshaForm.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import type { RudrakshaSubmission, RudrakshaType, RudrakshaOrigin } from "@/lib/rudraksha/types";
-import { RUDRAKSHA_TYPES, ORIGINS, generateItemName, normalizeTag, uniqTags } from "@/lib/rudraksha/options";
+import type {
+  RudrakshaSubmission,
+  RudrakshaType,
+  RudrakshaOrigin,
+  Origin,
+  MediaItem,
+} from "@/lib/rudraksha/types";
+import {
+  RUDRAKSHA_TYPES,
+  ORIGINS,
+  ORIGIN_TABS,
+  generateItemName,
+  normalizeTag,
+  uniqTags,
+} from "@/lib/rudraksha/options";
 import MediaUploader from "@/components/supplier/MediaUploader";
 import { uploadRudrakshaMediaBatch, deleteRudrakshaMedia } from "@/lib/firebase/rudrakshaDb";
 
@@ -13,7 +27,7 @@ type Props = {
   suggested?: {
     mukhi?: number[];
     purposes?: string[]; // "shivratri", "protection", "meditation"
-    styles?: string[];   // "dailywear", "temple", "minimal"
+    styles?: string[]; // "dailywear", "temple", "minimal"
     materials?: string[];
     types?: string[];
   };
@@ -28,13 +42,26 @@ const CHIP_SECTIONS: { key: keyof NonNullable<Props["suggested"]>; label: string
   { key: "types", label: "Type Tags" },
 ];
 
-const MUKHI_TABS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14].map((n) => ({ label: `${n} Mukhi`, value: String(n) }));
+const MUKHI_TABS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map((n) => ({
+  label: `${n} Mukhi`,
+  value: String(n),
+}));
 
 const MATERIAL_TABS = ["Thread", "Silver", "Gold", "Panchdhatu", "Brass", "Steel", "Elastic", "Other"];
 const CLOSURE_TABS = ["Adjustable", "Hook", "Elastic", "Slip-on", "Magnetic", "Toggle", "Other"];
 
 /* UI helpers */
-function Chip({ active, label, onClick, disabled }: { active: boolean; label: string; onClick: () => void; disabled?: boolean; }) {
+function Chip({
+  active,
+  label,
+  onClick,
+  disabled,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
@@ -51,7 +78,17 @@ function Chip({ active, label, onClick, disabled }: { active: boolean; label: st
   );
 }
 
-function Tabs({ value, options, onChange, disabled }: { value: string; options: { label: string; value: string }[]; onChange: (v: string) => void; disabled?: boolean; }) {
+function Tabs({
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  options: { label: string; value: string }[];
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) {
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((o) => (
@@ -84,14 +121,15 @@ function formatInr(n?: number | null) {
   return n.toLocaleString("en-IN");
 }
 
-function asKind(m: any): "IMG" | "VID" {
-  if (m?.kind === "IMG" || m?.kind === "VID") return m.kind;
+function asKind(m: any): MediaItem["kind"] {
+  if (m?.kind === "IMG" || m?.kind === "VID" || m?.kind === "CERT") return m.kind;
   if (m?.type === "video") return "VID";
+  if (m?.type === "file") return "CERT";
   return "IMG";
 }
 
-function safeMedia(value: RudrakshaSubmission) {
-  const arr = Array.isArray((value as any).media) ? ((value as any).media as any[]) : [];
+function safeMedia(value: RudrakshaSubmission): MediaItem[] {
+  const arr = Array.isArray((value as any).media) ? (((value as any).media as any[]) ?? []) : [];
   return arr.map((m) => ({
     ...m,
     kind: asKind(m),
@@ -101,19 +139,23 @@ function safeMedia(value: RudrakshaSubmission) {
 
 export default function RudrakshaForm({ value, onChange, suggested, readOnlyStatus }: Props) {
   const [customTag, setCustomTag] = useState("");
+
   const media = useMemo(() => safeMedia(value), [value]);
 
   const styleTags = useMemo(() => (value.tags || []).map(normalizeTag), [value.tags]);
+
+  // Prefer legacy origin (has UNKNOWN) for item name; fall back to new origin if present.
+  const originForName = (value.originLegacy ?? (value.origin as any) ?? null) as string | null;
 
   const autoName = useMemo(() => {
     return generateItemName({
       type: value.type,
       mukhi: value.mukhi ?? null,
-      origin: value.origin ?? null,
+      origin: originForName,
       material: value.material ?? null,
       tags: styleTags,
     });
-  }, [value.type, value.mukhi, value.origin, value.material, styleTags]);
+  }, [value.type, value.mukhi, originForName, value.material, styleTags]);
 
   useEffect(() => {
     if (!value.itemName?.trim()) onChange({ ...value, itemName: autoName });
@@ -143,12 +185,11 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
     setField("itemName", autoName);
   }
 
-  const priceMode = (value as any).priceMode || "MRP";
+  const priceMode = value.priceMode || "MRP";
+
   const computedByWeight =
-    priceMode === "WEIGHT" &&
-    typeof value.weightGm === "number" &&
-    typeof (value as any).ratePerGm === "number"
-      ? Math.round(value.weightGm * (value as any).ratePerGm)
+    priceMode === "WEIGHT" && typeof value.weightGm === "number" && typeof value.ratePerGm === "number"
+      ? Math.round(value.weightGm * value.ratePerGm)
       : null;
 
   return (
@@ -170,11 +211,21 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
 
           <div className="space-y-2">
             <div className="text-sm text-gray-600">Origin</div>
+            {/* New schema origin (NEPAL / INDONESIA_JAVA / INDIA / OTHER) */}
             <Tabs
-              value={value.origin || "UNKNOWN"}
+              value={value.origin || "NEPAL"}
+              disabled={readOnlyStatus}
+              options={ORIGIN_TABS.map((o) => ({ label: o.label, value: o.key }))}
+              onChange={(v) => setField("origin", v as Origin)}
+            />
+
+            {/* Optional legacy origin tabs (kept for compatibility / older data). */}
+            <div className="mt-3 text-xs text-gray-500">Legacy Origin (optional)</div>
+            <Tabs
+              value={value.originLegacy || "UNKNOWN"}
               disabled={readOnlyStatus}
               options={ORIGINS.map((o) => ({ label: o.label, value: o.value }))}
-              onChange={(v) => setField("origin", v as RudrakshaOrigin)}
+              onChange={(v) => setField("originLegacy", v as RudrakshaOrigin)}
             />
           </div>
         </div>
@@ -187,6 +238,7 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
             options={[{ label: "—", value: "" }, ...MUKHI_TABS]}
             onChange={(v) => setField("mukhi", v ? Number(v) : null)}
           />
+
           <div className="grid md:grid-cols-3 gap-4 mt-2">
             <label className="space-y-1">
               <div className="text-sm text-gray-600">Mukhi (number)</div>
@@ -234,6 +286,7 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
             />
             Lab Certified
           </label>
+
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -243,6 +296,7 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
             />
             Energized / Pran Pratishtha
           </label>
+
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -331,9 +385,9 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
             ]}
             onChange={(v) => {
               if (v === "MRP") {
-                onChange({ ...value, priceMode: "MRP" as any, ratePerGm: null as any });
+                onChange({ ...value, priceMode: "MRP", ratePerGm: null });
               } else {
-                onChange({ ...value, priceMode: "WEIGHT" as any });
+                onChange({ ...value, priceMode: "WEIGHT" });
               }
             }}
           />
@@ -365,9 +419,7 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
 
             <div className="rounded-xl border p-3 bg-gray-50">
               <div className="text-xs text-gray-600">Effective Price</div>
-              <div className="text-lg font-semibold">
-                ₹{formatInr(value.offerPrice ?? value.mrp ?? null) || "—"}
-              </div>
+              <div className="text-lg font-semibold">₹{formatInr(value.offerPrice ?? value.mrp ?? null) || "—"}</div>
               <div className="text-xs text-gray-500 mt-1">Uses Offer Price if filled, else MRP.</div>
             </div>
           </div>
@@ -388,8 +440,8 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
               <div className="text-sm text-gray-600">Rate per gm (₹)</div>
               <input
                 type="number"
-                value={(value as any).ratePerGm ?? ""}
-                onChange={(e) => setField("ratePerGm" as any, (numOrUndef(e.target.value) ?? null) as any)}
+                value={value.ratePerGm ?? ""}
+                onChange={(e) => setField("ratePerGm", numOrUndef(e.target.value) ?? null)}
                 className="w-full border rounded-xl px-3 py-2"
                 disabled={readOnlyStatus}
               />
@@ -397,7 +449,9 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
 
             <div className="rounded-xl border p-3 bg-gray-50">
               <div className="text-xs text-gray-600">Computed Offer Price</div>
-              <div className="text-lg font-semibold">{computedByWeight == null ? "—" : `₹${formatInr(computedByWeight)}`}</div>
+              <div className="text-lg font-semibold">
+                {computedByWeight == null ? "—" : `₹${formatInr(computedByWeight)}`}
+              </div>
               <div className="text-xs text-gray-500 mt-1">weightGm × ratePerGm (rounded).</div>
             </div>
           </div>
@@ -408,7 +462,6 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
       <section className="rounded-2xl border p-4 space-y-4">
         <div className="text-lg font-semibold">Hashtags (customer search)</div>
 
-        {/* Mukhi chip row (numbers) */}
         {!!suggested?.mukhi?.length && (
           <div className="space-y-2">
             <div className="text-sm text-gray-600">Mukhi tags</div>
@@ -417,13 +470,7 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
                 const tag = normalizeTag(`${n}-mukhi`);
                 const active = (value.tags || []).map(normalizeTag).includes(tag);
                 return (
-                  <Chip
-                    key={tag}
-                    label={tag}
-                    active={active}
-                    onClick={() => toggleTag(tag)}
-                    disabled={readOnlyStatus}
-                  />
+                  <Chip key={tag} label={tag} active={active} onClick={() => toggleTag(tag)} disabled={readOnlyStatus} />
                 );
               })}
             </div>
@@ -441,13 +488,7 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
                   const nt = normalizeTag(t);
                   const active = (value.tags || []).map(normalizeTag).includes(nt);
                   return (
-                    <Chip
-                      key={nt}
-                      label={nt}
-                      active={active}
-                      onClick={() => toggleTag(nt)}
-                      disabled={readOnlyStatus}
-                    />
+                    <Chip key={nt} label={nt} active={active} onClick={() => toggleTag(nt)} disabled={readOnlyStatus} />
                   );
                 })}
               </div>
@@ -475,9 +516,7 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
 
         <div className="text-sm text-gray-600">
           Selected:{" "}
-          <span className="text-black">
-            {(value.tags || []).map(normalizeTag).map((t) => `#${t}`).join(" ")}
-          </span>
+          <span className="text-black">{(value.tags || []).map(normalizeTag).map((t) => `#${t}`).join(" ")}</span>
         </div>
       </section>
 
@@ -518,7 +557,8 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
           items={media.filter((m) => m.kind === "IMG").sort((a, b) => (a.order ?? 0) - (b.order ?? 0))}
           onChange={(nextImgs) => {
             const vids = media.filter((m) => m.kind === "VID");
-            onChange({ ...value, media: [...nextImgs, ...vids] } as any);
+            const certs = media.filter((m) => m.kind === "CERT");
+            onChange({ ...value, media: [...nextImgs, ...vids, ...certs] });
           }}
           allowReorder
           uploadFn={uploadRudrakshaMediaBatch}
@@ -537,7 +577,8 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
           items={media.filter((m) => m.kind === "VID").sort((a, b) => (a.order ?? 0) - (b.order ?? 0))}
           onChange={(nextVids) => {
             const imgs = media.filter((m) => m.kind === "IMG");
-            onChange({ ...value, media: [...imgs, ...nextVids] } as any);
+            const certs = media.filter((m) => m.kind === "CERT");
+            onChange({ ...value, media: [...imgs, ...nextVids, ...certs] });
           }}
           allowReorder
           uploadFn={uploadRudrakshaMediaBatch}

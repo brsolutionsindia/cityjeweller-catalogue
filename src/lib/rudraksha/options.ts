@@ -1,5 +1,17 @@
 // src/lib/rudraksha/options.ts
-import type { ProductCategory, WearType, MukhiType, Origin, RudrakshaShape } from "./types";
+import type {
+  ProductCategory,
+  WearType,
+  MukhiType,
+  Origin,
+  RudrakshaShape,
+  RudrakshaOrigin,
+  RudrakshaType,
+} from "@/lib/rudraksha/types";
+
+/**
+ * UI Options
+ */
 
 export const PRODUCT_CATEGORY_TABS: { key: ProductCategory; label: string }[] = [
   { key: "LOOSE_RUDRAKSHA_BEAD", label: "Loose Bead" },
@@ -55,8 +67,37 @@ export const SHAPE_TABS: { key: RudrakshaShape; label: string; tag: string }[] =
   { key: "NATURAL_IRREGULAR", label: "Natural Irregular", tag: "naturalbead" },
 ];
 
-export function normalizeTag(x: string) {
-  return String(x || "")
+/**
+ * Legacy / Simple dropdown options (kept for compatibility)
+ */
+
+export const RUDRAKSHA_TYPES: { label: string; value: RudrakshaType }[] = [
+  { label: "Mala", value: "MALA" },
+  { label: "Bracelet", value: "BRACELET" },
+  { label: "Pendant", value: "PENDANT" },
+  { label: "Ring", value: "RING" },
+  { label: "Loose Bead", value: "LOOSE_BEAD" },
+  { label: "Kawach", value: "KAWACH" },
+  { label: "Jap Mala", value: "JAP_MALA" },
+  { label: "Combo", value: "COMBO" },
+  { label: "Other", value: "OTHER" },
+];
+
+export const ORIGINS: { label: string; value: RudrakshaOrigin }[] = [
+  { label: "Nepal", value: "NEPAL" },
+  { label: "Indonesia", value: "INDONESIA" },
+  { label: "India", value: "INDIA" },
+  { label: "Bhutan", value: "BHUTAN" },
+  { label: "Unknown", value: "UNKNOWN" },
+];
+
+/**
+ * Tags helpers
+ * (single unified implementation used by everything)
+ */
+
+export function normalizeTag(x: unknown) {
+  return String(x ?? "")
     .trim()
     .toLowerCase()
     .replace(/^#+/, "")
@@ -78,6 +119,9 @@ export function uniqTags(tags: string[]) {
   return out;
 }
 
+/**
+ * Auto-tags (from your richer options file)
+ */
 export function deriveAutoTags(params: {
   productCategory?: string | null;
   intendedWearTypes?: string[] | null;
@@ -90,4 +134,31 @@ export function deriveAutoTags(params: {
   if (params.origin) tags.push(normalizeTag(params.origin));
   for (const w of params.intendedWearTypes || []) tags.push(normalizeTag(w));
   return uniqTags(tags);
+}
+
+/**
+ * Item name generator (from your simpler options file)
+ */
+export function generateItemName(params: {
+  type?: string;
+  mukhi?: number | null;
+  origin?: string | null;
+  material?: string | null;
+  tags?: string[];
+}) {
+  const parts: string[] = [];
+  if (params.mukhi) parts.push(`${params.mukhi} Mukhi`);
+  parts.push(params.type ? title(params.type) : "Rudraksha");
+  if (params.origin && params.origin !== "UNKNOWN") parts.push(title(params.origin));
+  if (params.material) parts.push(title(params.material));
+  const t = (params.tags || []).map(normalizeTag).filter(Boolean).slice(0, 2);
+  if (t.length) parts.push(t.map((x) => `#${x}`).join(" "));
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+function title(s: string) {
+  return String(s ?? "")
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }

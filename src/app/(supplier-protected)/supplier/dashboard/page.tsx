@@ -30,6 +30,17 @@ function SupplierDashboardHome() {
           <div className="text-sm text-gray-600 mt-1"> Strings • Bracelets • Fashion jewellery (non-gold)</div>
         </Link>
 
+<Link
+  href="/supplier/rudraksha"
+  className="border rounded-xl p-5 hover:bg-gray-50"
+>
+  <div className="font-semibold">Rudraksha</div>
+  <div className="text-sm text-gray-600 mt-1">
+    Beads • Mukhi types • Malas • Bracelets
+  </div>
+</Link>
+
+
       </div>
     </main>
   );

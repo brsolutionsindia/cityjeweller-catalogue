@@ -1,21 +1,26 @@
 // src/lib/rudraksha/types.ts
 
+/**
+ * Status / enums
+ */
 export type RudrakshaStatus = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED";
-export type MediaKind = "IMG" | "VID" | "CERT";
 
-export type MediaItem = {
-  id: string;
-  kind: MediaKind;
-  url: string;
-  storagePath: string;
-  order?: number;
-  createdAt?: number;
-  updatedAt?: number;
+export type RudrakshaNature = "RUDRAKSHA" | "RUDRAKSHA_JEWELLERY"; // optional, for future
 
-  // backward compatibility
-  type?: "image" | "video" | "file";
-};
+export type RudrakshaType =
+  | "MALA"
+  | "BRACELET"
+  | "PENDANT"
+  | "RING"
+  | "LOOSE_BEAD"
+  | "KAWACH"
+  | "JAP_MALA"
+  | "COMBO"
+  | "OTHER";
 
+/**
+ * Rich product taxonomy (new)
+ */
 export type ProductCategory =
   | "LOOSE_RUDRAKSHA_BEAD"
   | "RUDRAKSHA_BRACELET"
@@ -54,7 +59,6 @@ export type MukhiType =
   | "TRIJUTI"
   | "OTHER";
 
-export type Origin = "NEPAL" | "INDONESIA_JAVA" | "INDIA" | "OTHER";
 export type RudrakshaShape = "ROUND" | "OVAL" | "NATURAL_IRREGULAR";
 
 export type SurfaceCondition =
@@ -63,7 +67,10 @@ export type SurfaceCondition =
   | "OIL_TREATED"
   | "POLISHED";
 
-export type AuthenticityStatus = "NATURAL_RUDRAKSHA" | "CULTIVATED" | "LAB_PROCESSED";
+export type AuthenticityStatus =
+  | "NATURAL_RUDRAKSHA"
+  | "CULTIVATED"
+  | "LAB_PROCESSED";
 
 export type CertAuthority =
   | "GOVERNMENT_LAB"
@@ -71,7 +78,12 @@ export type CertAuthority =
   | "INDEPENDENT_RUDRAKSHA_LAB"
   | "SUPPLIER_SELF_DECLARATION";
 
-export type JewelleryType = "BRACELET" | "NECKLACE_MALA" | "PENDANT" | "RING" | "EARRINGS";
+export type JewelleryType =
+  | "BRACELET"
+  | "NECKLACE_MALA"
+  | "PENDANT"
+  | "RING"
+  | "EARRINGS";
 
 export type MetalUsed =
   | "SILVER"
@@ -81,10 +93,28 @@ export type MetalUsed =
   | "STAINLESS_STEEL"
   | "OTHER";
 
-export type AdditionalStones = "NONE" | "SPHATIK" | "AMETHYST" | "TIGER_EYE" | "BLACK_ONYX" | "OTHER";
+export type AdditionalStones =
+  | "NONE"
+  | "SPHATIK"
+  | "AMETHYST"
+  | "TIGER_EYE"
+  | "BLACK_ONYX"
+  | "OTHER";
 
-export type DeityAssociation = "SHIVA" | "SHAKTI" | "VISHNU" | "GANESH" | "MULTIPLE" | "NONE_SPECIFIED";
-export type ChakraAssociation = "ROOT" | "HEART" | "THIRD_EYE" | "CROWN" | "MULTIPLE";
+export type DeityAssociation =
+  | "SHIVA"
+  | "SHAKTI"
+  | "VISHNU"
+  | "GANESH"
+  | "MULTIPLE"
+  | "NONE_SPECIFIED";
+
+export type ChakraAssociation =
+  | "ROOT"
+  | "HEART"
+  | "THIRD_EYE"
+  | "CROWN"
+  | "MULTIPLE";
 
 export type Benefit =
   | "PEACE_CALM"
@@ -96,15 +126,90 @@ export type Benefit =
 
 export type PackagingType = "CLOTH_POUCH" | "WOODEN_BOX" | "PREMIUM_GIFT_BOX";
 
+/**
+ * Origins (both models supported)
+ * - Origin: richer enum used by the new schema (Indonesia is split as Java)
+ * - RudrakshaOrigin: legacy/simple dropdown with Bhutan/Unknown
+ */
+export type Origin = "NEPAL" | "INDONESIA_JAVA" | "INDIA" | "OTHER";
+
+export type RudrakshaOrigin = "NEPAL" | "INDONESIA" | "INDIA" | "BHUTAN" | "UNKNOWN";
+
+/**
+ * Pricing (legacy/simple)
+ */
+export type PriceMode = "MRP" | "WEIGHT";
+
+/**
+ * Media (unified)
+ */
+export type MediaKind = "IMG" | "VID" | "CERT";
+
+export type MediaItem = {
+  id: string;
+  kind: MediaKind; // IMG | VID | CERT
+  url: string;
+  storagePath: string;
+  order?: number;
+  createdAt?: number;
+  updatedAt?: number;
+
+  // optional metadata
+  contentType?: string | null;
+
+  // backward compatibility (very old)
+  type?: "image" | "video" | "file";
+};
+
+/**
+ * Submission (merged)
+ * Keeps the richer schema, while also preserving legacy/simple fields for older UIs/data.
+ */
 export type RudrakshaSubmission = {
   skuId: string;
   gstNumber: string;
   supplierUid: string;
 
-  status: RudrakshaStatus;
+  // status: required in new schema, optional in legacy -> allow optional but keep compatible
+  status?: RudrakshaStatus;
 
   createdAt?: number;
   updatedAt?: number;
+
+  // -----------------------------
+  // Legacy/simple core product
+  // -----------------------------
+  nature?: RudrakshaNature; // optional, for future
+  type?: RudrakshaType;
+  originLegacy?: RudrakshaOrigin; // renamed to avoid clashing with new 'origin'
+  mukhi?: number | null; // 1..21 typically
+  sizeMm?: number | null; // single bead size
+  weightGm?: number | null;
+
+  // legacy quality / compliance
+  labCertified?: boolean | null;
+  certificateLab?: string | null;
+  energized?: boolean | null;
+  natural?: boolean | null;
+
+  // legacy jewellery fields
+  material?: string | null;
+  closure?: string | null;
+  lengthInch?: number | null;
+
+  // legacy pricing
+  currency?: "INR";
+  priceMode?: PriceMode | null;
+  ratePerGm?: number | null;
+  mrp?: number | null;
+  offerPrice?: number | null;
+
+  // legacy seo/search
+  itemName?: string;
+
+  // -----------------------------
+  // New/rich schema fields
+  // -----------------------------
 
   // PRODUCT TYPE SELECTION
   productCategory?: ProductCategory | null;
@@ -114,8 +219,11 @@ export type RudrakshaSubmission = {
   // RUDRAKSHA SPECIFICATIONS
   mukhiType?: MukhiType | null;
   mukhiOther?: string | null;
+
+  // NOTE: new schema uses 'origin' (Origin), legacy uses 'originLegacy' (RudrakshaOrigin)
   origin?: Origin | null;
   originOther?: string | null;
+
   rudrakshaShape?: RudrakshaShape | null;
 
   beadSizeMinMm?: number | null;
@@ -151,7 +259,7 @@ export type RudrakshaSubmission = {
   chakraAssociation?: ChakraAssociation[] | null;
   suggestedBenefits?: Benefit[] | null;
 
-  // PRICING & COMMERCIALS
+  // PRICING & COMMERCIALS (new)
   costPrice?: number | null;
   suggestedMrp?: number | null;
   moq?: number | null;
