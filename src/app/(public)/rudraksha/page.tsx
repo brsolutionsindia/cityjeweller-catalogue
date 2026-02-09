@@ -30,24 +30,34 @@ export default function RudrakshaListPage() {
     return () => { alive = false; };
   }, []);
 
+  const getType = (x: any) => x.type ?? x.typeLegacy ?? x.productType ?? x.category ?? "";
+  const getOrigin = (x: any) => x.origin ?? x.originLegacy ?? x.originNew ?? "";
+  const getMukhi = (x: any) => x.mukhi ?? x.mukhiType ?? null;
+
   const meta = useMemo(() => {
-    const types = uniq(items.map((x) => String(x.type || "").toUpperCase()).filter(Boolean));
+    const types = uniq(items.map((x) => String(x.productCategory || "").toUpperCase()).filter(Boolean));
     const origins = uniq(items.map((x) => String(x.origin || "").toUpperCase()).filter(Boolean));
-    const mukhis = uniq(items.map((x) => String(x.mukhi ?? "")).filter(Boolean));
+    const mukhis = uniq(items.map((x) => String(x.mukhiType ?? "")).filter(Boolean));
     return { types, origins, mukhis };
   }, [items]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     return items.filter((it) => {
-      const text = `${it.skuId} ${it.type || ""} ${it.origin || ""} ${it.mukhi ?? ""}`.toLowerCase();
+      const t = String(getType(it) || "");
+      const o = String(getOrigin(it) || "");
+      const m = getMukhi(it);
+
+      const text = `${it.skuId} ${t} ${o} ${m ?? ""}`.toLowerCase();
       if (s && !text.includes(s)) return false;
-      if (type !== "ALL" && String(it.type || "").toUpperCase() !== type) return false;
-      if (origin !== "ALL" && String(it.origin || "").toUpperCase() !== origin) return false;
-      if (mukhi !== "ALL" && String(it.mukhi ?? "") !== mukhi) return false;
+
+      if (type !== "ALL" && String(t).toUpperCase() !== type) return false;
+      if (origin !== "ALL" && String(o).toUpperCase() !== origin) return false;
+      if (mukhi !== "ALL" && String(m ?? "") !== mukhi) return false;
       return true;
     });
   }, [items, q, type, origin, mukhi]);
+
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-4">
