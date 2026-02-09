@@ -17,7 +17,8 @@ export default function RudrakshaCard({ it }: { it: PublicRudraksha }) {
 
       <div className="p-3 space-y-1">
         <div className="text-sm font-semibold line-clamp-2">
-          {it.mukhi ? `${it.mukhi} Mukhi ` : ""}{it.type || "Rudraksha"}
+          {it.mukhiType ? `${it.mukhiType} Mukhi ` : ""}{it.productCategory || "Rudraksha"}
+
         </div>
         <div className="text-xs text-gray-500">{it.origin || ""} • {it.skuId}</div>
         <div className="pt-1 text-sm font-bold">{price ? `₹${price.toLocaleString("en-IN")}` : "—"}</div>
