@@ -7,7 +7,12 @@ import { useParams, useRouter } from "next/navigation";
 import { useSupplierSession } from "@/lib/firebase/supplierContext";
 import RudrakshaForm from "@/components/supplier/RudrakshaForm";
 import type { RudrakshaSubmission } from "@/lib/rudraksha/types";
-import { getRudrakshaSubmission, upsertRudrakshaSubmission, submitRudrakshaForApproval } from "@/lib/firebase/rudrakshaDb";
+import {
+  getRudrakshaSubmission,
+  upsertRudrakshaSubmission,
+  submitForApprovalRudraksha,
+} from "@/lib/firebase/rudrakshaDb";
+
 
 function toStr(x: any) { return String(x ?? "").trim(); }
 
@@ -68,7 +73,7 @@ export default function SupplierRudrakshaEditPage() {
     setErr("");
     try {
       await upsertRudrakshaSubmission(form, { triggerReapprovalIfApproved: true });
-      await submitRudrakshaForApproval(form.gstNumber, form.skuId, form.supplierUid);
+      await submitForApprovalRudraksha(form.gstNumber, form.skuId, form.supplierUid);
       alert("Submitted for approval.");
       router.push("/supplier/rudraksha");
       router.refresh();
