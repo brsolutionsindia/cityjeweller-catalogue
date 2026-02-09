@@ -462,7 +462,12 @@ const session = useSupplierSession();
     if (!gst || !uid) return;
     if (!selectedIds.length) return;
 
-    const ok = window.confirm(`Delete ${selectedIds.length} listing(s)? This will remove them from your submissions.`);
+    const ok = window.confirm(
+      `Delete ${selectedIds.length} listing(s)?\n\n` +
+      `• Draft/Pending/Rejected: will be deleted.\n` +
+      `• Approved: will be UNLISTED from website and moved to Review (admin re-approval required).`
+    );
+
     if (!ok) return;
 
     setLoading(true);

@@ -1,3 +1,4 @@
+// src/lib/firebase/rudrakshaDb.ts
 import { db, storage } from "@/firebaseConfig";
 import {
   get,
@@ -16,37 +17,28 @@ import {
 
 import { getFunctions, httpsCallable } from "firebase/functions";
 
-import type { GemstoneJewellerySubmission, MediaItem } from "@/lib/gemstoneJewellery/types";
-import { uniqTags, normalizeTag } from "@/lib/gemstoneJewellery/options";
-
-/**
- * ✅ Goals (backward compatible):
- * - Keep ALL existing exported functions (no breakage)
- * - Avoid undefined in RTDB payloads (undefined -> null)
- * - Normalize optional strings/numbers (empty -> null)
- * - Reapproval/Unpublish should be server-first (Cloud Function), but fallback kept.
- * - Supplier delete on APPROVED listing becomes UNLIST request (server unpublishes).
- */
+import type { RudrakshaSubmission, MediaItem, MediaKind } from "@/lib/rudraksha/types";
+import { uniqTags, normalizeTag } from "@/lib/rudraksha/options";
 
 /* -------------------- DB nodes -------------------- */
-const SUBMISSION_NODE = (gstNumber: string) => `GST/${gstNumber}/Submissions/GemstoneJewellery`;
+const SUBMISSION_NODE = (gstNumber: string) => `GST/${gstNumber}/Submissions/Rudraksha`;
 const SUPPLIER_INDEX = (gstNumber: string, uid: string) =>
-  `GST/${gstNumber}/Indexes/GemstoneJewellerySubmissions/BySupplier/${uid}`;
+  `GST/${gstNumber}/Indexes/RudrakshaSubmissions/BySupplier/${uid}`;
 const SUPPLIER_DEFAULTS = (gstNumber: string, uid: string) =>
-  `GST/${gstNumber}/SupplierDefaults/GemstoneJewellery/${uid}`;
-const ADMIN_QUEUE = `AdminQueue/GemstoneJewellery`;
+  `GST/${gstNumber}/SupplierDefaults/Rudraksha/${uid}`;
+const ADMIN_QUEUE = `AdminQueue/Rudraksha`;
 
 // Published global
-const GLOBAL_NODE = `Global SKU/GemstoneJewellery`;
-const GLOBAL_TAG_INDEX = `Global SKU/Indexes/GemstoneJewellery/ByTag`;
-const GLOBAL_TYPE_INDEX = `Global SKU/Indexes/GemstoneJewellery/ByType`;
-const GLOBAL_NATURE_INDEX = `Global SKU/Indexes/GemstoneJewellery/ByNature`;
+const GLOBAL_NODE = `Global SKU/Rudraksha`;
+const GLOBAL_TAG_INDEX = `Global SKU/Indexes/Rudraksha/ByTag`;
+const GLOBAL_CATEGORY_INDEX = `Global SKU/Indexes/Rudraksha/ByCategory`;
+const GLOBAL_MUKHI_INDEX = `Global SKU/Indexes/Rudraksha/ByMukhi`;
 
-// ✅ Requests (new, backward compatible)
-const REQUESTS_NODE = (gstNumber: string) => `GST/${gstNumber}/Requests/GemstoneJewellery`;
+// Requests
+const REQUESTS_NODE = (gstNumber: string) => `GST/${gstNumber}/Requests/Rudraksha`;
 
-// Storage – keep GlobalSKU like YellowSapphire
-const STORAGE_BASE = (skuId: string) => `GlobalSKU/GemstoneJewellery/${skuId}`;
+// Storage
+const STORAGE_BASE = (skuId: string) => `GlobalSKU/Rudraksha/${skuId}`;
 
 /* -------------------- helpers -------------------- */
 function extFromFile(file: File) {
@@ -55,12 +47,10 @@ function extFromFile(file: File) {
   const m = file.name.match(/\.([a-zA-Z0-9]+)$/);
   return (m?.[1] || "bin").toLowerCase();
 }
-
 function cleanSku(skuId: string) {
   return skuId.trim().replace(/[^A-Za-z0-9_-]/g, "");
 }
-
-function makeMediaFileName(skuId: string, kind: "IMG" | "VID", file: File) {
+function makeMediaFileName(skuId: string, kind: MediaKind, file: File) {
   const ext = extFromFile(file);
   const ts = Date.now();
   const rnd = Math.random().toString(36).slice(2, 8);
@@ -96,25 +86,16 @@ function strOrNull(v: any): string | null {
   const s = String(v ?? "").trim();
   return s ? s : null;
 }
-
 function numOrNull(v: any): number | null {
   if (v === "" || v === null || v === undefined) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-/**
- * ✅ Firebase RTDB rejects undefined anywhere inside payload.
- * We convert undefined -> null recursively.
- */
 function stripUndefinedDeep<T>(input: T): T {
   if (input === undefined) return null as any;
   if (input === null) return input;
-
-  if (Array.isArray(input)) {
-    return input.map((x) => stripUndefinedDeep(x)) as any;
-  }
-
+  if (Array.isArray(input)) return input.map((x) => stripUndefinedDeep(x)) as any;
   if (typeof input === "object") {
     const out: any = {};
     for (const [k, v] of Object.entries(input as any)) {
@@ -122,25 +103,13 @@ function stripUndefinedDeep<T>(input: T): T {
     }
     return out;
   }
-
   return input;
 }
 
-/** Safe build for removing website indexes */
-function buildIndexRemovals(listing: GemstoneJewellerySubmission) {
-  const tags = uniqTags(listing.tags || []).map(normalizeTag);
-  const updates: Record<string, any> = {};
-
-  for (const t of tags) updates[`${GLOBAL_TAG_INDEX}/${t}/${listing.skuId}`] = null;
-  if (listing.type) updates[`${GLOBAL_TYPE_INDEX}/${listing.type}/${listing.skuId}`] = null;
-  if (listing.nature) updates[`${GLOBAL_NATURE_INDEX}/${listing.nature}/${listing.skuId}`] = null;
-
-  return updates;
-}
-
-function asKind(m: any): "IMG" | "VID" {
-  if (m?.kind === "IMG" || m?.kind === "VID") return m.kind;
+function asKind(m: any): MediaKind {
+  if (m?.kind === "IMG" || m?.kind === "VID" || m?.kind === "CERT") return m.kind;
   if (m?.type === "video") return "VID";
+  if (m?.type === "file") return "CERT";
   return "IMG";
 }
 
@@ -151,23 +120,29 @@ function pickThumbFromSubmission(sub: any): string {
   return (imgs?.[0] as any)?.url || "";
 }
 
+function buildIndexRemovals(listing: RudrakshaSubmission) {
+  const tags = uniqTags(listing.tags || []).map(normalizeTag);
+  const updates: Record<string, any> = {};
+
+  for (const t of tags) updates[`${GLOBAL_TAG_INDEX}/${t}/${listing.skuId}`] = null;
+  if (listing.productCategory) updates[`${GLOBAL_CATEGORY_INDEX}/${listing.productCategory}/${listing.skuId}`] = null;
+  if (listing.mukhiType) updates[`${GLOBAL_MUKHI_INDEX}/${listing.mukhiType}/${listing.skuId}`] = null;
+
+  return updates;
+}
+
 /* -------------------- common -------------------- */
-export async function deleteMediaObject(storagePath: string) {
+export async function deleteRudrakshaMedia(storagePath: string) {
   if (!storagePath) return;
   await deleteObject(sRef(storage, storagePath));
 }
 
-export async function deleteGemstoneJewelleryMedia(storagePath: string) {
-  if (!storagePath) return;
-  await deleteObject(sRef(storage, storagePath));
-}
-
-/* -------------------- NEW: supplier approved delete => UNLIST request -------------------- */
-export async function requestUnlistGemstoneJewellery(params: {
+/* -------------------- Requests: supplier approved delete => UNLIST -------------------- */
+export async function requestUnlistRudraksha(params: {
   gstNumber: string;
   skuId: string;
   supplierUid: string;
-  reason?: string; // "SUPPLIER_DELETE_REQUEST"
+  reason?: string;
 }) {
   const gst = normalizeGstNumber(params.gstNumber);
   if (!gst) throw new Error("Missing gstNumber");
@@ -194,12 +169,7 @@ export async function requestUnlistGemstoneJewellery(params: {
 }
 
 /* -------------------- supplier edit => reapproval + hide from website -------------------- */
-/**
- * ✅ Backward compatible:
- * - Server-first: call Cloud Function gemstoneJewelleryShiftToReview
- * - Fallback: your existing multi-location update (if still allowed by rules)
- */
-export async function markGemstoneJewelleryForReapproval(params: {
+export async function markRudrakshaForReapproval(params: {
   gstNumber: string;
   skuId: string;
   supplierUid: string;
@@ -211,35 +181,31 @@ export async function markGemstoneJewelleryForReapproval(params: {
   if (!params.skuId) throw new Error("Missing skuId");
   if (!params.supplierUid) throw new Error("Missing supplierUid");
 
-  // ✅ Try server-side first
+  // ✅ Server-first (optional): cloud function rudrakshaShiftToReview
   try {
-    const fn = httpsCallable(getFunctions(), "gemstoneJewelleryShiftToReview");
+    const fn = httpsCallable(getFunctions(), "rudrakshaShiftToReview");
     await fn({ gstNumber: gst, skuId: params.skuId });
     return;
   } catch {
     // fallback continues below
   }
 
-  // ---------------- fallback (your current client-side logic) ----------------
+  // fallback client-side (your gemstone pattern)
   const now = Date.now();
   const submissionPath = `${SUBMISSION_NODE(gst)}/${params.skuId}`;
 
-  // Read current submission to remove indexes safely
   const snap = await get(dbRef(db, submissionPath));
-  const sub = snap.exists() ? (snap.val() as GemstoneJewellerySubmission) : null;
+  const sub = snap.exists() ? (snap.val() as RudrakshaSubmission) : null;
 
-  // thumb fallback
   let thumbUrl = params.thumbUrl || "";
   if (!thumbUrl && sub) thumbUrl = pickThumbFromSubmission(sub);
 
   const updates: Record<string, any> = {};
 
-  // Mark pending
   updates[`${submissionPath}/status`] = "PENDING";
   updates[`${submissionPath}/updatedAt`] = now;
   updates[`${submissionPath}/_updatedAtServer`] = serverTimestamp();
 
-  // Admin queue item
   updates[`${ADMIN_QUEUE}/${params.skuId}`] = stripUndefinedDeep({
     gstNumber: gst,
     skuId: params.skuId,
@@ -252,7 +218,7 @@ export async function markGemstoneJewelleryForReapproval(params: {
     _queuedAtServer: serverTimestamp(),
   });
 
-  // Remove from website
+  // Remove from website + indexes
   updates[`${GLOBAL_NODE}/${params.skuId}`] = null;
   if (sub) Object.assign(updates, buildIndexRemovals(sub));
 
@@ -260,7 +226,7 @@ export async function markGemstoneJewelleryForReapproval(params: {
 }
 
 /* -------------------- SKU allocator -------------------- */
-export async function allocateGemstoneJewellerySku(gstNumber: string, supplierUid: string) {
+export async function allocateRudrakshaSku(gstNumber: string, supplierUid: string) {
   const gst = normalizeGstNumber(gstNumber);
   if (!gst) throw new Error("GST is required");
 
@@ -268,19 +234,21 @@ export async function allocateGemstoneJewellerySku(gstNumber: string, supplierUi
   const x = String(xSnap.val() || "").trim();
   if (!x) throw new Error("Missing /GST/<GST>/SKUID Code");
 
-  const serialRef = dbRef(db, `GST/${gst}/Counters/GemstoneJewellerySerial/${supplierUid}`);
+  const serialRef = dbRef(db, `GST/${gst}/Counters/RudrakshaSerial/${supplierUid}`);
   const txn = await runTransaction(serialRef, (cur) => Number(cur || 0) + 1);
   if (!txn.committed) throw new Error("Could not allocate serial");
 
   const y = Number(txn.snapshot.val());
   const yPadded = String(y).padStart(3, "0");
-  const skuId = `8165GJ${x}${yPadded}`;
+
+  // ✅ choose your own prefix; keep it consistent & searchable
+  const skuId = `8165RD${x}${yPadded}`;
 
   return { skuId, x, y, yPadded };
 }
 
 /* -------------------- submission stub (create once) -------------------- */
-export async function createGemstoneJewellerySubmissionStub(params: {
+export async function createRudrakshaSubmissionStub(params: {
   skuId: string;
   gstNumber: string;
   supplierUid: string;
@@ -292,13 +260,14 @@ export async function createGemstoneJewellerySubmissionStub(params: {
   const docRef = dbRef(db, `${SUBMISSION_NODE(gstNumberNorm)}/${skuId}`);
 
   await runTransaction(docRef, (cur) => {
-    if (cur) return cur; // already exists
+    if (cur) return cur;
     return stripUndefinedDeep({
       skuId,
       gstNumber: gstNumberNorm,
       supplierUid,
       status: "DRAFT",
       media: [],
+      tags: ["rudraksha"],
       createdAt: Date.now(),
       updatedAt: Date.now(),
       _createdAtServer: serverTimestamp(),
@@ -306,7 +275,6 @@ export async function createGemstoneJewellerySubmissionStub(params: {
     });
   });
 
-  // ensure supplier index exists
   await update(
     dbRef(db),
     stripUndefinedDeep({
@@ -318,42 +286,37 @@ export async function createGemstoneJewellerySubmissionStub(params: {
 }
 
 /* -------------------- read helpers -------------------- */
-export async function getGemstoneJewellerySubmission(gstNumber: string, skuId: string) {
+export async function getRudrakshaSubmission(gstNumber: string, skuId: string) {
   const gst = normalizeGstNumber(gstNumber);
   const snap = await get(dbRef(db, `${SUBMISSION_NODE(gst)}/${skuId}`));
-  return snap.exists() ? (snap.val() as GemstoneJewellerySubmission) : null;
+  return snap.exists() ? (snap.val() as RudrakshaSubmission) : null;
 }
 
-export async function listGemstoneJewellerySubmissionsBySupplier(gstNumber: string, uid: string) {
+export async function listRudrakshaSubmissionsBySupplier(gstNumber: string, uid: string) {
   const gst = normalizeGstNumber(gstNumber);
   const idxSnap = await get(dbRef(db, SUPPLIER_INDEX(gst, uid)));
   if (!idxSnap.exists()) return [] as string[];
   return Object.keys(idxSnap.val() || {});
 }
 
-export async function getSupplierDefaultsGemstoneJewellery(
+export async function getSupplierDefaultsRudraksha(
   gstNumber: string,
   supplierUid: string
-): Promise<Partial<GemstoneJewellerySubmission> | null> {
+): Promise<Partial<RudrakshaSubmission> | null> {
   const gst = normalizeGstNumber(gstNumber);
   const snap = await get(dbRef(db, SUPPLIER_DEFAULTS(gst, supplierUid)));
   return snap.exists() ? (snap.val() as any) : null;
 }
 
 /* -------------------- upsert submission -------------------- */
-/**
- * Upserts submission.
- * If you pass `triggerReapprovalIfApproved: true`, then:
- * - if existing status is APPROVED -> auto push to AdminQueue + remove from website (server-first).
- */
-export async function upsertGemstoneJewellerySubmission(
-  input: GemstoneJewellerySubmission,
+export async function upsertRudrakshaSubmission(
+  input: RudrakshaSubmission,
   opts?: { triggerReapprovalIfApproved?: boolean }
 ) {
   const now = Date.now();
 
   const gstNumber = normalizeGstNumber(input);
-  if (!gstNumber) throw new Error("Missing gstNumber in GemstoneJewellerySubmission");
+  if (!gstNumber) throw new Error("Missing gstNumber in RudrakshaSubmission");
   if (!input.skuId) throw new Error("Missing skuId");
   if (!input.supplierUid) throw new Error("Missing supplierUid");
 
@@ -368,9 +331,9 @@ export async function upsertGemstoneJewellerySubmission(
     priorStatus = null;
   }
 
-  // ✅ normalize media + kill undefineds
+  // normalize media
   const mediaNorm = safeArray<MediaItem>((input as any).media).map((m, i) => {
-    const kind = (m as any).kind || ((m as any).type === "video" ? "VID" : "IMG");
+    const kind = asKind(m);
     return stripUndefinedDeep({
       ...(m as any),
       kind,
@@ -378,37 +341,42 @@ export async function upsertGemstoneJewellerySubmission(
       order: typeof (m as any).order === "number" ? (m as any).order : i,
       createdAt: (m as any).createdAt ?? now,
       updatedAt: (m as any).updatedAt ?? now,
+      type: kind === "VID" ? "video" : kind === "CERT" ? "file" : "image",
     }) as any;
   }) as any;
 
-  const cleaned: GemstoneJewellerySubmission = stripUndefinedDeep({
+  const cleaned: RudrakshaSubmission = stripUndefinedDeep({
     ...input,
     gstNumber,
     tags: uniqTags(input.tags || []),
     updatedAt: now,
     createdAt: (input as any).createdAt ?? now,
-    currency: (input as any).currency ?? "INR",
     media: mediaNorm,
 
-    // normalize optional strings -> null
-    stoneName: strOrNull((input as any).stoneName),
-    lookName: strOrNull((input as any).lookName),
-    material: strOrNull((input as any).material),
-    closure: strOrNull((input as any).closure),
+    // normalize optional strings
+    productCategoryOther: strOrNull((input as any).productCategoryOther),
+    mukhiOther: strOrNull((input as any).mukhiOther),
+    originOther: strOrNull((input as any).originOther),
+    labProcessDetails: strOrNull((input as any).labProcessDetails),
+    metalPurity: strOrNull((input as any).metalPurity),
+    additionalStonesOther: strOrNull((input as any).additionalStonesOther),
+    productTitle: strOrNull((input as any).productTitle),
+    shortDescription: strOrNull((input as any).shortDescription),
+    detailedDescription: strOrNull((input as any).detailedDescription),
+    careInstructions: strOrNull((input as any).careInstructions),
 
-    // normalize optional numbers -> null
-    beadSizeMm: numOrNull((input as any).beadSizeMm),
-    lengthInch: numOrNull((input as any).lengthInch),
-    weightGm: numOrNull((input as any).weightGm),
-    mrp: numOrNull((input as any).mrp),
-    offerPrice: numOrNull((input as any).offerPrice),
-
-    // pricing mode fields (optional)
-    priceMode: (input as any).priceMode ?? null,
-    ratePerGm: numOrNull((input as any).ratePerGm),
+    // normalize optional numbers
+    beadSizeMinMm: numOrNull((input as any).beadSizeMinMm),
+    beadSizeMaxMm: numOrNull((input as any).beadSizeMaxMm),
+    numberOfBeadsCustom: numOrNull((input as any).numberOfBeadsCustom),
+    metalWeightGm: numOrNull((input as any).metalWeightGm),
+    costPrice: numOrNull((input as any).costPrice),
+    suggestedMrp: numOrNull((input as any).suggestedMrp),
+    moq: numOrNull((input as any).moq),
+    availableQty: numOrNull((input as any).availableQty),
+    returnPolicyDays: numOrNull((input as any).returnPolicyDays),
   }) as any;
 
-  // ✅ sanitize payload before update()
   const payload = stripUndefinedDeep({
     ...cleaned,
     _updatedAtServer: serverTimestamp(),
@@ -422,33 +390,25 @@ export async function upsertGemstoneJewellerySubmission(
     stripUndefinedDeep({ [cleaned.skuId]: true })
   );
 
-  // ✅ Save supplier defaults (all null-safe)
+  // supplier defaults (light)
   await update(
     dbRef(db, SUPPLIER_DEFAULTS(gstNumber, cleaned.supplierUid)),
     stripUndefinedDeep({
-      nature: (cleaned as any).nature ?? null,
-      type: (cleaned as any).type ?? null,
-      stoneName: (cleaned as any).stoneName ?? null,
-      lookName: (cleaned as any).lookName ?? null,
-      material: (cleaned as any).material ?? null,
-      closure: (cleaned as any).closure ?? null,
-      beadSizeMm: (cleaned as any).beadSizeMm ?? null,
-      lengthInch: (cleaned as any).lengthInch ?? null,
-      weightGm: (cleaned as any).weightGm ?? null,
-      priceMode: (cleaned as any).priceMode ?? null,
-      ratePerGm: (cleaned as any).ratePerGm ?? null,
-      mrp: (cleaned as any).mrp ?? null,
-      offerPrice: (cleaned as any).offerPrice ?? null,
+      productCategory: (cleaned as any).productCategory ?? null,
+      mukhiType: (cleaned as any).mukhiType ?? null,
+      origin: (cleaned as any).origin ?? null,
+      jewelleryType: (cleaned as any).jewelleryType ?? null,
+      metalUsed: (cleaned as any).metalUsed ?? null,
+      packagingType: (cleaned as any).packagingType ?? null,
       updatedAt: now,
       _updatedAtServer: serverTimestamp(),
     })
   );
 
-  // ✅ auto trigger reapproval if supplier edited an already approved listing
+  // auto trigger reapproval if supplier edited an approved listing
   if (opts?.triggerReapprovalIfApproved && String(priorStatus || "").toUpperCase() === "APPROVED") {
     const thumbUrl = pickThumbFromSubmission(cleaned);
-
-    await markGemstoneJewelleryForReapproval({
+    await markRudrakshaForReapproval({
       gstNumber,
       skuId: cleaned.skuId,
       supplierUid: cleaned.supplierUid,
@@ -461,7 +421,7 @@ export async function upsertGemstoneJewellerySubmission(
 }
 
 /* -------------------- submit for approval -------------------- */
-export async function submitForApproval(gstNumber: string, skuId: string, supplierUid: string) {
+export async function submitForApprovalRudraksha(gstNumber: string, skuId: string, supplierUid: string) {
   const gst = normalizeGstNumber(gstNumber);
   if (!gst) throw new Error("Missing gstNumber");
   const now = Date.now();
@@ -478,7 +438,7 @@ export async function submitForApproval(gstNumber: string, skuId: string, suppli
   );
 
   const subSnap = await get(dbRef(db, submissionPath));
-  const sub = subSnap.exists() ? (subSnap.val() as GemstoneJewellerySubmission) : null;
+  const sub = subSnap.exists() ? (subSnap.val() as RudrakshaSubmission) : null;
 
   const thumbUrl = pickThumbFromSubmission(sub);
 
@@ -499,10 +459,10 @@ export async function submitForApproval(gstNumber: string, skuId: string, suppli
 }
 
 /* -------------------- media upload -------------------- */
-export async function uploadGemstoneJewelleryMediaBatch(params: {
-  gst: string; // kept for compatibility
+export async function uploadRudrakshaMediaBatch(params: {
+  gst: string; // kept for compatibility like your gemstone function
   skuId: string;
-  kind: "IMG" | "VID";
+  kind: MediaKind; // IMG | VID | CERT
   files: File[];
 }): Promise<MediaItem[]> {
   const { skuId, kind, files } = params;
@@ -511,7 +471,7 @@ export async function uploadGemstoneJewelleryMediaBatch(params: {
   if (!files?.length) return [];
 
   const uploaded: MediaItem[] = [];
-  const folder = kind === "VID" ? "videos" : "images";
+  const folder = kind === "VID" ? "videos" : kind === "CERT" ? "certificates" : "images";
   const basePath = STORAGE_BASE(skuId);
 
   for (let i = 0; i < files.length; i++) {
@@ -541,6 +501,7 @@ export async function uploadGemstoneJewelleryMediaBatch(params: {
         order: i,
         createdAt: now,
         updatedAt: now,
+        type: kind === "VID" ? "video" : kind === "CERT" ? "file" : "image",
       }) as any
     );
   }
@@ -548,37 +509,13 @@ export async function uploadGemstoneJewelleryMediaBatch(params: {
   return uploaded;
 }
 
-/* -------------------- optional cleanup -------------------- */
-export async function deleteGemstoneJewelleryDraft(params: {
-  gstNumber: string;
-  skuId: string;
-  supplierUid: string;
-}) {
-  const gst = normalizeGstNumber(params.gstNumber);
-  const { skuId, supplierUid } = params;
-
-  await remove(dbRef(db, `${SUBMISSION_NODE(gst)}/${skuId}`));
-  await remove(dbRef(db, `${SUPPLIER_INDEX(gst, supplierUid)}/${skuId}`));
-  await remove(dbRef(db, `${ADMIN_QUEUE}/${skuId}`));
-
-  // Also remove from website if any (admin rules may block; safe attempt)
-  await remove(dbRef(db, `${GLOBAL_NODE}/${skuId}`));
-}
-
 /* -------------------- delete submission (draft/pending/rejected) -------------------- */
-/**
- * ✅ Backward compatible signature (kept).
- * ✅ NEW behavior: if status is APPROVED and supplier is deleting:
- * - DO NOT hard delete
- * - Create UNLIST request (server will unpublish + move to review)
- */
-export async function deleteGemstoneJewellerySubmission(params: {
+export async function deleteRudrakshaSubmission(params: {
   gstNumber: string;
   skuId: string;
   supplierUid: string;
   deleteMedia?: boolean; // default true
 
-  // ✅ NEW: only admin should set these true
   alsoDeleteFromAdminQueue?: boolean; // default false
   alsoDeleteFromGlobalSku?: boolean;  // default false
 }) {
@@ -591,29 +528,23 @@ export async function deleteGemstoneJewellerySubmission(params: {
 
   const submissionPath = `${SUBMISSION_NODE(gst)}/${skuId}`;
 
-  // 1) Read submission once (for status + media paths)
   const snap = await get(dbRef(db, submissionPath));
-  const sub = snap.exists() ? (snap.val() as GemstoneJewellerySubmission) : null;
+  const sub = snap.exists() ? (snap.val() as RudrakshaSubmission) : null;
 
-  // If it doesn't exist, treat as already deleted
   if (!sub) {
-    const updates: Record<string, any> = {};
-    updates[`${SUPPLIER_INDEX(gst, supplierUid)}/${skuId}`] = null;
-    await update(dbRef(db), stripUndefinedDeep(updates));
+    await update(dbRef(db), stripUndefinedDeep({ [`${SUPPLIER_INDEX(gst, supplierUid)}/${skuId}`]: null }));
     return true;
   }
 
-  // ✅ Safety: prevent deleting someone else's SKU (client-side check)
   if (String((sub as any).supplierUid || "") !== supplierUid) {
     throw new Error("Not allowed: SKU does not belong to this supplier");
   }
 
   const status = String((sub as any).status || "").toUpperCase();
 
-  // ✅ Supplier delete of APPROVED listing -> UNLIST request (no hard delete)
-  // (Admin can still hard delete with flags from admin UI)
+  // supplier delete of APPROVED -> UNLIST request (unless admin flags)
   if (status === "APPROVED" && !params.alsoDeleteFromGlobalSku && !params.alsoDeleteFromAdminQueue) {
-    await requestUnlistGemstoneJewellery({
+    await requestUnlistRudraksha({
       gstNumber: gst,
       skuId,
       supplierUid,
@@ -622,32 +553,26 @@ export async function deleteGemstoneJewellerySubmission(params: {
     return true;
   }
 
-  // 2) Build multi-location delete updates (RTDB)
   const updates: Record<string, any> = {};
-
-  // ✅ always allowed paths (supplier-owned under GST)
   updates[submissionPath] = null;
   updates[`${SUPPLIER_INDEX(gst, supplierUid)}/${skuId}`] = null;
 
-  // ❗ Only remove global indexes if ALSO deleting from global sku (admin path)
   if (params.alsoDeleteFromGlobalSku) {
     updates[`${GLOBAL_NODE}/${skuId}`] = null;
     Object.assign(updates, buildIndexRemovals(sub));
   }
 
-  // AdminQueue optional delete (admin UI)
   if (params.alsoDeleteFromAdminQueue) {
     updates[`${ADMIN_QUEUE}/${skuId}`] = null;
   }
 
   await update(dbRef(db), stripUndefinedDeep(updates));
 
-  // 3) Delete media from Storage (best-effort)
   const doDeleteMedia = params.deleteMedia !== false;
   if (doDeleteMedia) {
     const media = safeArray<MediaItem>((sub as any).media);
     const paths = media.map((m: any) => String(m?.storagePath || "")).filter(Boolean);
-    await Promise.allSettled(paths.map((p) => deleteGemstoneJewelleryMedia(p)));
+    await Promise.allSettled(paths.map((p) => deleteRudrakshaMedia(p)));
   }
 
   return true;

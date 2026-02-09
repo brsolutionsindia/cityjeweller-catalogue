@@ -130,7 +130,7 @@ export default function NewGemstoneJewelleryPage() {
     if (!form) return;
     setSaving(true);
     try {
-      await upsertGemstoneJewellerySubmission(form);
+      await upsertGemstoneJewellerySubmission(form, { triggerReapprovalIfApproved: true });
       alert("Saved");
     } catch (e: any) {
       console.error(e);
@@ -144,7 +144,7 @@ export default function NewGemstoneJewelleryPage() {
     if (!form) return;
     setSaving(true);
     try {
-      await upsertGemstoneJewellerySubmission(form);
+      await upsertGemstoneJewellerySubmission(form, { triggerReapprovalIfApproved: true });
       await submitForApproval(form.gstNumber, form.skuId, form.supplierUid);
       alert("Submitted for approval");
       router.push("/supplier/gemstone-jewellery");

@@ -1,100 +1,40 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import type {
-  GemstoneJewellerySubmission,
-  Nature,
-  GJType,
-} from "@/lib/gemstoneJewellery/types";
-import {
-  GJ_TYPES,
-  generateItemName,
-  normalizeTag,
-  uniqTags,
-} from "@/lib/gemstoneJewellery/options";
+import type { RudrakshaSubmission, RudrakshaType, RudrakshaOrigin } from "@/lib/rudraksha/types";
+import { RUDRAKSHA_TYPES, ORIGINS, generateItemName, normalizeTag, uniqTags } from "@/lib/rudraksha/options";
 import MediaUploader from "@/components/supplier/MediaUploader";
-import {
-  uploadGemstoneJewelleryMediaBatch,
-  deleteGemstoneJewelleryMedia,
-} from "@/lib/firebase/gemstoneJewelleryDb";
-
-/**
- * ✅ IMPORTANT:
- * This form assumes your `GemstoneJewellerySubmission` includes:
- * - priceMode?: "MRP" | "WEIGHT"
- * - ratePerGm?: number
- * - weightGm?: number
- *
- * Add these in `src/lib/gemstoneJewellery/types.ts` if not already.
- */
+import { uploadRudrakshaMediaBatch, deleteRudrakshaMedia } from "@/lib/firebase/rudrakshaDb";
 
 type Props = {
-  value: GemstoneJewellerySubmission;
-  onChange: (next: GemstoneJewellerySubmission) => void;
+  value: RudrakshaSubmission;
+  onChange: (next: RudrakshaSubmission) => void;
 
   suggested?: {
-    colors?: string[];
-    stones?: string[];
-    styles?: string[];
+    mukhi?: number[];
+    purposes?: string[]; // "shivratri", "protection", "meditation"
+    styles?: string[];   // "dailywear", "temple", "minimal"
+    materials?: string[];
     types?: string[];
   };
 
   readOnlyStatus?: boolean;
 };
 
-const CHIP_SECTIONS: { key: keyof NonNullable<Props["suggested"]>; label: string }[] =
-  [
-    { key: "colors", label: "Colors" },
-    { key: "stones", label: "Stones / Looks" },
-    { key: "styles", label: "Style / Occasion" },
-    { key: "types", label: "Type Tags" },
-  ];
-
-/* ---------- Presets for Tabs ---------- */
-const NATURAL_STONE_TABS = [
-  "Pearl",
-  "Amethyst",
-  "Citrine",
-  "Ruby",
-  "Emerald",
-  "Opal",
-  "Garnet",
-  "Blue Sapphire",
-  "Yellow Sapphire",
+const CHIP_SECTIONS: { key: keyof NonNullable<Props["suggested"]>; label: string }[] = [
+  { key: "purposes", label: "Purpose / Occasion" },
+  { key: "styles", label: "Style Tags" },
+  { key: "materials", label: "Material Tags" },
+  { key: "types", label: "Type Tags" },
 ];
 
-const LOOK_TABS = [
-  "Ruby Look",
-  "Emerald Look",
-  "Pearl Look",
-  "Amethyst Look",
-  "Citrine Look",
-  "Opal Look",
-];
+const MUKHI_TABS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14].map((n) => ({ label: `${n} Mukhi`, value: String(n) }));
 
-const MATERIAL_TABS = ["Thread", "Silver", "Alloy", "Elastic", "Brass", "Steel"];
+const MATERIAL_TABS = ["Thread", "Silver", "Gold", "Panchdhatu", "Brass", "Steel", "Elastic", "Other"];
+const CLOSURE_TABS = ["Adjustable", "Hook", "Elastic", "Slip-on", "Magnetic", "Toggle", "Other"];
 
-const CLOSURE_TABS = [
-  "Adjustable",
-  "Hook",
-  "Elastic",
-  "Slip-on",
-  "Magnetic",
-  "Toggle",
-];
-
-/* ---------- Small UI helpers ---------- */
-function Chip({
-  active,
-  label,
-  onClick,
-  disabled,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
+/* UI helpers */
+function Chip({ active, label, onClick, disabled }: { active: boolean; label: string; onClick: () => void; disabled?: boolean; }) {
   return (
     <button
       type="button"
@@ -102,9 +42,7 @@ function Chip({
       disabled={disabled}
       className={
         "px-3 py-1 rounded-full text-sm border " +
-        (active
-          ? "bg-black text-white border-black"
-          : "bg-white text-black border-gray-300") +
+        (active ? "bg-black text-white border-black" : "bg-white text-black border-gray-300") +
         (disabled ? " opacity-60" : "")
       }
     >
@@ -113,33 +51,7 @@ function Chip({
   );
 }
 
-function safeMedia(value: GemstoneJewellerySubmission) {
-  const arr = Array.isArray((value as any).media) ? ((value as any).media as any[]) : [];
-  return arr.map((m) => {
-    const kind =
-      m?.kind === "VID" || m?.type === "video" ? "VID" : "IMG";
-
-    return {
-      ...m,
-      kind,
-      order: Number.isFinite(Number(m?.order)) ? Number(m.order) : 0,
-    };
-  });
-}
-
-
-
-function Tabs({
-  value,
-  options,
-  onChange,
-  disabled,
-}: {
-  value: string;
-  options: { label: string; value: string }[];
-  onChange: (v: string) => void;
-  disabled?: boolean;
-}) {
+function Tabs({ value, options, onChange, disabled }: { value: string; options: { label: string; value: string }[]; onChange: (v: string) => void; disabled?: boolean; }) {
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((o) => (
@@ -150,9 +62,7 @@ function Tabs({
           onClick={() => onChange(o.value)}
           className={
             "px-3 py-2 rounded-xl border text-sm " +
-            (value === o.value
-              ? "bg-black text-white border-black"
-              : "bg-white text-black border-gray-300") +
+            (value === o.value ? "bg-black text-white border-black" : "bg-white text-black border-gray-300") +
             (disabled ? " opacity-60" : "")
           }
         >
@@ -174,41 +84,43 @@ function formatInr(n?: number | null) {
   return n.toLocaleString("en-IN");
 }
 
-export default function GemstoneJewelleryForm({
-  value,
-  onChange,
-  suggested,
-  readOnlyStatus,
-}: Props) {
+function asKind(m: any): "IMG" | "VID" {
+  if (m?.kind === "IMG" || m?.kind === "VID") return m.kind;
+  if (m?.type === "video") return "VID";
+  return "IMG";
+}
+
+function safeMedia(value: RudrakshaSubmission) {
+  const arr = Array.isArray((value as any).media) ? ((value as any).media as any[]) : [];
+  return arr.map((m) => ({
+    ...m,
+    kind: asKind(m),
+    order: Number.isFinite(Number(m?.order)) ? Number(m.order) : 0,
+  }));
+}
+
+export default function RudrakshaForm({ value, onChange, suggested, readOnlyStatus }: Props) {
   const [customTag, setCustomTag] = useState("");
   const media = useMemo(() => safeMedia(value), [value]);
 
-
-  const styleTags = useMemo(() => {
-    return (value.tags || []).map(normalizeTag);
-  }, [value.tags]);
+  const styleTags = useMemo(() => (value.tags || []).map(normalizeTag), [value.tags]);
 
   const autoName = useMemo(() => {
     return generateItemName({
-      nature: value.nature,
       type: value.type,
-      stoneName: value.stoneName,
-      lookName: value.lookName,
-      styleTags,
+      mukhi: value.mukhi ?? null,
+      origin: value.origin ?? null,
+      material: value.material ?? null,
+      tags: styleTags,
     });
-  }, [value.nature, value.type, value.stoneName, value.lookName, styleTags]);
+  }, [value.type, value.mukhi, value.origin, value.material, styleTags]);
 
   useEffect(() => {
-    if (!value.itemName?.trim()) {
-      onChange({ ...value, itemName: autoName });
-    }
+    if (!value.itemName?.trim()) onChange({ ...value, itemName: autoName });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function setField<K extends keyof GemstoneJewellerySubmission>(
-    k: K,
-    v: GemstoneJewellerySubmission[K]
-  ) {
+  function setField<K extends keyof RudrakshaSubmission>(k: K, v: RudrakshaSubmission[K]) {
     onChange({ ...value, [k]: v });
   }
 
@@ -231,12 +143,6 @@ export default function GemstoneJewelleryForm({
     setField("itemName", autoName);
   }
 
-  const isArtificial = value.nature === "ARTIFICIAL";
-
-  const activeStoneOrLook = isArtificial
-    ? value.lookName || ""
-    : value.stoneName || "";
-
   const priceMode = (value as any).priceMode || "MRP";
   const computedByWeight =
     priceMode === "WEIGHT" &&
@@ -251,93 +157,116 @@ export default function GemstoneJewelleryForm({
       <section className="rounded-2xl border p-4 space-y-4">
         <div className="text-lg font-semibold">Basics</div>
 
-        <div className="space-y-3">
-          <div className="text-sm text-gray-600">Nature</div>
-          <Tabs
-            value={value.nature}
-            disabled={readOnlyStatus}
-            options={[
-              { label: "Natural", value: "NATURAL" },
-              { label: "Artificial / Fashion", value: "ARTIFICIAL" },
-            ]}
-            onChange={(v) => {
-              const nextNature = v as Nature;
-              // when switching nature, keep fields sane
-              if (nextNature === "NATURAL") {
-                onChange({
-                  ...value,
-                  nature: nextNature,
-                  lookName: undefined,
-                  stoneName: value.stoneName || "",
-                });
-              } else {
-                onChange({
-                  ...value,
-                  nature: nextNature,
-                  stoneName: undefined,
-                  lookName: value.lookName || "",
-                });
-              }
-            }}
-          />
-        </div>
-
-        <div className="space-y-3">
-          <div className="text-sm text-gray-600">Type</div>
-          <Tabs
-            value={value.type}
-            disabled={readOnlyStatus}
-            options={GJ_TYPES.map((t) => ({ label: t.label, value: t.value }))}
-            onChange={(v) => setField("type", v as GJType)}
-          />
-        </div>
-
-        {/* Stone / Look tabs + custom input */}
-        <div className="space-y-2">
-          <div className="text-sm text-gray-600">
-            {isArtificial ? "Look Name" : "Stone Name"}
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <div className="text-sm text-gray-600">Type</div>
+            <Tabs
+              value={value.type || "MALA"}
+              disabled={readOnlyStatus}
+              options={RUDRAKSHA_TYPES.map((t) => ({ label: t.label, value: t.value }))}
+              onChange={(v) => setField("type", v as RudrakshaType)}
+            />
           </div>
 
-          <Tabs
-            value={activeStoneOrLook}
-            disabled={readOnlyStatus}
-            options={(isArtificial ? LOOK_TABS : NATURAL_STONE_TABS).map((x) => ({
-              label: x,
-              value: x,
-            }))}
-            onChange={(v) =>
-              isArtificial ? setField("lookName", v) : setField("stoneName", v)
-            }
-          />
-
-          <input
-            value={activeStoneOrLook}
-            onChange={(e) =>
-              isArtificial
-                ? setField("lookName", e.target.value)
-                : setField("stoneName", e.target.value)
-            }
-            className="w-full border rounded-xl px-3 py-2"
-            placeholder={
-              isArtificial ? "Type custom look (optional)" : "Type custom stone (optional)"
-            }
-            disabled={readOnlyStatus}
-          />
+          <div className="space-y-2">
+            <div className="text-sm text-gray-600">Origin</div>
+            <Tabs
+              value={value.origin || "UNKNOWN"}
+              disabled={readOnlyStatus}
+              options={ORIGINS.map((o) => ({ label: o.label, value: o.value }))}
+              onChange={(v) => setField("origin", v as RudrakshaOrigin)}
+            />
+          </div>
         </div>
 
-        {/* Material + Closure: tabs + custom input */}
+        <div className="space-y-2">
+          <div className="text-sm text-gray-600">Mukhi (quick select)</div>
+          <Tabs
+            value={value.mukhi ? String(value.mukhi) : ""}
+            disabled={readOnlyStatus}
+            options={[{ label: "—", value: "" }, ...MUKHI_TABS]}
+            onChange={(v) => setField("mukhi", v ? Number(v) : null)}
+          />
+          <div className="grid md:grid-cols-3 gap-4 mt-2">
+            <label className="space-y-1">
+              <div className="text-sm text-gray-600">Mukhi (number)</div>
+              <input
+                type="number"
+                value={value.mukhi ?? ""}
+                onChange={(e) => setField("mukhi", numOrUndef(e.target.value) ?? null)}
+                className="w-full border rounded-xl px-3 py-2"
+                disabled={readOnlyStatus}
+              />
+            </label>
+
+            <label className="space-y-1">
+              <div className="text-sm text-gray-600">Bead Size (mm)</div>
+              <input
+                type="number"
+                value={value.sizeMm ?? ""}
+                onChange={(e) => setField("sizeMm", numOrUndef(e.target.value) ?? null)}
+                className="w-full border rounded-xl px-3 py-2"
+                disabled={readOnlyStatus}
+              />
+            </label>
+
+            <label className="space-y-1">
+              <div className="text-sm text-gray-600">Weight (gm)</div>
+              <input
+                type="number"
+                value={value.weightGm ?? ""}
+                onChange={(e) => setField("weightGm", numOrUndef(e.target.value) ?? null)}
+                className="w-full border rounded-xl px-3 py-2"
+                disabled={readOnlyStatus}
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* Quality toggles */}
+        <div className="grid md:grid-cols-3 gap-3">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={!!value.labCertified}
+              onChange={(e) => setField("labCertified", e.target.checked)}
+              disabled={readOnlyStatus}
+            />
+            Lab Certified
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={!!value.energized}
+              onChange={(e) => setField("energized", e.target.checked)}
+              disabled={readOnlyStatus}
+            />
+            Energized / Pran Pratishtha
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={value.natural !== false}
+              onChange={(e) => setField("natural", e.target.checked)}
+              disabled={readOnlyStatus}
+            />
+            Natural Bead
+          </label>
+        </div>
+
+        {/* Jewellery fields (optional) */}
         <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <div className="text-sm text-gray-600">Material</div>
             <Tabs
               value={value.material || ""}
               disabled={readOnlyStatus}
-              options={MATERIAL_TABS.map((x) => ({ label: x, value: x }))}
-              onChange={(v) => setField("material", v)}
+              options={[{ label: "—", value: "" }, ...MATERIAL_TABS.map((x) => ({ label: x, value: x }))]}
+              onChange={(v) => setField("material", v || null)}
             />
             <input
               value={value.material || ""}
-              onChange={(e) => setField("material", e.target.value)}
+              onChange={(e) => setField("material", e.target.value || null)}
               className="w-full border rounded-xl px-3 py-2"
               placeholder="Type custom material (optional)"
               disabled={readOnlyStatus}
@@ -349,12 +278,12 @@ export default function GemstoneJewelleryForm({
             <Tabs
               value={value.closure || ""}
               disabled={readOnlyStatus}
-              options={CLOSURE_TABS.map((x) => ({ label: x, value: x }))}
-              onChange={(v) => setField("closure", v)}
+              options={[{ label: "—", value: "" }, ...CLOSURE_TABS.map((x) => ({ label: x, value: x }))]}
+              onChange={(v) => setField("closure", v || null)}
             />
             <input
               value={value.closure || ""}
-              onChange={(e) => setField("closure", e.target.value)}
+              onChange={(e) => setField("closure", e.target.value || null)}
               className="w-full border rounded-xl px-3 py-2"
               placeholder="Type custom closure (optional)"
               disabled={readOnlyStatus}
@@ -362,37 +291,25 @@ export default function GemstoneJewelleryForm({
           </div>
         </div>
 
-        {/* Measurements */}
         <div className="grid md:grid-cols-3 gap-4">
-          <label className="space-y-1">
-            <div className="text-sm text-gray-600">Bead Size (mm)</div>
-            <input
-              type="number"
-              value={value.beadSizeMm ?? ""}
-              onChange={(e) => setField("beadSizeMm", numOrUndef(e.target.value))}
-              className="w-full border rounded-xl px-3 py-2"
-              disabled={readOnlyStatus}
-            />
-          </label>
-
           <label className="space-y-1">
             <div className="text-sm text-gray-600">Length (inch)</div>
             <input
               type="number"
               value={value.lengthInch ?? ""}
-              onChange={(e) => setField("lengthInch", numOrUndef(e.target.value))}
+              onChange={(e) => setField("lengthInch", numOrUndef(e.target.value) ?? null)}
               className="w-full border rounded-xl px-3 py-2"
               disabled={readOnlyStatus}
             />
           </label>
 
-          <label className="space-y-1">
-            <div className="text-sm text-gray-600">Weight (gm)</div>
+          <label className="space-y-1 md:col-span-2">
+            <div className="text-sm text-gray-600">Certificate Lab / Note</div>
             <input
-              type="number"
-              value={value.weightGm ?? ""}
-              onChange={(e) => setField("weightGm", numOrUndef(e.target.value))}
+              value={value.certificateLab || ""}
+              onChange={(e) => setField("certificateLab", e.target.value || null)}
               className="w-full border rounded-xl px-3 py-2"
+              placeholder="e.g., Lab name / report id / any note"
               disabled={readOnlyStatus}
             />
           </label>
@@ -413,19 +330,10 @@ export default function GemstoneJewelleryForm({
               { label: "Price per Weight", value: "WEIGHT" },
             ]}
             onChange={(v) => {
-              // keep fields sane when switching mode
               if (v === "MRP") {
-                onChange({
-                  ...value,
-                  priceMode: "MRP" as any,
-                  ratePerGm: undefined as any,
-                });
+                onChange({ ...value, priceMode: "MRP" as any, ratePerGm: null as any });
               } else {
-                onChange({
-                  ...value,
-                  priceMode: "WEIGHT" as any,
-                  // keep existing offerPrice/mrp; they can still fill if they want
-                });
+                onChange({ ...value, priceMode: "WEIGHT" as any });
               }
             }}
           />
@@ -438,7 +346,7 @@ export default function GemstoneJewelleryForm({
               <input
                 type="number"
                 value={value.mrp ?? ""}
-                onChange={(e) => setField("mrp", numOrUndef(e.target.value))}
+                onChange={(e) => setField("mrp", numOrUndef(e.target.value) ?? null)}
                 className="w-full border rounded-xl px-3 py-2"
                 disabled={readOnlyStatus}
               />
@@ -449,7 +357,7 @@ export default function GemstoneJewelleryForm({
               <input
                 type="number"
                 value={value.offerPrice ?? ""}
-                onChange={(e) => setField("offerPrice", numOrUndef(e.target.value))}
+                onChange={(e) => setField("offerPrice", numOrUndef(e.target.value) ?? null)}
                 className="w-full border rounded-xl px-3 py-2"
                 disabled={readOnlyStatus}
               />
@@ -460,9 +368,7 @@ export default function GemstoneJewelleryForm({
               <div className="text-lg font-semibold">
                 ₹{formatInr(value.offerPrice ?? value.mrp ?? null) || "—"}
               </div>
-              <div className="text-xs text-gray-500 mt-1">
-                Uses Offer Price if filled, else MRP.
-              </div>
+              <div className="text-xs text-gray-500 mt-1">Uses Offer Price if filled, else MRP.</div>
             </div>
           </div>
         ) : (
@@ -472,7 +378,7 @@ export default function GemstoneJewelleryForm({
               <input
                 type="number"
                 value={value.weightGm ?? ""}
-                onChange={(e) => setField("weightGm", numOrUndef(e.target.value))}
+                onChange={(e) => setField("weightGm", numOrUndef(e.target.value) ?? null)}
                 className="w-full border rounded-xl px-3 py-2"
                 disabled={readOnlyStatus}
               />
@@ -483,7 +389,7 @@ export default function GemstoneJewelleryForm({
               <input
                 type="number"
                 value={(value as any).ratePerGm ?? ""}
-                onChange={(e) => setField("ratePerGm" as any, numOrUndef(e.target.value) as any)}
+                onChange={(e) => setField("ratePerGm" as any, (numOrUndef(e.target.value) ?? null) as any)}
                 className="w-full border rounded-xl px-3 py-2"
                 disabled={readOnlyStatus}
               />
@@ -491,33 +397,47 @@ export default function GemstoneJewelleryForm({
 
             <div className="rounded-xl border p-3 bg-gray-50">
               <div className="text-xs text-gray-600">Computed Offer Price</div>
-              <div className="text-lg font-semibold">
-                {computedByWeight == null ? "—" : `₹${formatInr(computedByWeight)}`}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">
-                weightGm × ratePerGm (rounded).
-              </div>
-            </div>
-
-            <div className="md:col-span-3 text-xs text-gray-500">
-              Tip: You can still optionally fill MRP/Offer above later, but the computed price will be used for weight mode.
+              <div className="text-lg font-semibold">{computedByWeight == null ? "—" : `₹${formatInr(computedByWeight)}`}</div>
+              <div className="text-xs text-gray-500 mt-1">weightGm × ratePerGm (rounded).</div>
             </div>
           </div>
         )}
       </section>
 
-      {/* Tags */}
+      {/* Hashtags */}
       <section className="rounded-2xl border p-4 space-y-4">
         <div className="text-lg font-semibold">Hashtags (customer search)</div>
 
+        {/* Mukhi chip row (numbers) */}
+        {!!suggested?.mukhi?.length && (
+          <div className="space-y-2">
+            <div className="text-sm text-gray-600">Mukhi tags</div>
+            <div className="flex flex-wrap gap-2">
+              {suggested.mukhi.map((n) => {
+                const tag = normalizeTag(`${n}-mukhi`);
+                const active = (value.tags || []).map(normalizeTag).includes(tag);
+                return (
+                  <Chip
+                    key={tag}
+                    label={tag}
+                    active={active}
+                    onClick={() => toggleTag(tag)}
+                    disabled={readOnlyStatus}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {CHIP_SECTIONS.map((sec) => {
-          const list = suggested?.[sec.key] || [];
+          const list = (suggested as any)?.[sec.key] || [];
           if (!list.length) return null;
           return (
             <div key={sec.key} className="space-y-2">
               <div className="text-sm text-gray-600">{sec.label}</div>
               <div className="flex flex-wrap gap-2">
-                {list.map((t) => {
+                {list.map((t: any) => {
                   const nt = normalizeTag(t);
                   const active = (value.tags || []).map(normalizeTag).includes(nt);
                   return (
@@ -540,7 +460,7 @@ export default function GemstoneJewelleryForm({
             value={customTag}
             onChange={(e) => setCustomTag(e.target.value)}
             className="flex-1 border rounded-xl px-3 py-2"
-            placeholder="Add custom tag (e.g., pearl, red, minimal)"
+            placeholder="Add custom tag (e.g., shivratri, nepal, premium)"
             disabled={readOnlyStatus}
           />
           <button
@@ -556,15 +476,12 @@ export default function GemstoneJewelleryForm({
         <div className="text-sm text-gray-600">
           Selected:{" "}
           <span className="text-black">
-            {(value.tags || [])
-              .map(normalizeTag)
-              .map((t) => `#${t}`)
-              .join(" ")}
+            {(value.tags || []).map(normalizeTag).map((t) => `#${t}`).join(" ")}
           </span>
         </div>
       </section>
 
-      {/* Item Name */}
+      {/* Item name */}
       <section className="rounded-2xl border p-4 space-y-3">
         <div className="text-lg font-semibold">Item Name (auto-generated, editable)</div>
         <div className="grid md:grid-cols-[1fr_auto] gap-2 items-start">
@@ -598,14 +515,14 @@ export default function GemstoneJewelleryForm({
           label="Photos"
           accept="image/*"
           kind="IMG"
-          items={media.filter((m) => m.kind === "IMG").sort((a, b) => a.order - b.order)}
+          items={media.filter((m) => m.kind === "IMG").sort((a, b) => (a.order ?? 0) - (b.order ?? 0))}
           onChange={(nextImgs) => {
             const vids = media.filter((m) => m.kind === "VID");
             onChange({ ...value, media: [...nextImgs, ...vids] } as any);
           }}
           allowReorder
-          uploadFn={uploadGemstoneJewelleryMediaBatch}
-          deleteFn={deleteGemstoneJewelleryMedia}
+          uploadFn={uploadRudrakshaMediaBatch}
+          deleteFn={deleteRudrakshaMedia}
           getUrl={(m) => m.url}
           getStoragePath={(m) => m.storagePath}
           isVideoItem={(m) => m.kind === "VID"}
@@ -617,20 +534,19 @@ export default function GemstoneJewelleryForm({
           label="Videos"
           accept="video/*"
           kind="VID"
-          items={media.filter((m) => m.kind === "VID").sort((a, b) => a.order - b.order)}
+          items={media.filter((m) => m.kind === "VID").sort((a, b) => (a.order ?? 0) - (b.order ?? 0))}
           onChange={(nextVids) => {
             const imgs = media.filter((m) => m.kind === "IMG");
             onChange({ ...value, media: [...imgs, ...nextVids] } as any);
           }}
           allowReorder
-          uploadFn={uploadGemstoneJewelleryMediaBatch}
-          deleteFn={deleteGemstoneJewelleryMedia}
+          uploadFn={uploadRudrakshaMediaBatch}
+          deleteFn={deleteRudrakshaMedia}
           getUrl={(m) => m.url}
           getStoragePath={(m) => m.storagePath}
           isVideoItem={(m) => m.kind === "VID"}
           setOrder={(m, order) => ({ ...m, order })}
         />
-
 
         <div className="text-sm text-gray-600">
           Recommended: 1 white background photo (mandatory), 1 close-up, 1 lifestyle, 1 short video.
