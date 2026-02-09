@@ -31,13 +31,15 @@ function move<T>(arr: T[], from: number, to: number) {
   return copy;
 }
 
-function asKind(m: any): "IMG" | "VID" {
-  if (m?.kind === "IMG" || m?.kind === "VID") return m.kind;
+function asKind(m: any): "IMG" | "VID" | "CERT" {
+  if (m?.kind === "IMG" || m?.kind === "VID" || m?.kind === "CERT") return m.kind;
   if (m?.type === "video") return "VID";
+  if (m?.type === "file") return "CERT";
   return "IMG";
 }
 
-function normalizeMediaList(list: MediaItem[], kind: "IMG" | "VID") {
+
+function normalizeMediaList(list: MediaItem[], kind: "IMG" | "VID" | "CERT") {
   const now = Date.now();
   return (list || [])
     .filter(Boolean)
@@ -107,11 +109,23 @@ export default function AdminRudrakshaDetail() {
       setMarginPct(existingMargin);
 
       const all = (s?.media || []) as any[];
-      const imgs = all.filter((m) => asKind(m) === "IMG").sort((a, b) => (a?.order ?? 9999) - (b?.order ?? 9999));
-      const vids = all.filter((m) => asKind(m) === "VID").sort((a, b) => (a?.order ?? 9999) - (b?.order ?? 9999));
+
+      const imgs = all
+        .filter((m) => asKind(m) === "IMG")
+        .sort((a, b) => (a?.order ?? 9999) - (b?.order ?? 9999));
+
+      const vids = all
+        .filter((m) => asKind(m) === "VID")
+        .sort((a, b) => (a?.order ?? 9999) - (b?.order ?? 9999));
+
+      const certs = all
+        .filter((m) => asKind(m) === "CERT")
+        .sort((a, b) => (a?.order ?? 9999) - (b?.order ?? 9999));
 
       setImages(normalizeMediaList(imgs as any, "IMG"));
       setVideos(normalizeMediaList(vids as any, "VID"));
+      setCertificates(normalizeMediaList(certs as any, "CERT"));
+
     } finally {
       setBusy(false);
     }
@@ -135,12 +149,16 @@ export default function AdminRudrakshaDetail() {
     try {
       const nextImages = normalizeMediaList(images, "IMG");
       const nextVideos = normalizeMediaList(videos, "VID");
+      const nextCerts = normalizeMediaList(certificates, "CERT");
+
       await updateRudrakshaSubmissionMedia({
         gstNumber: data.gstNumber,
         skuId: data.skuId,
         images: nextImages,
         videos: nextVideos,
+        certificates: nextCerts,
       });
+
       alert("Media order updated.");
       await load();
     } catch (e: any) {
