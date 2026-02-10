@@ -12,7 +12,6 @@ import { deleteRudrakshaSubmission } from "@/lib/firebase/rudrakshaDb";
 
 const SUBMISSION_NODE = (gst: string) => `GST/${gst}/Submissions/Rudraksha`;
 const SUPPLIER_INDEX = (gst: string, uid: string) => `GST/${gst}/Indexes/RudrakshaSubmissions/BySupplier/${uid}`;
-const [mobilePanel, setMobilePanel] = useState<null | "filters" | "sort">(null);
 
 const SORTS = [
   { key: "new", label: "Newest" },
@@ -58,6 +57,8 @@ export default function SupplierRudrakshaHome() {
   const session = useSupplierSession();
   const gst = session?.gst;
   const uid = session?.uid;
+
+  const [mobilePanel, setMobilePanel] = useState<null | "filters" | "sort">(null);
 
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<RudrakshaSubmission[]>([]);
@@ -214,7 +215,9 @@ export default function SupplierRudrakshaHome() {
 
   function resetFilters() {
     setQ(""); setType("ALL"); setOrigin("ALL"); setMukhi("ALL"); setTag("ALL"); setMinP(""); setMaxP(""); setSortKey("new");
+    setMobilePanel(null); // ✅ close sheet on reset
   }
+
 
   const stats = useMemo(() => {
     const total = items.length;
