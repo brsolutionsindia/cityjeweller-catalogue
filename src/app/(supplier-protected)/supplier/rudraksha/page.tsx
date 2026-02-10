@@ -12,6 +12,7 @@ import { deleteRudrakshaSubmission } from "@/lib/firebase/rudrakshaDb";
 
 const SUBMISSION_NODE = (gst: string) => `GST/${gst}/Submissions/Rudraksha`;
 const SUPPLIER_INDEX = (gst: string, uid: string) => `GST/${gst}/Indexes/RudrakshaSubmissions/BySupplier/${uid}`;
+const [mobilePanel, setMobilePanel] = useState<null | "filters" | "sort">(null);
 
 const SORTS = [
   { key: "new", label: "Newest" },
@@ -116,6 +117,19 @@ export default function SupplierRudrakshaHome() {
 
   useEffect(() => { if (gst && uid) load(); /* eslint-disable-next-line */ }, [gst, uid]);
 
+  const activeFilterCount = useMemo(() => {
+    let c = 0;
+    if (q.trim()) c++;
+    if (type !== "ALL") c++;
+    if (origin !== "ALL") c++;
+    if (mukhi !== "ALL") c++;
+    if (tag !== "ALL") c++;
+    if (minP.trim()) c++;
+    if (maxP.trim()) c++;
+    return c;
+  }, [q, type, origin, mukhi, tag, minP, maxP]);
+
+
   const meta = useMemo(() => {
     const types = uniq(items.map((x) => String(x.type || "").toUpperCase()).filter(Boolean));
     const origins = uniq(items.map((x) => String((x as any).origin || "").toUpperCase()).filter(Boolean));
@@ -212,7 +226,7 @@ export default function SupplierRudrakshaHome() {
   }, [items]);
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-4 md:p-6 space-y-4 pb-28 md:pb-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Rudraksha</h1>
         <div className="flex gap-2">
@@ -229,7 +243,7 @@ export default function SupplierRudrakshaHome() {
         <div>Rejected: <b>{stats.rejected}</b></div>
       </div>
 
-      <div className="rounded-2xl border p-4 bg-white space-y-3">
+            <div className="hidden md:block rounded-2xl border p-4 bg-white space-y-3">
         <div className="flex items-center justify-between">
           <div className="font-semibold">Filters</div>
           <button className="text-xs underline text-gray-600" onClick={resetFilters}>Reset</button>
@@ -398,6 +412,170 @@ export default function SupplierRudrakshaHome() {
           </div>
         </div>
       )}
+
+        {/* ---------------- Mobile footer tabs (Filters / Sort / Reset) ---------------- */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t bg-white">
+          <div className="px-4 py-2 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setMobilePanel("filters")}
+              className="flex-1 px-3 py-2 rounded-xl border text-sm flex items-center justify-center gap-2"
+            >
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full border bg-gray-50">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMobilePanel("sort")}
+              className="flex-1 px-3 py-2 rounded-xl border text-sm flex items-center justify-center gap-2"
+            >
+              Sort
+              <span className="text-[11px] text-gray-500">{SORTS.find(s => s.key === sortKey)?.label}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="px-3 py-2 rounded-xl border text-sm"
+            >
+              Reset
+            </button>
+          </div>
+
+          <div className="px-4 pb-2 text-xs text-gray-600">
+            {loading ? "Loading…" : <>Showing <b>{filtered.length}</b> • Selected <b>{selectedIds.length}</b></>}
+          </div>
+        </div>
+
+        {/* Extra bottom padding so list doesn’t hide behind footer */}
+        <div className="md:hidden h-20" />
+
+        {/* ---------------- Mobile bottom sheet ---------------- */}
+        {mobilePanel && (
+          <div className="md:hidden fixed inset-0 z-50">
+            {/* Backdrop */}
+            <button
+              type="button"
+              onClick={() => setMobilePanel(null)}
+              className="absolute inset-0 bg-black/40"
+              aria-label="Close"
+            />
+
+            {/* Sheet */}
+            <div className="absolute left-0 right-0 bottom-0 bg-white rounded-t-2xl border-t shadow-xl max-h-[85vh] overflow-auto">
+              <div className="px-4 py-3 flex items-center justify-between border-b">
+                <div className="font-semibold">
+                  {mobilePanel === "filters" ? "Filters" : "Sort"}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button type="button" className="text-xs underline text-gray-600" onClick={resetFilters}>
+                    Reset
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-1.5 rounded-xl border text-sm"
+                    onClick={() => setMobilePanel(null)}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+
+              {mobilePanel === "sort" ? (
+                <div className="p-4 space-y-2">
+                  <div className="text-xs text-gray-500">Sort</div>
+                  <select
+                    value={sortKey}
+                    onChange={(e) => setSortKey(e.target.value as any)}
+                    className="w-full border rounded-xl px-3 py-2"
+                  >
+                    {SORTS.map((x) => (
+                      <option key={x.key} value={x.key}>{x.label}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => setMobilePanel(null)}
+                    className="w-full mt-3 px-4 py-3 rounded-xl bg-black text-white"
+                  >
+                    Apply Sort
+                  </button>
+                </div>
+              ) : (
+                <div className="p-4 space-y-3">
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">Search</div>
+                    <input
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      className="w-full border rounded-xl px-3 py-2"
+                      placeholder="SKU / name / mukhi..."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Type</div>
+                      <select value={type} onChange={(e) => setType(e.target.value)} className="w-full border rounded-xl px-3 py-2">
+                        <option value="ALL">All</option>
+                        {meta.types.map((x) => <option key={x} value={x}>{x}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Origin</div>
+                      <select value={origin} onChange={(e) => setOrigin(e.target.value)} className="w-full border rounded-xl px-3 py-2">
+                        <option value="ALL">All</option>
+                        {meta.origins.map((x) => <option key={x} value={x}>{x}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Mukhi</div>
+                      <select value={mukhi} onChange={(e) => setMukhi(e.target.value)} className="w-full border rounded-xl px-3 py-2">
+                        <option value="ALL">All</option>
+                        {meta.mukhis.map((x) => <option key={x} value={x}>{x}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Tag</div>
+                      <select value={tag} onChange={(e) => setTag(e.target.value)} className="w-full border rounded-xl px-3 py-2">
+                        <option value="ALL">All</option>
+                        {meta.tags.map((x) => <option key={x} value={x}>#{x}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Min</div>
+                      <input value={minP} onChange={(e) => setMinP(e.target.value)} className="w-full border rounded-xl px-3 py-2" placeholder="0" inputMode="numeric" />
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Max</div>
+                      <input value={maxP} onChange={(e) => setMaxP(e.target.value)} className="w-full border rounded-xl px-3 py-2" placeholder="50000" inputMode="numeric" />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setMobilePanel(null)}
+                    className="w-full mt-2 px-4 py-3 rounded-xl bg-black text-white"
+                  >
+                    Apply Filters
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
     </div>
   );
 }
