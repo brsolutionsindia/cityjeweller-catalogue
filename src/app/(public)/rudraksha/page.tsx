@@ -131,16 +131,34 @@ function getPrice(it: any): number | null {
 }
 
 function getCoverUrl(it: any): string | null {
-  // try common patterns
   const cover =
     it.primaryImg ||
     it.coverUrl ||
     it.imageUrl ||
     it.img ||
-    it.photoUrl ||
-    (Array.isArray(it.media) ? pickFirst(it.media)?.url : null);
-  return cover ? String(cover) : null;
+    it.photoUrl;
+
+  if (cover) return String(cover);
+
+  // media can be unknown -> safely read first item's url
+  if (Array.isArray(it.media) && it.media.length) {
+    const first = it.media[0] as unknown;
+
+    if (first && typeof first === "object" && "url" in (first as any)) {
+      const u = (first as any).url;
+      return u ? String(u) : null;
+    }
+
+    // fallback: some older shapes may store link as src
+    if (first && typeof first === "object" && "src" in (first as any)) {
+      const u = (first as any).src;
+      return u ? String(u) : null;
+    }
+  }
+
+  return null;
 }
+
 
 function inPriceRange(p: number | null, min: number | null, max: number | null) {
   if (p == null) return true; // if price missing, do not hide by default
