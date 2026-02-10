@@ -1,3 +1,5 @@
+//src/app/(supplier-protected)/supplier/rudraksha/page.tsx
+
 "use client";
 
 import Link from "next/link";
@@ -308,73 +310,92 @@ export default function SupplierRudrakshaHome() {
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border p-6 text-gray-600">No listings matched your filters. Try resetting filters.</div>
       ) : (
-        <div className="rounded-2xl border overflow-hidden bg-white">
-          <div className="grid grid-cols-[44px_90px_1fr_120px_180px_140px] gap-0 px-4 py-3 text-xs font-semibold bg-gray-50 border-b">
-            <div className="flex items-center justify-center">
-              <input
-                type="checkbox"
-                checked={allVisibleSelected}
-                ref={(el) => { if (el) el.indeterminate = !allVisibleSelected && someVisibleSelected; }}
-                onChange={(e) => toggleSelectAllVisible(e.target.checked)}
-              />
-            </div>
-            <div>Media</div>
-            <div>Item</div>
-            <div>Supplier Price</div>
-            <div>Updated</div>
-            <div className="text-right">Action</div>
-          </div>
-
-          {filtered.map((s) => {
-            const thumb = getThumb(s);
-            const price = pickSupplierPrice(s);
-
-            return (
-              <div key={s.skuId} className="grid grid-cols-[44px_90px_1fr_120px_180px_140px] gap-0 px-4 py-3 border-b last:border-b-0 items-center">
+        <div className="rounded-2xl border bg-white overflow-hidden">
+          <div className="overflow-x-auto">
+            <div className="min-w-[720px]">
+              <div className="grid grid-cols-[44px_90px_1fr_120px_180px_140px] gap-0 px-4 py-3 text-xs font-semibold bg-gray-50 border-b">
                 <div className="flex items-center justify-center">
                   <input
                     type="checkbox"
-                    checked={!!selected[s.skuId]}
-                    onChange={(e) =>
-                      setSelected((prev) => {
-                        const next = { ...prev };
-                        if (e.target.checked) next[s.skuId] = true;
-                        else delete next[s.skuId];
-                        return next;
-                      })
-                    }
+                    checked={allVisibleSelected}
+                    ref={(el) => { if (el) el.indeterminate = !allVisibleSelected && someVisibleSelected; }}
+                    onChange={(e) => toggleSelectAllVisible(e.target.checked)}
                   />
                 </div>
-
-                <div>
-                  {thumb ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={thumb} alt={s.itemName || s.skuId} className="h-14 w-14 rounded-xl object-cover border" />
-                  ) : (
-                    <div className="h-14 w-14 rounded-xl border flex items-center justify-center text-xs text-gray-400">No media</div>
-                  )}
-                </div>
-
-                <div className="min-w-0">
-                  <div className="font-semibold truncate">{s.itemName || "(No item name)"}</div>
-                  <div className="text-xs text-gray-500 truncate">{s.skuId}</div>
-                  <div className="text-xs mt-1">
-                    <span className="px-2 py-1 rounded-full border text-[11px]">{s.status || "DRAFT"}</span>
-                  </div>
-                </div>
-
-                <div className="text-sm font-semibold">{money(price)}</div>
-
-                <div className="text-sm text-gray-600">{formatWhen((s.updatedAt as any) || (s.createdAt as any))}</div>
-
-                <div className="text-right">
-                  <Link href={`/supplier/rudraksha/${encodeURIComponent(s.skuId)}`} className="px-3 py-2 rounded-xl border inline-block text-sm">
-                    View / Edit
-                  </Link>
-                </div>
+                <div>Media</div>
+                <div>Item</div>
+                <div>Supplier Price</div>
+                <div>Updated</div>
+                <div className="text-right">Action</div>
               </div>
-            );
-          })}
+
+              {filtered.map((s) => {
+                const thumb = getThumb(s);
+                const price = pickSupplierPrice(s);
+
+                return (
+                  <div
+                    key={s.skuId}
+                    className="grid grid-cols-[44px_90px_1fr_120px_180px_140px] gap-0 px-4 py-3 border-b last:border-b-0 items-center"
+                  >
+                    <div className="flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={!!selected[s.skuId]}
+                        onChange={(e) =>
+                          setSelected((prev) => {
+                            const next = { ...prev };
+                            if (e.target.checked) next[s.skuId] = true;
+                            else delete next[s.skuId];
+                            return next;
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      {thumb ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={thumb} alt={s.itemName || s.skuId} className="h-14 w-14 rounded-xl object-cover border" />
+                      ) : (
+                        <div className="h-14 w-14 rounded-xl border flex items-center justify-center text-xs text-gray-400">No media</div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="font-semibold truncate">{s.itemName || "(No item name)"}</div>
+                      <div className="text-xs text-gray-500 truncate">{s.skuId}</div>
+                      <div className="text-xs mt-1 flex flex-wrap gap-2">
+                        <span className="px-2 py-1 rounded-full border text-[11px]">{s.status || "DRAFT"}</span>
+
+                        <span className="px-2 py-1 rounded-full border text-[11px]">
+                          X-Ray: {s.xrayMukhiVerified ? "YES" : "NO"}
+                        </span>
+
+                        <span className="px-2 py-1 rounded-full border text-[11px]">
+                          Lab: {s.labCertified ? "YES" : "NO"}
+                        </span>
+                      </div>
+
+                    </div>
+
+                    <div className="text-sm font-semibold">{money(price)}</div>
+
+                    <div className="text-sm text-gray-600">{formatWhen((s.updatedAt as any) || (s.createdAt as any))}</div>
+
+                    <div className="text-right">
+                      <Link
+                        href={`/supplier/rudraksha/${encodeURIComponent(s.skuId)}`}
+                        className="px-3 py-2 rounded-xl border inline-block text-sm"
+                      >
+                        View / Edit
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </div>

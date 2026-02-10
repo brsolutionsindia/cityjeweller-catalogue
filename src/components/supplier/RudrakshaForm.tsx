@@ -276,7 +276,7 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
         </div>
 
         {/* Quality toggles */}
-        <div className="grid md:grid-cols-3 gap-3">
+        <div className="grid md:grid-cols-4 gap-3">
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -285,6 +285,16 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
               disabled={readOnlyStatus}
             />
             Lab Certified
+          </label>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={!!value.xrayMukhiVerified}
+              onChange={(e) => setField("xrayMukhiVerified", e.target.checked)}
+              disabled={readOnlyStatus}
+            />
+            X-Ray Report Available
           </label>
 
           <label className="flex items-center gap-2 text-sm">
@@ -307,6 +317,7 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
             Natural Bead
           </label>
         </div>
+
 
         {/* Jewellery fields (optional) */}
         <div className="grid md:grid-cols-2 gap-4">

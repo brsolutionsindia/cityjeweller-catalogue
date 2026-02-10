@@ -251,17 +251,42 @@ export default function NewRudrakshaPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">New Rudraksha Listing</h1>
-        <div className="flex gap-2">
-          <button onClick={saveDraft} disabled={saving} className="px-4 py-2 rounded-xl border">
-            Save Draft
-          </button>
-          <button onClick={sendForApproval} disabled={saving} className="px-4 py-2 rounded-xl bg-black text-white">
-            Submit
-          </button>
+      </div>
+
+      <RudrakshaForm
+        value={form}
+        onChange={setForm}
+        readOnlyStatus={false}
+        suggested={SUGGESTED_TAGS}
+      />
+
+      {/* Bottom action bar */}
+      <div className="sticky bottom-0 left-0 right-0 z-20 mt-8 border-t bg-white">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <div className="text-xs text-gray-600">
+            Status: <b>{form.status || "DRAFT"}</b>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={saveDraft}
+              disabled={saving}
+              className="px-4 py-2 rounded-xl border text-sm disabled:opacity-60"
+            >
+              Save Draft
+            </button>
+
+            <button
+              onClick={sendForApproval}
+              disabled={saving}
+              className="px-4 py-2 rounded-xl bg-black text-white text-sm disabled:opacity-60"
+            >
+              Submit
+            </button>
+          </div>
         </div>
       </div>
 
-      <RudrakshaForm value={form} onChange={setForm} readOnlyStatus={false} suggested={SUGGESTED_TAGS} />
     </div>
   );
 }

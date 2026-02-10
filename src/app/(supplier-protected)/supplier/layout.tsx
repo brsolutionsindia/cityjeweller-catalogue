@@ -32,6 +32,8 @@ function Shell({ children }: { children: React.ReactNode }) {
             <Link className="underline" href="/supplier/dashboard">Home</Link>
             <Link className="underline" href="/supplier/natural-diamonds">Natural Diamonds</Link>
             <Link className="underline" href="/supplier/yellow-sapphires">Yellow Sapphire</Link>
+            <Link className="underline" href="/supplier/gemstone-jewellery">Gemstone Jewellery</Link>
+            <Link className="underline" href="/supplier/rudraksha">Rudraksha</Link>
 
             {/* ✅ Logout */}
             <button
