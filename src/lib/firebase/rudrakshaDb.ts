@@ -28,6 +28,10 @@ const SUPPLIER_DEFAULTS = (gstNumber: string, uid: string) =>
   `GST/${gstNumber}/SupplierDefaults/Rudraksha/${uid}`;
 const ADMIN_QUEUE = `AdminQueue/Rudraksha`;
 
+// ✅ supplier review inbox node (admin send-back)
+const SUPPLIER_INBOX = (gstNumber: string) => `GST/${gstNumber}/SupplierInbox/Rudraksha`;
+
+
 // Published global
 const GLOBAL_NODE = `Global SKU/Rudraksha`;
 const GLOBAL_TAG_INDEX = `Global SKU/Indexes/Rudraksha/ByTag`;
@@ -531,8 +535,19 @@ export async function deleteRudrakshaSubmission(params: {
   const snap = await get(dbRef(db, submissionPath));
   const sub = snap.exists() ? (snap.val() as RudrakshaSubmission) : null;
 
+  // ✅ ALWAYS cleanup these "pointers" (prevents ghost items)
+  // - supplier index
+  // - admin queue item (if it exists)
+  // - supplier inbox item (if it exists)
+  const baseCleanup: Record<string, any> = {
+    [`${SUPPLIER_INDEX(gst, supplierUid)}/${skuId}`]: null,
+    [`${ADMIN_QUEUE}/${skuId}`]: null,
+    [`${SUPPLIER_INBOX(gst)}/${skuId}`]: null,
+  };
+
+  // If submission already gone (maybe your CF removed it), still clear pointers
   if (!sub) {
-    await update(dbRef(db), stripUndefinedDeep({ [`${SUPPLIER_INDEX(gst, supplierUid)}/${skuId}`]: null }));
+    await update(dbRef(db), stripUndefinedDeep(baseCleanup));
     return true;
   }
 
@@ -542,8 +557,11 @@ export async function deleteRudrakshaSubmission(params: {
 
   const status = String((sub as any).status || "").toUpperCase();
 
-  // supplier delete of APPROVED -> UNLIST request (unless admin flags)
+  // supplier delete of APPROVED -> UNLIST request (default behavior)
+  // ✅ but still clear AdminQueue/SupplierInbox/SupplierIndex so it doesn't stay in admin list
   if (status === "APPROVED" && !params.alsoDeleteFromGlobalSku && !params.alsoDeleteFromAdminQueue) {
+    await update(dbRef(db), stripUndefinedDeep(baseCleanup));
+
     await requestUnlistRudraksha({
       gstNumber: gst,
       skuId,
@@ -553,18 +571,20 @@ export async function deleteRudrakshaSubmission(params: {
     return true;
   }
 
-  const updates: Record<string, any> = {};
-  updates[submissionPath] = null;
-  updates[`${SUPPLIER_INDEX(gst, supplierUid)}/${skuId}`] = null;
+  const updates: Record<string, any> = {
+    ...baseCleanup,
+    [submissionPath]: null,
+  };
 
   if (params.alsoDeleteFromGlobalSku) {
     updates[`${GLOBAL_NODE}/${skuId}`] = null;
     Object.assign(updates, buildIndexRemovals(sub));
   }
 
-  if (params.alsoDeleteFromAdminQueue) {
-    updates[`${ADMIN_QUEUE}/${skuId}`] = null;
-  }
+  // NOTE:
+  // We already clear ADMIN_QUEUE in baseCleanup. Keeping this flag for compatibility:
+  // if (params.alsoDeleteFromAdminQueue) { ... }  // no longer needed, but harmless if you want to keep.
+  // We won't re-add it.
 
   await update(dbRef(db), stripUndefinedDeep(updates));
 

@@ -1,17 +1,17 @@
 //src/app/(supplier-protected)/supplier/rudraksha/page.tsx
-
 "use client";
 
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import { useSupplierSession } from "@/lib/firebase/supplierContext";
 import { db } from "@/firebaseConfig";
-import { get, ref as dbRef } from "firebase/database";
+import { get, ref as dbRef, update } from "firebase/database";
 import type { RudrakshaSubmission } from "@/lib/rudraksha/types";
 import { deleteRudrakshaSubmission } from "@/lib/firebase/rudrakshaDb";
 
 const SUBMISSION_NODE = (gst: string) => `GST/${gst}/Submissions/Rudraksha`;
-const SUPPLIER_INDEX = (gst: string, uid: string) => `GST/${gst}/Indexes/RudrakshaSubmissions/BySupplier/${uid}`;
+const SUPPLIER_INDEX = (gst: string, uid: string) =>
+  `GST/${gst}/Indexes/RudrakshaSubmissions/BySupplier/${uid}`;
 
 const SORTS = [
   { key: "new", label: "Newest" },
@@ -30,7 +30,9 @@ function asKind(m: any): "IMG" | "VID" {
   return "IMG";
 }
 function getThumb(s: RudrakshaSubmission) {
-  const imgs = (s.media || []).filter((m: any) => asKind(m) === "IMG").sort((a: any, b: any) => (a?.order ?? 9999) - (b?.order ?? 9999));
+  const imgs = (s.media || [])
+    .filter((m: any) => asKind(m) === "IMG")
+    .sort((a: any, b: any) => (a?.order ?? 9999) - (b?.order ?? 9999));
   return (imgs?.[0] as any)?.url || "";
 }
 
@@ -91,14 +93,28 @@ export default function SupplierRudrakshaHome() {
         return;
       }
 
+      // fetch all submissions
       const results = await Promise.all(
         skuIds.map(async (skuId) => {
           const snap = await get(dbRef(db, `${SUBMISSION_NODE(gst)}/${skuId}`));
-          return snap.exists() ? (snap.val() as RudrakshaSubmission) : null;
+          return { skuId, exists: snap.exists(), value: snap.exists() ? (snap.val() as RudrakshaSubmission) : null };
         })
       );
 
-      const cleaned = results.filter(Boolean).map((x) => x as RudrakshaSubmission).filter((s) => !uid || s.supplierUid === uid);
+      // ✅ cleanup: remove stale supplier index keys if submission missing
+      const staleIds = results.filter(r => !r.exists).map(r => r.skuId);
+      if (staleIds.length) {
+        const upd: Record<string, any> = {};
+        for (const id of staleIds) upd[`${SUPPLIER_INDEX(gst, uid)}/${id}`] = null;
+        await update(dbRef(db), upd);
+      }
+
+      const cleaned = results
+        .map(r => r.value)
+        .filter(Boolean)
+        .map(x => x as RudrakshaSubmission)
+        .filter((s) => !uid || s.supplierUid === uid);
+
       cleaned.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
       setItems(cleaned);
@@ -129,7 +145,6 @@ export default function SupplierRudrakshaHome() {
     if (maxP.trim()) c++;
     return c;
   }, [q, type, origin, mukhi, tag, minP, maxP]);
-
 
   const meta = useMemo(() => {
     const types = uniq(items.map((x) => String(x.type || "").toUpperCase()).filter(Boolean));
@@ -200,7 +215,13 @@ export default function SupplierRudrakshaHome() {
     setLoading(true);
     try {
       for (const skuId of selectedIds) {
-        await deleteRudrakshaSubmission({ gstNumber: gst, supplierUid: uid, skuId, deleteMedia: true });
+        // ✅ delete + cleanup orphan admin queue + supplier inbox automatically (in updated rudrakshaDb.ts)
+        await deleteRudrakshaSubmission({
+          gstNumber: gst,
+          supplierUid: uid,
+          skuId,
+          deleteMedia: true,
+        });
       }
       setSelected({});
       await load();
@@ -215,9 +236,8 @@ export default function SupplierRudrakshaHome() {
 
   function resetFilters() {
     setQ(""); setType("ALL"); setOrigin("ALL"); setMukhi("ALL"); setTag("ALL"); setMinP(""); setMaxP(""); setSortKey("new");
-    setMobilePanel(null); // ✅ close sheet on reset
+    setMobilePanel(null);
   }
-
 
   const stats = useMemo(() => {
     const total = items.length;
@@ -230,7 +250,9 @@ export default function SupplierRudrakshaHome() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 pb-28 md:pb-6">
-      <div className="flex items-center justify-between gap-3">
+      {/* ... your UI unchanged ... */}
+      {/* (no other changes below this point) */}
+<div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Rudraksha</h1>
         <div className="flex gap-2">
           <button onClick={load} className="px-4 py-2 rounded-xl border" disabled={loading || !gst || !uid} type="button">Refresh</button>
@@ -578,6 +600,7 @@ export default function SupplierRudrakshaHome() {
             </div>
           </div>
         )}
+
 
     </div>
   );

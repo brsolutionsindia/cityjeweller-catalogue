@@ -14,21 +14,13 @@ const GLOBAL_TAG_INDEX = `Global SKU/Indexes/Rudraksha/ByTag`;
 const GLOBAL_CATEGORY_INDEX = `Global SKU/Indexes/Rudraksha/ByCategory`;
 const GLOBAL_MUKHI_INDEX = `Global SKU/Indexes/Rudraksha/ByMukhi`;
 
-export async function getPendingRudrakshaQueue() {
-  const snap = await get(dbRef(db, ADMIN_QUEUE));
-  return (snap.val() as Record<string, any> | null) ?? null;
-}
+// NEW: supplier trigger/inbox (for "send back to supplier review")
+const SUPPLIER_INBOX_NODE = (gstNumber: string) => `GST/${gstNumber}/SupplierInbox/Rudraksha`;
 
-export async function getQueuedRudraksha(skuId: string) {
-  const qSnap = await get(dbRef(db, `${ADMIN_QUEUE}/${skuId}`));
-  if (!qSnap.exists()) return null;
-
-  const { gstNumber } = qSnap.val() as { gstNumber: string };
-  if (!gstNumber) return null;
-
-  const sSnap = await get(dbRef(db, `${SUBMISSION_NODE(gstNumber)}/${skuId}`));
-  return sSnap.exists() ? (sSnap.val() as RudrakshaSubmission) : null;
-}
+const toNum = (v: any) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
 function stripUndefined(obj: any) {
   const out: any = Array.isArray(obj) ? [] : {};
@@ -51,10 +43,47 @@ function buildIndexUpdates(listing: RudrakshaSubmission) {
   return updates;
 }
 
-const toNum = (v: any) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-};
+// NEW: remove indexes when hiding/unpublishing/sending back
+function buildIndexRemovals(listing: RudrakshaSubmission) {
+  const tags = uniqTags(listing.tags || []).map(normalizeTag);
+  const updates: Record<string, any> = {};
+
+  for (const t of tags) updates[`${GLOBAL_TAG_INDEX}/${t}/${listing.skuId}`] = null;
+  if (listing.productCategory) updates[`${GLOBAL_CATEGORY_INDEX}/${listing.productCategory}/${listing.skuId}`] = null;
+  if (listing.mukhiType) updates[`${GLOBAL_MUKHI_INDEX}/${listing.mukhiType}/${listing.skuId}`] = null;
+
+  return updates;
+}
+
+// NEW: list approved + hidden from global
+export async function listAllGlobalRudraksha() {
+  const snap = await get(dbRef(db, GLOBAL_NODE));
+  const obj = (snap.val() as Record<string, RudrakshaSubmission> | null) ?? null;
+
+  const arr = Object.values(obj || {}).filter(Boolean);
+  arr.sort(
+    (a: any, b: any) =>
+      toNum(b.updatedAt) - toNum(a.updatedAt) || toNum(b.createdAt) - toNum(a.createdAt)
+  );
+
+  return arr;
+}
+
+export async function getPendingRudrakshaQueue() {
+  const snap = await get(dbRef(db, ADMIN_QUEUE));
+  return (snap.val() as Record<string, any> | null) ?? null;
+}
+
+export async function getQueuedRudraksha(skuId: string) {
+  const qSnap = await get(dbRef(db, `${ADMIN_QUEUE}/${skuId}`));
+  if (!qSnap.exists()) return null;
+
+  const { gstNumber } = qSnap.val() as { gstNumber: string };
+  if (!gstNumber) return null;
+
+  const sSnap = await get(dbRef(db, `${SUBMISSION_NODE(gstNumber)}/${skuId}`));
+  return sSnap.exists() ? (sSnap.val() as RudrakshaSubmission) : null;
+}
 
 /**
  * Rudraksha pricing:
@@ -97,10 +126,7 @@ export async function approveRudraksha(params: {
 
   const finalListing: any = stripUndefined({
     ...merged,
-    tags: uniqTags([
-      ...(submission.tags || []),
-      ...(((finalPatch?.tags as string[] | undefined) || [])),
-    ]),
+    tags: uniqTags([...(submission.tags || []), ...(((finalPatch?.tags as string[]) || []))]),
     status: "APPROVED",
     updatedAt: Date.now(),
 
@@ -154,8 +180,145 @@ export async function rejectRudraksha(params: {
   await update(dbRef(db), updates);
 }
 
+/**
+ * NEW: Hide from website (no supplier trigger)
+ * - keep global record, but mark status HIDDEN
+ * - remove indexes so it won't appear via public filters
+ */
+export async function hideRudrakshaFromWebsite(params: { skuId: string; adminUid: string }) {
+  const { skuId, adminUid } = params;
+
+  const gSnap = await get(dbRef(db, `${GLOBAL_NODE}/${skuId}`));
+  if (!gSnap.exists()) throw new Error("Global listing not found");
+
+  const listing = gSnap.val() as RudrakshaSubmission;
+
+  const updates: Record<string, any> = {};
+  Object.assign(updates, buildIndexRemovals(listing));
+
+  updates[`${GLOBAL_NODE}/${skuId}/status`] = "HIDDEN";
+  updates[`${GLOBAL_NODE}/${skuId}/hiddenAt`] = Date.now();
+  updates[`${GLOBAL_NODE}/${skuId}/hiddenBy`] = adminUid;
+  updates[`${GLOBAL_NODE}/${skuId}/_hiddenAtServer`] = serverTimestamp();
+  updates[`${GLOBAL_NODE}/${skuId}/updatedAt`] = Date.now();
+  updates[`${GLOBAL_NODE}/${skuId}/_updatedAtServer`] = serverTimestamp();
+
+  await update(dbRef(db), updates);
+}
+
+/**
+ * NEW: Unhide (make visible on website again, no supplier trigger)
+ * - status back to APPROVED
+ * - rebuild indexes
+ */
+export async function unhideRudrakshaToWebsite(params: { skuId: string; adminUid: string }) {
+  const { skuId, adminUid } = params;
+
+  const gSnap = await get(dbRef(db, `${GLOBAL_NODE}/${skuId}`));
+  if (!gSnap.exists()) throw new Error("Global listing not found");
+
+  const listing = gSnap.val() as RudrakshaSubmission;
+
+  const finalListing: any = stripUndefined({
+    ...listing,
+    status: "APPROVED",
+    updatedAt: Date.now(),
+  });
+
+  const updates: Record<string, any> = {};
+  updates[`${GLOBAL_NODE}/${skuId}`] = stripUndefined({
+    ...finalListing,
+    unhiddenAt: Date.now(),
+    unhiddenBy: adminUid,
+    _unhiddenAtServer: serverTimestamp(),
+    _updatedAtServer: serverTimestamp(),
+  });
+
+  Object.assign(updates, buildIndexUpdates(finalListing));
+
+  await update(dbRef(db), updates);
+}
+
+/**
+ * UPDATED: Unpublish should also remove indexes
+ * (This is "remove from website" style delete)
+ */
 export async function unpublishRudraksha(skuId: string) {
-  await remove(dbRef(db, `${GLOBAL_NODE}/${skuId}`));
+  const gSnap = await get(dbRef(db, `${GLOBAL_NODE}/${skuId}`));
+  if (!gSnap.exists()) {
+    // fallback to old behavior
+    await remove(dbRef(db, `${GLOBAL_NODE}/${skuId}`));
+    return;
+  }
+
+  const listing = gSnap.val() as RudrakshaSubmission;
+
+  const updates: Record<string, any> = {};
+  Object.assign(updates, buildIndexRemovals(listing));
+  updates[`${GLOBAL_NODE}/${skuId}`] = null;
+
+  await update(dbRef(db), updates);
+}
+
+/**
+ * NEW: Send back to supplier review (TRIGGERS supplier)
+ * - remove from global + indexes
+ * - set submission status to SUPPLIER_REVIEW + reason
+ * - create supplier inbox entry
+ * - add to admin queue as SUPPLIER_REVIEW so admin can track
+ */
+export async function sendRudrakshaBackToSupplierReview(params: {
+  gstNumber: string;
+  skuId: string;
+  supplierUid: string;
+  adminUid: string;
+  reason: string;
+}) {
+  const { gstNumber, skuId, supplierUid, adminUid, reason } = params;
+
+  const updates: Record<string, any> = {};
+
+  // remove from global + indexes (if exists)
+  const gSnap = await get(dbRef(db, `${GLOBAL_NODE}/${skuId}`));
+  if (gSnap.exists()) {
+    const listing = gSnap.val() as RudrakshaSubmission;
+    Object.assign(updates, buildIndexRemovals(listing));
+    updates[`${GLOBAL_NODE}/${skuId}`] = null;
+  }
+
+  // supplier submission update
+  updates[`${SUBMISSION_NODE(gstNumber)}/${skuId}/status`] = "SUPPLIER_REVIEW";
+  updates[`${SUBMISSION_NODE(gstNumber)}/${skuId}/reviewReason`] =
+    reason || "Please review and resubmit.";
+  updates[`${SUBMISSION_NODE(gstNumber)}/${skuId}/reviewRequestedAt`] = Date.now();
+  updates[`${SUBMISSION_NODE(gstNumber)}/${skuId}/reviewRequestedBy`] = adminUid;
+  updates[`${SUBMISSION_NODE(gstNumber)}/${skuId}/_reviewRequestedAtServer`] = serverTimestamp();
+  updates[`${SUBMISSION_NODE(gstNumber)}/${skuId}/updatedAt`] = Date.now();
+  updates[`${SUBMISSION_NODE(gstNumber)}/${skuId}/_updatedAtServer`] = serverTimestamp();
+
+  // supplier inbox trigger
+  updates[`${SUPPLIER_INBOX_NODE(gstNumber)}/${skuId}`] = stripUndefined({
+    skuId,
+    gstNumber,
+    supplierUid,
+    status: "SUPPLIER_REVIEW",
+    reason,
+    createdAt: Date.now(),
+    _createdAtServer: serverTimestamp(),
+  });
+
+  // admin queue track (this is what your admin list reads)
+  updates[`${ADMIN_QUEUE}/${skuId}`] = stripUndefined({
+    skuId,
+    gstNumber,
+    supplierUid,
+    status: "SUPPLIER_REVIEW",
+    reason,
+    updatedAt: Date.now(),
+    _updatedAtServer: serverTimestamp(),
+  });
+
+  await update(dbRef(db), updates);
 }
 
 /* ------------------------------ media helpers ------------------------------ */
