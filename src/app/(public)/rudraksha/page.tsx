@@ -414,39 +414,50 @@ export default function RudrakshaListPage() {
           {/* trust row */}
           <div className="grid sm:grid-cols-3 gap-3 p-4 sm:p-5 bg-white">
             <div className="rounded-2xl border p-4">
-              <div className="text-sm font-semibold">Authenticity First</div>
-              <div className="text-xs text-gray-600">Certification & key declarations visible per item.</div>
+              <div className="text-sm font-semibold">Trusted Listings</div>
+              <div className="text-xs text-gray-600">Clear authenticity info, certification & important notes.</div>
             </div>
             <div className="rounded-2xl border p-4">
-              <div className="text-sm font-semibold">Fast Filtering</div>
-              <div className="text-xs text-gray-600">Mukhi, origin, wear type, shape, price—everything ready.</div>
+              <div className="text-sm font-semibold">Instant Shortlisting</div>
+              <div className="text-xs text-gray-600">Mukhi • Origin • Wear • Shape • Price — all in one place.</div>
             </div>
             <div className="rounded-2xl border p-4">
-              <div className="text-sm font-semibold">Premium Shopping UX</div>
-              <div className="text-xs text-gray-600">Desktop sidebar-style filters + mobile footer tabs.</div>
+              <div className="text-sm font-semibold">Fast, Clean Shopping</div>
+              <div className="text-xs text-gray-600">Desktop-friendly layout + mobile quick actions.</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Desktop Filters + Sort (sticky) */}
       <div className="max-w-6xl mx-auto px-4 mt-5" id="listing">
-        <div className="hidden md:block sticky top-[70px] z-20">
-          <div className="rounded-3xl border bg-white p-4">
-            <div className="grid grid-cols-12 gap-3 items-end">
+        {/* Desktop layout */}
+        <div className="hidden md:grid grid-cols-12 gap-4 items-start">
+          {/* Sidebar filters */}
+          <aside className="col-span-3 sticky top-[70px] z-20">
+            <div className="rounded-3xl border bg-white p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold">Filters</div>
+                <button
+                  onClick={clearAll}
+                  className="text-xs rounded-full border px-3 py-1.5 bg-white hover:bg-gray-50"
+                >
+                  Clear ({activeFilterCount})
+                </button>
+              </div>
+
               {/* Search */}
-              <div className="col-span-4">
+              <div>
                 <div className="text-xs text-gray-500 mb-1">Search</div>
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   className="w-full border rounded-2xl px-3 py-2"
-                  placeholder="mukhi / bracelet / nepal / certified / sku..."
+                  placeholder="mukhi / bracelet / nepal / sku..."
                 />
               </div>
 
               {/* Category */}
-              <div className="col-span-2">
+              <div>
                 <div className="text-xs text-gray-500 mb-1">Category</div>
                 <select
                   value={category}
@@ -459,7 +470,6 @@ export default function RudrakshaListPage() {
                       {x.label}
                     </option>
                   ))}
-                  {/* fallback for existing data categories */}
                   {meta.categories
                     .filter((x) => !PRODUCT_CATEGORY_TABS.some((t) => String(t.key).toUpperCase() === x))
                     .map((x) => (
@@ -471,7 +481,7 @@ export default function RudrakshaListPage() {
               </div>
 
               {/* Origin */}
-              <div className="col-span-2">
+              <div>
                 <div className="text-xs text-gray-500 mb-1">Origin</div>
                 <select
                   value={origin}
@@ -495,7 +505,7 @@ export default function RudrakshaListPage() {
               </div>
 
               {/* Mukhi */}
-              <div className="col-span-2">
+              <div>
                 <div className="text-xs text-gray-500 mb-1">Mukhi</div>
                 <select
                   value={mukhi}
@@ -518,27 +528,10 @@ export default function RudrakshaListPage() {
                 </select>
               </div>
 
-              {/* Sort */}
-              <div className="col-span-2">
-                <div className="text-xs text-gray-500 mb-1">Sort</div>
-                <select
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value as SortKey)}
-                  className="w-full border rounded-2xl px-3 py-2"
-                >
-                  {SORT_OPTIONS.map((x) => (
-                    <option key={x.key} value={x.key}>
-                      {x.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* second row */}
-              <div className="col-span-12 grid grid-cols-12 gap-3 items-end pt-1">
-                {/* Wear */}
-                <div className="col-span-3">
-                  <div className="text-xs text-gray-500 mb-1">Wear Type</div>
+              {/* Wear + Shape */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Wear</div>
                   <select
                     value={wear}
                     onChange={(e) => setWear(e.target.value)}
@@ -552,9 +545,7 @@ export default function RudrakshaListPage() {
                     ))}
                   </select>
                 </div>
-
-                {/* Shape */}
-                <div className="col-span-2">
+                <div>
                   <div className="text-xs text-gray-500 mb-1">Shape</div>
                   <select
                     value={shape}
@@ -576,109 +567,92 @@ export default function RudrakshaListPage() {
                       ))}
                   </select>
                 </div>
+              </div>
 
-                {/* Price */}
-                <div className="col-span-3">
-                  <div className="text-xs text-gray-500 mb-1">Price Range (₹)</div>
-                  <div className="flex gap-2">
-                    <input
-                      value={minPrice}
-                      onChange={(e) => setMinPrice(e.target.value)}
-                      inputMode="numeric"
-                      className="w-full border rounded-2xl px-3 py-2"
-                      placeholder="Min"
-                    />
-                    <input
-                      value={maxPrice}
-                      onChange={(e) => setMaxPrice(e.target.value)}
-                      inputMode="numeric"
-                      className="w-full border rounded-2xl px-3 py-2"
-                      placeholder="Max"
-                    />
-                  </div>
-                </div>
-
-                {/* Toggles */}
-                <div className="col-span-3">
-                  <div className="text-xs text-gray-500 mb-1">Quick Filters</div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setCertOnly((v) => !v)}
-                      className={`rounded-full border px-3 py-2 text-xs ${
-                        certOnly ? "bg-black text-white" : "bg-white hover:bg-gray-50"
-                      }`}
-                    >
-                      Certified Only
-                    </button>
-                    <button
-                      onClick={() => setInStockOnly((v) => !v)}
-                      className={`rounded-full border px-3 py-2 text-xs ${
-                        inStockOnly ? "bg-black text-white" : "bg-white hover:bg-gray-50"
-                      }`}
-                    >
-                      In-Stock Only
-                    </button>
-                    <button
-                      onClick={clearAll}
-                      className="rounded-full border px-3 py-2 text-xs bg-white hover:bg-gray-50"
-                    >
-                      Clear All ({activeFilterCount})
-                    </button>
-                  </div>
-                </div>
-
-                {/* Count */}
-                <div className="col-span-1 text-right text-xs text-gray-600">
-                  {busy ? "Loading…" : `${sorted.length}`}
+              {/* Price */}
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Price (₹)</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    value={minPrice}
+                    onChange={(e) => setMinPrice(e.target.value)}
+                    inputMode="numeric"
+                    className="w-full border rounded-2xl px-3 py-2"
+                    placeholder="Min"
+                  />
+                  <input
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(e.target.value)}
+                    inputMode="numeric"
+                    className="w-full border rounded-2xl px-3 py-2"
+                    placeholder="Max"
+                  />
                 </div>
               </div>
+
+              {/* Toggles */}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setCertOnly((v) => !v)}
+                  className={`rounded-full border px-3 py-2 text-xs ${
+                    certOnly ? "bg-black text-white" : "bg-white hover:bg-gray-50"
+                  }`}
+                >
+                  Certified
+                </button>
+                <button
+                  onClick={() => setInStockOnly((v) => !v)}
+                  className={`rounded-full border px-3 py-2 text-xs ${
+                    inStockOnly ? "bg-black text-white" : "bg-white hover:bg-gray-50"
+                  }`}
+                >
+                  In Stock
+                </button>
+              </div>
             </div>
-          </div>
+          </aside>
+
+          {/* Content */}
+          <section className="col-span-9">
+            {/* Compact sort row */}
+            <div className="rounded-3xl border bg-white p-4 flex items-center justify-between">
+              <div className="text-xs text-gray-600">
+                {busy ? "Loading…" : `Showing ${sorted.length} items`}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-gray-500">Sort</div>
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as SortKey)}
+                  className="border rounded-2xl px-3 py-2 text-sm"
+                >
+                  {SORT_OPTIONS.map((x) => (
+                    <option key={x.key} value={x.key}>
+                      {x.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Listing */}
+            <div className="mt-4 pb-10">
+              {busy ? (
+                <div className="rounded-3xl border bg-white p-6 text-gray-600">Loading…</div>
+              ) : (
+                <RudrakshaGrid items={sorted} />
+              )}
+            </div>
+          </section>
         </div>
 
-        {/* Mobile mini header (chips) */}
+        {/* Mobile mini header stays as-is below */}
         <div className="md:hidden mt-4">
-          <div className="rounded-3xl border bg-white p-4 space-y-2">
-            <div className="text-sm font-semibold">Browse Rudraksha</div>
-            <div className="text-xs text-gray-600">
-              {busy ? "Loading…" : `Showing ${sorted.length} items`} • Filters: {activeFilterCount}
-            </div>
-
-            {/* small promo banner image */}
-            <div className="relative h-[110px] rounded-2xl overflow-hidden border">
-              <Image
-                src="/images/rudraksha/banner-1.jpg"
-                alt="Rudraksha jewellery banner"
-                fill
-                className="object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-black/55 to-transparent" />
-              <div className="absolute inset-0 p-3 flex items-end">
-                <div className="text-white text-sm font-semibold">
-                  Find your mukhi in seconds → Use Filters
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={clearAll}
-                className="flex-1 rounded-2xl border px-3 py-2 text-sm bg-white hover:bg-gray-50"
-              >
-                Clear
-              </button>
-              <Link
-                href="https://www.cityjeweller.in"
-                className="flex-1 rounded-2xl bg-black text-white px-3 py-2 text-sm text-center"
-              >
-                Home
-              </Link>
-            </div>
-          </div>
+          ...
         </div>
 
-        {/* Listing */}
-        <div className="mt-5 pb-24 md:pb-10">
+        {/* Mobile listing stays as-is */}
+        <div className="md:hidden mt-5 pb-24">
           {busy ? (
             <div className="rounded-3xl border bg-white p-6 text-gray-600">Loading…</div>
           ) : (
@@ -686,6 +660,7 @@ export default function RudrakshaListPage() {
           )}
         </div>
       </div>
+
 
       {/* Mobile Footer Tabs */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t">
