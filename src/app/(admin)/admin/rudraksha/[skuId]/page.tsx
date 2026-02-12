@@ -11,8 +11,10 @@ import {
   getQueuedRudraksha,
   approveRudraksha,
   rejectRudraksha,
+  updateRudrakshaSubmissionMedia,
+  removeRudrakshaSubmissionMediaItem,
 } from "@/lib/firebase/rudrakshaAdminDb";
-import RudrakshaForm from "@/components/supplier/RudrakshaForm";
+
 
 const DEFAULT_MARGIN = 20;
 
@@ -62,6 +64,17 @@ function computeBaseAndPublic(listing: any) {
 
 // --- media helpers (needed by load()) ---
 type MediaKind = "IMG" | "VID" | "CERT";
+
+
+type MediaItem = {
+  url?: string;
+  storagePath?: string;
+  kind?: "IMG" | "VID" | "CERT";
+  type?: string;          // legacy
+  order?: number;
+  updatedAt?: number;
+  [key: string]: any;     // allow extra fields safely
+};
 
 function asKind(m: any): MediaKind {
   const k = String(m?.kind || "").toUpperCase();
