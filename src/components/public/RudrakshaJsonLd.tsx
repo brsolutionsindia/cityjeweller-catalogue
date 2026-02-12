@@ -36,8 +36,8 @@ export default function RudrakshaJsonLd({
       item.mukhi != null
         ? { "@type": "PropertyValue", name: "Mukhi", value: String(item.mukhi) }
         : null,
-      (item.origin || item.originLegacy || item.origin_legacy)
-        ? { "@type": "PropertyValue", name: "Origin", value: String(item.origin || item.originLegacy || item.origin_legacy) }
+      (item.origin || item.originLegacy || (item as any).origin_legacy)
+        ? { "@type": "PropertyValue", name: "Origin", value: String(item.origin || item.originLegacy || (item as any).origin_legacy) }
         : null,
       item.sizeMm
         ? { "@type": "PropertyValue", name: "Bead size (mm)", value: String(item.sizeMm) }
