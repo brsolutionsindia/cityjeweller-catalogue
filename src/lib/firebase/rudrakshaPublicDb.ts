@@ -26,7 +26,7 @@ export type PublicRudraksha = {
   labCertified?: boolean | null;   // ✅ added
 
   tags?: string[] | null;
-  media?: any[] | null;
+  media?: any[];
 
   // ✅ pricing (support both new + legacy)
   suggestedMrp?: number | null;
@@ -93,7 +93,7 @@ function normalize(it: any): PublicRudraksha {
     labCertified: toBool(it?.labCertified ?? it?.certified ?? it?.isCertified) ?? null,
 
     tags: Array.isArray(it?.tags) ? it.tags : null,
-    media: Array.isArray(it?.media) ? it.media : null,
+    media: Array.isArray(it?.media) ? it.media : [],
 
     // ✅ include all possible pricing fields
     computedPublicPrice: toNum(it?.computedPublicPrice) ?? null,

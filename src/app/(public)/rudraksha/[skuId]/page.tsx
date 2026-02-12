@@ -55,7 +55,7 @@ export async function generateMetadata(
   if (!it) return { title: "Rudraksha | Not found" };
 
   const price = pickDisplayPrice(it);
-  const cover = pickCoverUrl(it.media) || FALLBACK_IMAGES[0];
+  const cover = pickCoverUrl(data.media ?? undefined) || FALLBACK_IMAGES[0];
   const title = titleFrom(it);
 
   const origin = safeText(it.origin) ? `Origin: ${it.origin}` : "";
@@ -111,7 +111,7 @@ export default async function RudrakshaProductPage(
 
   const price = pickDisplayPrice(data);
   const mrp = pickMrpPrice(data);
-  const cover = pickCoverUrl(data.media) || FALLBACK_IMAGES[0];
+  const cover = pickCoverUrl(data.media ?? undefined) || FALLBACK_IMAGES[0];
 
   // WhatsApp (fixed number)
   const WA_NUMBER = "919023130944"; // ✅ your number
@@ -146,7 +146,8 @@ export default async function RudrakshaProductPage(
       <div className="grid lg:grid-cols-2 gap-8">
         {/* Gallery */}
         <div className="space-y-3">
-          <RudrakshaGallery media={data.media} />
+          <RudrakshaGallery media={Array.isArray(data.media) ? data.media : []} />
+
 
           {/* Trust strip */}
           <div className="grid grid-cols-3 gap-3 text-xs">
