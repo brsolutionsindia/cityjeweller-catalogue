@@ -1,308 +1,35 @@
-// src/lib/firebase/gemstoneJewelleryAdminDb.ts
-import { db } from "@/firebaseConfig";
-import { get, ref as dbRef, update, remove, serverTimestamp } from "firebase/database";
-import type { GemstoneJewellerySubmission, MediaItem } from "@/lib/gemstoneJewellery/types";
-import { uniqTags, normalizeTag } from "@/lib/gemstoneJewellery/options";
-import { deleteGemstoneJewelleryMedia } from "@/lib/firebase/gemstoneJewelleryDb";
+# Phase 1: Database Functions Implementation Guide
 
-const SUBMISSION_NODE = (gstNumber: string) => `GST/${gstNumber}/Submissions/GemstoneJewellery`;
-const ADMIN_QUEUE = `AdminQueue/GemstoneJewellery`;
+**Target File:** `src/lib/firebase/gemstoneJewelleryAdminDb.ts`  
+**Time:** 4-5 hours  
+**Focus:** New functions for listing lifecycle management
 
-// Published global
-const GLOBAL_NODE = `Global SKU/GemstoneJewellery`;
-const GLOBAL_TAG_INDEX = `Global SKU/Indexes/GemstoneJewellery/ByTag`;
-const GLOBAL_TYPE_INDEX = `Global SKU/Indexes/GemstoneJewellery/ByType`;
-const GLOBAL_NATURE_INDEX = `Global SKU/Indexes/GemstoneJewellery/ByNature`;
+---
 
-export async function getPendingGemstoneJewelleryQueue() {
-  const snap = await get(dbRef(db, ADMIN_QUEUE));
-  return (snap.val() as Record<string, any> | null) ?? null;
-}
+## Overview of Changes
 
-export async function getQueuedGemstoneJewellery(skuId: string) {
-  const qSnap = await get(dbRef(db, `${ADMIN_QUEUE}/${skuId}`));
-  if (!qSnap.exists()) return null;
+You'll add 7 new functions to handle:
+1. Hide/unhide listings from website
+2. Send back to supplier for review
+3. Handle unlist requests
+4. Track hidden/review states
 
-  const { gstNumber } = qSnap.val() as { gstNumber: string };
-  if (!gstNumber) return null;
+All existing functions remain unchanged (backward compatible).
 
-  const sSnap = await get(dbRef(db, `${SUBMISSION_NODE(gstNumber)}/${skuId}`));
-  return sSnap.exists() ? (sSnap.val() as GemstoneJewellerySubmission) : null;
-}
+---
 
-function buildIndexUpdates(listing: GemstoneJewellerySubmission) {
-  const tags = uniqTags(listing.tags || []).map(normalizeTag);
-  const updates: Record<string, any> = {};
+## Function 1: Hide from Website
 
-  for (const t of tags) updates[`${GLOBAL_TAG_INDEX}/${t}/${listing.skuId}`] = true;
-  updates[`${GLOBAL_TYPE_INDEX}/${listing.type}/${listing.skuId}`] = true;
-  updates[`${GLOBAL_NATURE_INDEX}/${listing.nature}/${listing.skuId}`] = true;
+**Purpose:** Admin hides an APPROVED listing without deleting it
 
-  return updates;
-}
-
-function stripUndefined(obj: any) {
-  const out: any = Array.isArray(obj) ? [] : {};
-  for (const [k, v] of Object.entries(obj || {})) {
-    if (v === undefined) continue;
-    if (v && typeof v === "object" && !Array.isArray(v)) out[k] = stripUndefined(v);
-    else out[k] = v;
-  }
-  return out;
-}
-
-function toNum(v: any) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function isWeightMode(pm: any) {
-  const x = String(pm || "").toUpperCase();
-  return x === "WEIGHT" || x === "PRICE_PER_WEIGHT" || x === "RATE_PER_WEIGHT";
-}
-
-/**
- * ✅ Margin ALWAYS applies:
- * basePrice is selected from:
- * - weight mode: ratePerGm * weightGm
- * - else: offerPrice > mrp > 0
- */
-function computeBaseAndPublic(listing: any) {
-  const pm = String(listing?.priceMode || "MRP");
-  const marginPct = toNum(listing?.adminMarginPct ?? listing?.marginPct ?? 0);
-
-  let base = 0;
-  let source = "";
-
-  if (isWeightMode(pm)) {
-    const rate = toNum(listing?.ratePerGm);
-    const wt = toNum(listing?.weightGm);
-    base = rate > 0 && wt > 0 ? Math.round(rate * wt) : 0;
-    source = "WEIGHT(ratePerGm*weightGm)";
-  } else {
-    const offer = toNum(listing?.offerPrice);
-    const mrp = toNum(listing?.mrp);
-
-    if (offer > 0) {
-      base = Math.round(offer);
-      source = "OFFER_PRICE";
-    } else if (mrp > 0) {
-      base = Math.round(mrp);
-      source = "MRP";
-    } else {
-      base = 0;
-      source = "NONE";
-    }
-  }
-
-  const publicPrice = base > 0 ? Math.round(base * (1 + marginPct / 100)) : 0;
-
-  return { marginPct, base, publicPrice, source };
-}
-
-export async function approveGemstoneJewellery(params: {
-  gstNumber: string;
-  skuId: string;
-  adminUid: string;
-  finalPatch?: Partial<GemstoneJewellerySubmission>;
-}) {
-  const { gstNumber, skuId, adminUid, finalPatch } = params;
-
-  const snap = await get(dbRef(db, `${SUBMISSION_NODE(gstNumber)}/${skuId}`));
-  if (!snap.exists()) throw new Error("Submission not found");
-  const submission = snap.val() as GemstoneJewellerySubmission;
-
-  // Merge submission + admin patch first
-  const merged: any = stripUndefined({
-    ...submission,
-    ...(finalPatch || {}),
-  });
-
-  // ✅ Ensure margin fields exist (default 20 if missing)
-  if (merged.adminMarginPct === undefined || merged.adminMarginPct === null) {
-    merged.adminMarginPct = 20;
-  }
-
-  // ✅ Compute ALWAYS (weight or non-weight)
-  const { marginPct, base, publicPrice, source } = computeBaseAndPublic(merged);
-
-  const finalListing: any = stripUndefined({
-    ...merged,
-    tags: uniqTags([
-      ...(submission.tags || []),
-      ...(((finalPatch?.tags as string[] | undefined) || [])),
-    ]),
-    status: "APPROVED",
-    updatedAt: Date.now(),
-
-    // ✅ store computed values
-    adminMarginPct: marginPct,
-    computedBasePrice: base,
-    computedPublicPrice: publicPrice,
-    computedPriceSource: source,
-  });
-
-  const updates: Record<string, any> = {};
-
-  // Publish
-  updates[`${GLOBAL_NODE}/${skuId}`] = stripUndefined({
-    ...finalListing,
-    _approvedAtServer: serverTimestamp(),
-    approvedAt: Date.now(),
-    approvedBy: adminUid,
-  });
-
-  Object.assign(updates, buildIndexUpdates(finalListing));
-
-  // Update submission (store same computed info)
-  updates[`${SUBMISSION_NODE(gstNumber)}/${skuId}`] = stripUndefined({
-    ...finalListing,
-    approvedAt: Date.now(),
-    approvedBy: adminUid,
-    rejectionReason: null,
-    _approvedAtServer: serverTimestamp(),
-  });
-
-  // Remove from queue
-  updates[`${ADMIN_QUEUE}/${skuId}`] = null;
-
-  await update(dbRef(db), updates);
-}
-
-export async function rejectGemstoneJewellery(params: {
-  gstNumber: string;
-  skuId: string;
-  adminUid: string;
-  reason: string;
-}) {
-  const { gstNumber, skuId, adminUid, reason } = params;
-
-  const updates: Record<string, any> = {};
-  updates[`${SUBMISSION_NODE(gstNumber)}/${skuId}/status`] = "REJECTED";
-  updates[`${SUBMISSION_NODE(gstNumber)}/${skuId}/rejectionReason`] = reason;
-  updates[`${SUBMISSION_NODE(gstNumber)}/${skuId}/rejectedAt`] = Date.now();
-  updates[`${SUBMISSION_NODE(gstNumber)}/${skuId}/rejectedBy`] = adminUid;
-  updates[`${SUBMISSION_NODE(gstNumber)}/${skuId}/_rejectedAtServer`] = serverTimestamp();
-
-  updates[`${ADMIN_QUEUE}/${skuId}`] = null;
-
-  await update(dbRef(db), updates);
-}
-
-export async function unpublishGemstoneJewellery(skuId: string) {
-  await remove(dbRef(db, `${GLOBAL_NODE}/${skuId}`));
-}
-
-/* ------------------------------ media helpers ------------------------------ */
-
-export async function updateGemstoneJewellerySubmissionMedia(params: {
-  gstNumber: string;
-  skuId: string;
-  images: MediaItem[];
-  videos: MediaItem[];
-}) {
-  const { gstNumber, skuId, images, videos } = params;
-  const now = Date.now();
-
-  const cleanedImages = (images || [])
-    .filter(Boolean)
-    .map((m: any, i) => stripUndefined({ ...m, kind: "IMG", order: i, updatedAt: now }));
-
-  const cleanedVideos = (videos || [])
-    .filter(Boolean)
-    .map((m: any, i) => stripUndefined({ ...m, kind: "VID", order: i, updatedAt: now }));
-
-  await update(dbRef(db, `${SUBMISSION_NODE(gstNumber)}/${skuId}`), {
-    media: [...cleanedImages, ...cleanedVideos],
-    updatedAt: now,
-    _updatedAtServer: serverTimestamp(),
-  });
-}
-
-export async function removeGemstoneJewellerySubmissionMediaItem(params: {
-  gstNumber: string;
-  skuId: string;
-  kind: "IMG" | "VID";
-  index: number;
-  deleteFromStorage: boolean;
-}) {
-  const { gstNumber, skuId, kind, index, deleteFromStorage } = params;
-
-  const subSnap = await get(dbRef(db, `${SUBMISSION_NODE(gstNumber)}/${skuId}`));
-  if (!subSnap.exists()) throw new Error("Submission not found");
-
-  const submission = subSnap.val() as GemstoneJewellerySubmission;
-  const all = Array.isArray((submission as any).media) ? ((submission as any).media as any[]) : [];
-
-  const list = all
-    .filter(
-      (m: any) =>
-        m?.kind === kind ||
-        (kind === "IMG" && m?.type === "image") ||
-        (kind === "VID" && m?.type === "video")
-    )
-    .sort((a: any, b: any) => (a?.order ?? 9999) - (b?.order ?? 9999));
-
-  const target: any = list[index];
-  if (!target) throw new Error("Media item not found at index");
-
-  if (deleteFromStorage && target.storagePath) {
-    await deleteGemstoneJewelleryMedia(target.storagePath);
-  }
-
-  const nextAll = all.filter((m: any) => {
-    const sameStorage = target.storagePath && m?.storagePath === target.storagePath;
-    const sameUrl = !target.storagePath && target.url && m?.url === target.url;
-    return !(sameStorage || sameUrl);
-  });
-
-  const nextImages = nextAll
-    .map((m: any) => ({
-      ...m,
-      kind: m?.kind || (m?.type === "image" ? "IMG" : m?.type === "video" ? "VID" : m?.kind),
-    }))
-    .filter((m: any) => m.kind === "IMG")
-    .sort((a: any, b: any) => (a?.order ?? 9999) - (b?.order ?? 9999))
-    .map((m: any, i) => stripUndefined({ ...m, kind: "IMG", order: i }));
-
-  const nextVideos = nextAll
-    .map((m: any) => ({
-      ...m,
-      kind: m?.kind || (m?.type === "video" ? "VID" : m?.type === "image" ? "IMG" : m?.kind),
-    }))
-    .filter((m: any) => m.kind === "VID")
-    .sort((a: any, b: any) => (a?.order ?? 9999) - (b?.order ?? 9999))
-    .map((m: any, i) => stripUndefined({ ...m, kind: "VID", order: i }));
-
-  await update(dbRef(db, `${SUBMISSION_NODE(gstNumber)}/${skuId}`), {
-    media: [...nextImages, ...nextVideos],
-    updatedAt: Date.now(),
-    _updatedAtServer: serverTimestamp(),
-  });
-}
-
-/* ------------------------------ NEW: Listing Lifecycle Management ------------------------------ */
-
-/**
- * Helper: Build index removals for unpublishing
- */
-function buildIndexRemovals(listing: GemstoneJewellerySubmission) {
-  const tags = uniqTags(listing.tags || []).map(normalizeTag);
-  const updates: Record<string, any> = {};
-
-  for (const t of tags) updates[`${GLOBAL_TAG_INDEX}/${t}/${listing.skuId}`] = null;
-  if (listing.type) updates[`${GLOBAL_TYPE_INDEX}/${listing.type}/${listing.skuId}`] = null;
-  if (listing.nature) updates[`${GLOBAL_NATURE_INDEX}/${listing.nature}/${listing.skuId}`] = null;
-
-  return updates;
-}
-
+```typescript
 /**
  * Hide approved listing from website
- * - Removes from Global SKU
+ * - Removes from Global SKU/{skuId}
  * - Removes from indexes
- * - Sets status = HIDDEN
+ * - Sets status = HIDDEN in submission
  * - Tracks who hid and when
+ * - Listing stays in submission (can be unhidden)
  */
 export async function hideGemstoneJewelleryFromWebsite(params: {
   skuId: string;
@@ -327,7 +54,10 @@ export async function hideGemstoneJewelleryFromWebsite(params: {
   updates[`${GLOBAL_NODE}/${params.skuId}`] = null;
 
   // Remove all indexes
-  Object.assign(updates, buildIndexRemovals(listing));
+  const tags = uniqTags(listing.tags || []).map(normalizeTag);
+  for (const t of tags) updates[`${GLOBAL_TAG_INDEX}/${t}/${params.skuId}`] = null;
+  if (listing.type) updates[`${GLOBAL_TYPE_INDEX}/${listing.type}/${params.skuId}`] = null;
+  if (listing.nature) updates[`${GLOBAL_NATURE_INDEX}/${listing.nature}/${params.skuId}`] = null;
 
   // Update submission status + tracking
   updates[`${SUBMISSION_NODE(gstNumber)}/${params.skuId}/status`] = "HIDDEN";
@@ -339,11 +69,19 @@ export async function hideGemstoneJewelleryFromWebsite(params: {
 
   await update(dbRef(db), updates);
 }
+```
 
+---
+
+## Function 2: Unhide to Website
+
+**Purpose:** Admin restores a HIDDEN listing back to website
+
+```typescript
 /**
  * Unhide listing - restore to website
- * - Restores to Global SKU
- * - Rebuilds indexes
+ * - Restores to Global SKU/{skuId}
+ * - Rebuilds all indexes
  * - Sets status = APPROVED
  * - Clears hidden flags
  */
@@ -387,13 +125,22 @@ export async function unhideGemstoneJewelleryToWebsite(params: {
 
   await update(dbRef(db), updates);
 }
+```
 
+---
+
+## Function 3: Send Back for Review
+
+**Purpose:** Admin sends APPROVED listing back to supplier with reason
+
+```typescript
 /**
  * Send listing back to supplier for review
  * - Removes from website + indexes
- * - Sets status = SUPPLIER_REVIEW
- * - Creates entry in SupplierInbox
- * - Updates AdminQueue with status = SUPPLIER_REVIEW
+ * - Sets status = SUPPLIER_REVIEW in submission
+ * - Creates entry in SupplierInbox/{gstNumber}/GemstoneJewellery/{skuId}
+ * - Updates AdminQueue with status = SUPPLIER_REVIEW for tracking
+ * - Supplier gets notification they need to re-submit
  */
 export async function sendGemstoneJewelleryBackToSupplierReview(params: {
   gstNumber: string;
@@ -422,7 +169,10 @@ export async function sendGemstoneJewelleryBackToSupplierReview(params: {
   updates[`${GLOBAL_NODE}/${params.skuId}`] = null;
 
   // Remove indexes
-  Object.assign(updates, buildIndexRemovals(listing));
+  const tags = uniqTags(listing.tags || []).map(normalizeTag);
+  for (const t of tags) updates[`${GLOBAL_TAG_INDEX}/${t}/${params.skuId}`] = null;
+  if (listing.type) updates[`${GLOBAL_TYPE_INDEX}/${listing.type}/${params.skuId}`] = null;
+  if (listing.nature) updates[`${GLOBAL_NATURE_INDEX}/${listing.nature}/${params.skuId}`] = null;
 
   // Update submission status
   updates[`${SUBMISSION_NODE(params.gstNumber)}/${params.skuId}/status`] = "SUPPLIER_REVIEW";
@@ -456,9 +206,17 @@ export async function sendGemstoneJewelleryBackToSupplierReview(params: {
 
   await update(dbRef(db), updates);
 }
+```
 
+---
+
+## Function 4: Get Supplier Inbox
+
+**Purpose:** Supplier sees items admin sent back for review
+
+```typescript
 /**
- * Get supplier's inbox - items sent back by admin
+ * Get supplier's inbox - items sent back for review by admin
  */
 export async function getSupplierInboxGemstoneJewellery(
   gstNumber: string
@@ -489,7 +247,15 @@ export async function getSupplierInboxGemstoneJewellery(
 
   return items;
 }
+```
 
+---
+
+## Function 5: Mark Inbox Item as Read
+
+**Purpose:** Supplier marks inbox notification as read
+
+```typescript
 /**
  * Mark inbox item as read (supplier action)
  */
@@ -510,13 +276,22 @@ export async function markSupplierInboxItemAsRead(
     }
   );
 }
+```
 
+---
+
+## Function 6: Approve Unlist Request
+
+**Purpose:** Admin approves supplier's request to delete APPROVED listing
+
+```typescript
 /**
  * Approve supplier's unlist request
- * - Deletes submission
+ * - Deletes submission (or archives it)
  * - Removes from website + indexes
  * - Removes from AdminQueue
- * - Removes from Requests
+ * - Removes from Requests/UNLIST_REQUEST
+ * - Supplier listing is gone
  */
 export async function approveUnlistRequestGemstoneJewellery(params: {
   gstNumber: string;
@@ -543,20 +318,43 @@ export async function approveUnlistRequestGemstoneJewellery(params: {
 
   // Remove from website + indexes
   updates[`${GLOBAL_NODE}/${params.skuId}`] = null;
-  Object.assign(updates, buildIndexRemovals(listing));
+
+  const tags = uniqTags(listing.tags || []).map(normalizeTag);
+  for (const t of tags) updates[`${GLOBAL_TAG_INDEX}/${t}/${params.skuId}`] = null;
+  if (listing.type) updates[`${GLOBAL_TYPE_INDEX}/${listing.type}/${params.skuId}`] = null;
+  if (listing.nature) updates[`${GLOBAL_NATURE_INDEX}/${listing.nature}/${params.skuId}`] = null;
 
   // Clean up queue + requests
   updates[`${ADMIN_QUEUE}/${params.skuId}`] = null;
   updates[`GST/${params.gstNumber}/Requests/GemstoneJewellery/${params.skuId}`] = null;
 
+  // Optional: Log to archive
+  if (false) { // set to true if you want to keep deleted items in audit log
+    updates[`GST/${params.gstNumber}/DeletedListings/GemstoneJewellery/${params.skuId}`] = stripUndefined({
+      skuId: params.skuId,
+      deletedBy: params.adminUid,
+      reason: params.reason || "APPROVED_UNLIST_REQUEST",
+      deletedAt: now,
+      _deletedAtServer: serverTimestamp(),
+    });
+  }
+
   await update(dbRef(db), updates);
 }
+```
 
+---
+
+## Function 7: Reject Unlist Request
+
+**Purpose:** Admin rejects supplier's deletion request, keeps listing APPROVED
+
+```typescript
 /**
  * Reject supplier's unlist request
  * - Removes from Requests
  * - Keeps listing status = APPROVED
- * - Optionally notifies supplier
+ * - Optionally notifies supplier via inbox
  */
 export async function rejectUnlistRequestGemstoneJewellery(params: {
   gstNumber: string;
@@ -592,9 +390,18 @@ export async function rejectUnlistRequestGemstoneJewellery(params: {
 
   await update(dbRef(db), updates);
 }
+```
 
+---
+
+## Function 8: List All Global Listings
+
+**Purpose:** Admin sees all listings currently on website (with filters)
+
+```typescript
 /**
- * Get all published listings (APPROVED or HIDDEN)
+ * Get all published (APPROVED or HIDDEN) listings
+ * Used by admin to see what's visible on website
  */
 export async function listAllGemstoneJewelleryGlobal(
   filter?: "APPROVED" | "HIDDEN"
@@ -624,9 +431,18 @@ export async function listAllGemstoneJewelleryGlobal(
 
   return listings;
 }
+```
 
+---
+
+## Function 9: List Supplier Listings by Status
+
+**Purpose:** Supplier/Admin sees supplier's listings filtered by status
+
+```typescript
 /**
  * List supplier's submissions by status
+ * Status: DRAFT | PENDING | APPROVED | REJECTED | HIDDEN | SUPPLIER_REVIEW
  */
 export async function listGemstoneJewelleryByStatus(
   gstNumber: string,
@@ -659,4 +475,75 @@ export async function listGemstoneJewelleryByStatus(
 
   return results;
 }
+```
+
+---
+
+## Summary of Additions
+
+**Add to `gemstoneJewelleryAdminDb.ts`:**
+
+```typescript
+// NEW: Listing visibility management
+export async function hideGemstoneJewelleryFromWebsite(params: {...}) { ... }
+export async function unhideGemstoneJewelleryToWebsite(params: {...}) { ... }
+
+// NEW: Supplier review workflow
+export async function sendGemstoneJewelleryBackToSupplierReview(params: {...}) { ... }
+export async function getSupplierInboxGemstoneJewellery(gstNumber: string) { ... }
+export async function markSupplierInboxItemAsRead(gstNumber: string, skuId: string) { ... }
+
+// NEW: Unlist request handling
+export async function approveUnlistRequestGemstoneJewellery(params: {...}) { ... }
+export async function rejectUnlistRequestGemstoneJewellery(params: {...}) { ... }
+
+// NEW: Listing queries
+export async function listAllGemstoneJewelleryGlobal(filter?: ...) { ... }
+export async function listGemstoneJewelleryByStatus(gstNumber, uid, status) { ... }
+```
+
+---
+
+## Testing These Functions
+
+```typescript
+// Test: Hide listing
+await hideGemstoneJewelleryFromWebsite({
+  skuId: "8165GJ001001",
+  adminUid: "admin123",
+  reason: "Out of stock",
+});
+
+// Test: Unhide listing
+await unhideGemstoneJewelleryToWebsite({
+  skuId: "8165GJ001001",
+  adminUid: "admin123",
+  gstNumber: "18AABCT1234H1Z0",
+});
+
+// Test: Send back
+await sendGemstoneJewelleryBackToSupplierReview({
+  gstNumber: "18AABCT1234H1Z0",
+  skuId: "8165GJ001001",
+  supplierUid: "supplier123",
+  adminUid: "admin123",
+  reason: "Please provide clearer product images",
+});
+
+// Test: Get inbox
+const inbox = await getSupplierInboxGemstoneJewellery("18AABCT1234H1Z0");
+console.log(inbox); // Items sent back for review
+```
+
+---
+
+## Next Steps
+
+1. Add these 9 functions to `gemstoneJewelleryAdminDb.ts`
+2. Update types if needed (add HIDDEN, SUPPLIER_REVIEW to status enum)
+3. Move to Phase 2: Supplier UI changes
+4. Then Phase 3: Admin UI changes
+
+Ready to proceed with UI?
+
 

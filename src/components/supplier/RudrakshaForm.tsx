@@ -556,54 +556,57 @@ export default function RudrakshaForm({ value, onChange, suggested, readOnlyStat
         </div>
       </section>
 
-      {/* Media */}
-      <section className="rounded-2xl border p-4 space-y-4">
-        <div className="text-lg font-semibold">Media (crop / trim / reorder)</div>
+            {/* Media */}
+            {!readOnlyStatus && (
+              <section className="rounded-2xl border p-4 space-y-4">
+                <div className="text-lg font-semibold">Media (crop / trim / reorder)</div>
 
-        <MediaUploader
-          skuId={value.skuId}
-          label="Photos"
-          accept="image/*"
-          kind="IMG"
-          items={media.filter((m) => m.kind === "IMG").sort((a, b) => (a.order ?? 0) - (b.order ?? 0))}
-          onChange={(nextImgs) => {
-            const vids = media.filter((m) => m.kind === "VID");
-            const certs = media.filter((m) => m.kind === "CERT");
-            onChange({ ...value, media: [...nextImgs, ...vids, ...certs] });
-          }}
-          allowReorder
-          uploadFn={uploadRudrakshaMediaBatch}
-          deleteFn={deleteRudrakshaMedia}
-          getUrl={(m) => m.url}
-          getStoragePath={(m) => m.storagePath}
-          isVideoItem={(m) => m.kind === "VID"}
-          setOrder={(m, order) => ({ ...m, order })}
-        />
+                <MediaUploader
+                  skuId={value.skuId}
+                  label="Photos"
+                  accept="image/*"
+                  kind="IMG"
+                  items={media.filter((m) => m.kind === "IMG").sort((a, b) => (a.order ?? 0) - (b.order ?? 0))}
+                  onChange={(nextImgs) => {
+                    const vids = media.filter((m) => m.kind === "VID");
+                    const certs = media.filter((m) => m.kind === "CERT");
+                    onChange({ ...value, media: [...nextImgs, ...vids, ...certs] });
+                  }}
+                  allowReorder
+                  uploadFn={uploadRudrakshaMediaBatch}
+                  deleteFn={deleteRudrakshaMedia}
+                  getUrl={(m) => m.url}
+                  getStoragePath={(m) => m.storagePath}
+                  isVideoItem={(m) => m.kind === "VID"}
+                  setOrder={(m, order) => ({ ...m, order })}
+                />
 
-        <MediaUploader
-          skuId={value.skuId}
-          label="Videos"
-          accept="video/*"
-          kind="VID"
-          items={media.filter((m) => m.kind === "VID").sort((a, b) => (a.order ?? 0) - (b.order ?? 0))}
-          onChange={(nextVids) => {
-            const imgs = media.filter((m) => m.kind === "IMG");
-            const certs = media.filter((m) => m.kind === "CERT");
-            onChange({ ...value, media: [...imgs, ...nextVids, ...certs] });
-          }}
-          allowReorder
-          uploadFn={uploadRudrakshaMediaBatch}
-          deleteFn={deleteRudrakshaMedia}
-          getUrl={(m) => m.url}
-          getStoragePath={(m) => m.storagePath}
-          isVideoItem={(m) => m.kind === "VID"}
-          setOrder={(m, order) => ({ ...m, order })}
-        />
+                <MediaUploader
+                  skuId={value.skuId}
+                  label="Videos"
+                  accept="video/*"
+                  kind="VID"
+                  items={media.filter((m) => m.kind === "VID").sort((a, b) => (a.order ?? 0) - (b.order ?? 0))}
+                  onChange={(nextVids) => {
+                    const imgs = media.filter((m) => m.kind === "IMG");
+                    const certs = media.filter((m) => m.kind === "CERT");
+                    onChange({ ...value, media: [...imgs, ...nextVids, ...certs] });
+                  }}
+                  allowReorder
+                  uploadFn={uploadRudrakshaMediaBatch}
+                  deleteFn={deleteRudrakshaMedia}
+                  getUrl={(m) => m.url}
+                  getStoragePath={(m) => m.storagePath}
+                  isVideoItem={(m) => m.kind === "VID"}
+                  setOrder={(m, order) => ({ ...m, order })}
+                />
 
-        <div className="text-sm text-gray-600">
-          Recommended: 1 white background photo (mandatory), 1 close-up, 1 lifestyle, 1 short video.
-        </div>
-      </section>
-    </div>
-  );
-}
+                <div className="text-sm text-gray-600">
+                  Recommended: 1 white background photo (mandatory), 1 close-up, 1 lifestyle, 1 short video.
+                </div>
+              </section>
+            )}
+
+          </div>
+        );
+      }

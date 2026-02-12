@@ -13,6 +13,7 @@ import {
   getGemstoneJewellerySubmission,
   upsertGemstoneJewellerySubmission,
   submitForApproval,
+  deleteGemstoneJewellerySubmission,
 } from "@/lib/firebase/gemstoneJewelleryDb";
 
 function toStr(x: any) {
@@ -112,6 +113,56 @@ export default function SupplierGemstoneJewelleryEditPage() {
     }
   }
 
+  async function onDeleteDraft() {
+    if (!form) return;
+    const ok = window.confirm("Delete this listing? This cannot be undone.");
+    if (!ok) return;
+
+    setSaving(true);
+    try {
+      await deleteGemstoneJewellerySubmission({
+        gstNumber: form.gstNumber,
+        supplierUid: form.supplierUid,
+        skuId: form.skuId,
+        deleteMedia: true,
+      });
+      alert("Deleted.");
+      router.push("/supplier/gemstone-jewellery");
+      router.refresh();
+    } catch (e: any) {
+      alert(e?.message || "Failed to delete");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onDeleteApproved() {
+    if (!form) return;
+    const ok = window.confirm(
+      "Request deletion of this approved listing?\n\n" +
+      "Your request will be sent to admin for approval. " +
+      "The listing will remain visible until admin reviews and approves the deletion."
+    );
+    if (!ok) return;
+
+    setSaving(true);
+    try {
+      await deleteGemstoneJewellerySubmission({
+        gstNumber: form.gstNumber,
+        supplierUid: form.supplierUid,
+        skuId: form.skuId,
+        deleteMedia: false,
+      });
+      alert("Deletion request sent to admin.");
+      router.push("/supplier/gemstone-jewellery");
+      router.refresh();
+    } catch (e: any) {
+      alert(e?.message || "Failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (!gst || !uid) {
     return (
       <div className="p-6">
@@ -189,6 +240,28 @@ export default function SupplierGemstoneJewelleryEditPage() {
       )}
 
       <GemstoneJewelleryForm value={form} onChange={setForm} readOnlyStatus={false} />
+
+      <div className="flex gap-2">
+        {form.status === "DRAFT" && (
+          <button
+            onClick={onDeleteDraft}
+            disabled={saving}
+            className="px-4 py-2 rounded-xl bg-red-600 text-white"
+          >
+            Delete Draft
+          </button>
+        )}
+
+        {form.status === "APPROVED" && (
+          <button
+            onClick={onDeleteApproved}
+            disabled={saving}
+            className="px-4 py-2 rounded-xl bg-red-600 text-white"
+          >
+            Request Deletion
+          </button>
+        )}
+      </div>
     </div>
   );
 }

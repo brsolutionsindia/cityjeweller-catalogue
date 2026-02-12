@@ -5,54 +5,16 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { auth } from "@/firebaseConfig";
 
-import type { RudrakshaSubmission, MediaItem } from "@/lib/rudraksha/types";
+
+import type { RudrakshaSubmission } from "@/lib/rudraksha/types";
 import {
   getQueuedRudraksha,
   approveRudraksha,
   rejectRudraksha,
-  updateRudrakshaSubmissionMedia,
-  removeRudrakshaSubmissionMediaItem,
 } from "@/lib/firebase/rudrakshaAdminDb";
+import RudrakshaForm from "@/components/supplier/RudrakshaForm";
 
 const DEFAULT_MARGIN = 20;
-
-const withBust = (m: any) => {
-  const u = m?.url || "";
-  const v = m?.updatedAt ? String(m.updatedAt) : "";
-  if (!u) return "";
-  if (!v) return u;
-  return u.includes("?") ? `${u}&v=${v}` : `${u}?v=${v}`;
-};
-
-function move<T>(arr: T[], from: number, to: number) {
-  const copy = [...arr];
-  const [x] = copy.splice(from, 1);
-  copy.splice(to, 0, x);
-  return copy;
-}
-
-function asKind(m: any): "IMG" | "VID" | "CERT" {
-  if (m?.kind === "IMG" || m?.kind === "VID" || m?.kind === "CERT") return m.kind;
-  if (m?.type === "video") return "VID";
-  if (m?.type === "file") return "CERT";
-  return "IMG";
-}
-
-
-function normalizeMediaList(list: MediaItem[], kind: "IMG" | "VID" | "CERT") {
-  const now = Date.now();
-  return (list || [])
-    .filter(Boolean)
-    .map((m: any, i) => ({
-      ...m,
-      kind: asKind(m),
-      order: i,
-      updatedAt: m?.updatedAt ?? now,
-      createdAt: m?.createdAt ?? now,
-      id: m?.id || m?.storagePath || m?.url || `${kind}_${i}`,
-    }))
-    .filter((m: any) => m.kind === kind);
-}
 
 function toNum(v: any) {
   const n = Number(v);
@@ -64,22 +26,81 @@ function isWeightMode(pm: any) {
   return x === "WEIGHT" || x === "PRICE_PER_WEIGHT" || x === "RATE_PER_WEIGHT";
 }
 
-function computeBase(data: any) {
-  const pm = String(data?.priceMode || "MRP");
+function computeBaseAndPublic(listing: any) {
+  const pm = String(listing?.priceMode || "MRP");
+  const marginPct = toNum(listing?.adminMarginPct ?? listing?.marginPct ?? DEFAULT_MARGIN);
+
+  let base = 0;
+  let source = "";
+
   if (isWeightMode(pm)) {
-    const rate = toNum(data?.ratePerGm);
-    const wt = toNum(data?.weightGm);
-    const base = rate > 0 && wt > 0 ? Math.round(rate * wt) : 0;
-    return { base, source: "WEIGHT(ratePerGm*weightGm)" };
+    const rate = toNum(listing?.ratePerGm);
+    const wt = toNum(listing?.weightGm);
+    base = rate > 0 && wt > 0 ? Math.round(rate * wt) : 0;
+    source = "WEIGHT(ratePerGm*weightGm)";
+  } else {
+    const offer = toNum(listing?.offerPrice);
+    const mrp = toNum(listing?.mrp);
+
+    if (offer > 0) {
+      base = Math.round(offer);
+      source = "OFFER_PRICE";
+    } else if (mrp > 0) {
+      base = Math.round(mrp);
+      source = "MRP";
+    } else {
+      base = 0;
+      source = "NONE";
+    }
   }
 
-  const offer = toNum(data?.offerPrice);
-  const mrp = toNum(data?.mrp);
+  const publicPrice = base > 0 ? Math.round(base * (1 + marginPct / 100)) : 0;
 
-  if (offer > 0) return { base: Math.round(offer), source: "OFFER_PRICE" };
-  if (mrp > 0) return { base: Math.round(mrp), source: "MRP" };
-  return { base: 0, source: "NONE" };
+  return { marginPct, base, publicPrice, source };
 }
+
+
+// --- media helpers (needed by load()) ---
+type MediaKind = "IMG" | "VID" | "CERT";
+
+function asKind(m: any): MediaKind {
+  const k = String(m?.kind || "").toUpperCase();
+  if (k === "IMG" || k === "VID" || k === "CERT") return k as MediaKind;
+
+  // fallback mapping from older shapes
+  const t = String(m?.type || "").toLowerCase();
+  if (t === "video") return "VID";
+  if (t === "file" || t === "cert") return "CERT";
+  return "IMG";
+}
+
+function normalizeMediaList(list: any[], kind: MediaKind) {
+  const now = Date.now();
+  return (list || [])
+    .filter(Boolean)
+    .map((m: any, i: number) => ({
+      ...m,
+      kind,
+      order: i,
+      updatedAt: m?.updatedAt ?? now,
+    }));
+}
+
+function move<T>(arr: T[], from: number, to: number) {
+  const next = [...arr];
+  const [x] = next.splice(from, 1);
+  next.splice(to, 0, x);
+  return next;
+}
+
+function withBust(m: any) {
+  const u = m?.url || "";
+  const v = m?.updatedAt ? String(m.updatedAt) : "";
+  if (!u) return "";
+  if (!v) return u;
+  return u.includes("?") ? `${u}&v=${v}` : `${u}?v=${v}`;
+}
+
 
 export default function AdminRudrakshaDetail() {
   const params = useParams<{ skuId: string }>();
@@ -138,11 +159,10 @@ export default function AdminRudrakshaDetail() {
   const ratePerGm = toNum((data as any)?.ratePerGm);
   const weightGm = toNum((data as any)?.weightGm);
 
-  const { base: baseAmount, source: baseSource } = useMemo(() => computeBase(data), [data]);
-  const publicAmount = useMemo(() => {
-    const m = toNum(marginPct);
-    return baseAmount > 0 ? Math.round(baseAmount * (1 + m / 100)) : 0;
-  }, [baseAmount, marginPct]);
+  const { base: baseAmount, source: baseSource, publicPrice: publicAmount } = useMemo(
+    () => computeBaseAndPublic({ ...(data || {}), adminMarginPct: marginPct }),
+    [data, marginPct]
+  );
 
   async function saveMediaOrder() {
     if (!data?.gstNumber || !data?.skuId) return;

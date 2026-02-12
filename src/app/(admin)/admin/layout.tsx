@@ -1,3 +1,4 @@
+//src/app/(admin)/admin/layout.tsx
 import React from "react";
 import AdminGate from "@/components/admin/AdminGate";
 

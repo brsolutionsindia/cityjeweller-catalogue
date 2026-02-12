@@ -10,7 +10,7 @@ export type GJType =
   | "PENDANT"
   | "SET";
 
-export type GJStatus = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED";
+export type GJStatus = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED" | "HIDDEN" | "SUPPLIER_REVIEW";
 
 export type TagCategory = "colors" | "stones" | "styles" | "types";
 
@@ -87,6 +87,11 @@ export type GemstoneJewellerySubmission = {
   // admin moderation
   adminNote?: string;       // internal
   rejectionReason?: string; // shown to supplier
+
+  // NEW: tracking when hidden from website
+  hiddenAt?: number;        // timestamp when hidden
+  hiddenBy?: string;        // admin uid who hid it
+  hiddenReason?: string;    // why it was hidden
 
   // visibility flags (optional for later)
   featured?: boolean;

@@ -1,3 +1,4 @@
+//src/components/public/RudrakshaGrid.tsx
 "use client";
 
 import RudrakshaCard from "@/components/public/RudrakshaCard";

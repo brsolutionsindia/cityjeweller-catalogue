@@ -1,7 +1,39 @@
-// src/app/(admin)/admin/gemstone-jewellery/page.tsx
+# Phase 3: Admin UI Implementation Guide
+
+**Target File:** `src/app/(admin)/admin/gemstone-jewellery/page.tsx` (NEW)
+
+**Time:** 4-5 hours  
+**Focus:** Admin dashboard for listing lifecycle management
+
+---
+
+## Admin Dashboard Structure
+
+**URL:** `/admin/gemstone-jewellery`
+
+### Navigation Tabs
+1. **PENDING** - Items awaiting approval
+2. **APPROVED** - Live on website
+3. **HIDDEN** - Hidden from website
+4. **UNLIST_REQUESTS** - Supplier deletion requests
+5. **ALL** - View all listings
+
+### Features
+- Search by SKU, supplier name, title
+- Real-time counts for each tab
+- Action buttons based on status
+- Modal for reasons (when rejecting/sending back)
+- Bulk actions (future enhancement)
+
+---
+
+## Full Admin Page Implementation
+
+```typescript
 "use client";
 
 import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useState } from "react";
 import {
   getPendingGemstoneJewelleryQueue,
@@ -28,8 +60,8 @@ type QueueItem = GemstoneJewellerySubmission & {
 type TabType = "PENDING" | "APPROVED" | "HIDDEN" | "UNLIST_REQUESTS" | "ALL";
 
 export default function AdminGemstoneJewelleryPage() {
-  // Get adminUid from localStorage (set during auth flow)
-  const [adminUid, setAdminUid] = useState<string>("");
+  const auth = useAuth();
+  const adminUid = auth?.uid;
 
   // State
   const [tab, setTab] = useState<TabType>("PENDING");
@@ -47,19 +79,6 @@ export default function AdminGemstoneJewelleryPage() {
   const [modalType, setModalType] = useState<"REJECT" | "SEND_BACK">("REJECT");
   const [modalSkuId, setModalSkuId] = useState<string>("");
   const [modalReason, setModalReason] = useState("");
-
-  // Initialize adminUid from localStorage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const uid = localStorage.getItem("adminUid") || "admin";
-        setAdminUid(uid);
-      } catch (e) {
-        console.error("Failed to get adminUid from localStorage:", e);
-        setAdminUid("admin");
-      }
-    }
-  }, []);
 
   // Load data on mount + tab change
   useEffect(() => {
@@ -114,6 +133,8 @@ export default function AdminGemstoneJewelleryPage() {
   }
 
   async function loadUnlistRequests() {
+    // Unlist requests are in Requests/{gstNumber}/GemstoneJewellery/{skuId}
+    // For now, we'll get from queue with status UNLIST_REQUEST
     const queue = await getPendingGemstoneJewelleryQueue();
     if (!queue) {
       setUnlistRequests([]);
@@ -417,15 +438,7 @@ export default function AdminGemstoneJewelleryPage() {
             </thead>
             <tbody>
               {filtered.map((item) => (
-                <tr
-                  key={item.skuId}
-                  className="border-t hover:bg-blue-50 cursor-pointer transition"
-                  onClick={() => {
-                    // Navigate to detail page
-                    const url = `/admin/gemstone-jewellery/${encodeURIComponent(item.skuId)}`;
-                    window.location.href = url;
-                  }}
-                >
+                <tr key={item.skuId} className="border-t hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-mono">{item.skuId}</td>
                   <td className="px-4 py-3 text-sm">
                     {item.itemName || item.stoneName || "-"}
@@ -436,7 +449,7 @@ export default function AdminGemstoneJewelleryPage() {
                   <td className="px-4 py-3">
                     <StatusBadge status={item.status || ""} isHidden={item.isHidden} />
                   </td>
-                  <td className="px-4 py-3 text-sm space-x-2 flex" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-3 text-sm space-x-2 flex">
                     {tab === "PENDING" && (
                       <>
                         <button
@@ -584,3 +597,83 @@ function StatusBadge({ status, isHidden }: { status: string; isHidden?: boolean 
     </span>
   );
 }
+```
+
+---
+
+## Key Features Implemented
+
+✅ **5 Tabs:**
+- PENDING: Items awaiting approval
+- APPROVED: Live listings
+- HIDDEN: Temporarily hidden
+- UNLIST_REQUESTS: Deletion requests
+- ALL: All items
+
+✅ **Search:** Filter by SKU, supplier, title
+
+✅ **Actions by Status:**
+- PENDING: Approve, Send Back, Reject
+- APPROVED: Hide, Send Back
+- HIDDEN: Unhide, Send Back
+- UNLIST_REQUESTS: Approve Delete, Reject
+
+✅ **Modal:** Reason input for Send Back and Reject
+
+✅ **Real-time Counts:** Tab shows item counts
+
+✅ **Status Badges:** Color-coded status display
+
+---
+
+## Testing Admin UI
+
+1. Create test listings
+2. Submit some for approval
+3. Open admin panel
+4. See PENDING tab
+5. Click Approve on one
+6. See it move to APPROVED tab
+7. Hide one listing
+8. See it in HIDDEN tab
+9. Send one back to supplier
+10. As supplier, verify inbox appears
+
+---
+
+## Imports Needed
+
+```typescript
+import {
+  getPendingGemstoneJewelleryQueue,
+  getQueuedGemstoneJewellery,
+  approveGemstoneJewellery,
+  rejectGemstoneJewellery,
+  listAllGemstoneJewelleryGlobal,
+  hideGemstoneJewelleryFromWebsite,
+  unhideGemstoneJewelleryToWebsite,
+  sendGemstoneJewelleryBackToSupplierReview,
+  approveUnlistRequestGemstoneJewellery,
+  rejectUnlistRequestGemstoneJewellery,
+} from "@/lib/firebase/gemstoneJewelleryAdminDb";
+import { getGemstoneJewellerySubmission } from "@/lib/firebase/gemstoneJewelleryDb";
+import type { GemstoneJewellerySubmission } from "@/lib/gemstoneJewellery/types";
+```
+
+---
+
+## Next Steps
+
+1. Implement Phase 1 (Database functions)
+2. Implement Phase 2 (Supplier UI)
+3. Implement Phase 3 (This admin page)
+4. Test complete workflow
+5. Phase 4 (Optional): Add email notifications
+
+---
+
+**End of Phase 3 Guide**
+
+Ready to implement or need adjustments?
+
+

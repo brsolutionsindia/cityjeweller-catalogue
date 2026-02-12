@@ -1,57 +1,18 @@
-// src/app/(admin)/admin/gemstone-jewellery/[skuId]/page.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { auth } from "@/firebaseConfig";
 
-import type { GemstoneJewellerySubmission, MediaItem } from "@/lib/gemstoneJewellery/types";
+import type { GemstoneJewellerySubmission } from "@/lib/gemstoneJewellery/types";
 import {
   getQueuedGemstoneJewellery,
   approveGemstoneJewellery,
   rejectGemstoneJewellery,
-  updateGemstoneJewellerySubmissionMedia,
-  removeGemstoneJewellerySubmissionMediaItem,
 } from "@/lib/firebase/gemstoneJewelleryAdminDb";
+import GemstoneJewelleryForm from "@/components/supplier/GemstoneJewelleryForm";
 
 const DEFAULT_MARGIN = 20;
-
-const withBust = (m: any) => {
-  const u = m?.url || "";
-  const v = m?.updatedAt ? String(m.updatedAt) : "";
-  if (!u) return "";
-  if (!v) return u;
-  return u.includes("?") ? `${u}&v=${v}` : `${u}?v=${v}`;
-};
-
-function move<T>(arr: T[], from: number, to: number) {
-  const copy = [...arr];
-  const [x] = copy.splice(from, 1);
-  copy.splice(to, 0, x);
-  return copy;
-}
-
-function asKind(m: any): "IMG" | "VID" {
-  if (m?.kind === "IMG" || m?.kind === "VID") return m.kind;
-  if (m?.type === "video") return "VID";
-  return "IMG";
-}
-
-function normalizeMediaList(list: MediaItem[], kind: "IMG" | "VID") {
-  const now = Date.now();
-  return (list || [])
-    .filter(Boolean)
-    .map((m: any, i) => ({
-      ...m,
-      kind: asKind(m),
-      order: i,
-      updatedAt: m?.updatedAt ?? now,
-      createdAt: m?.createdAt ?? now,
-      id: m?.id || m?.storagePath || m?.url || `${kind}_${i}`,
-    }))
-    .filter((m: any) => m.kind === kind);
-}
 
 function toNum(v: any) {
   const n = Number(v);
@@ -63,21 +24,37 @@ function isWeightMode(pm: any) {
   return x === "WEIGHT" || x === "PRICE_PER_WEIGHT" || x === "RATE_PER_WEIGHT";
 }
 
-function computeBase(data: any) {
-  const pm = String(data?.priceMode || "MRP");
+function computeBaseAndPublic(listing: any) {
+  const pm = String(listing?.priceMode || "MRP");
+  const marginPct = toNum(listing?.adminMarginPct ?? listing?.marginPct ?? DEFAULT_MARGIN);
+
+  let base = 0;
+  let source = "";
+
   if (isWeightMode(pm)) {
-    const rate = toNum(data?.ratePerGm);
-    const wt = toNum(data?.weightGm);
-    const base = rate > 0 && wt > 0 ? Math.round(rate * wt) : 0;
-    return { base, source: "WEIGHT(ratePerGm*weightGm)" };
+    const rate = toNum(listing?.ratePerGm);
+    const wt = toNum(listing?.weightGm);
+    base = rate > 0 && wt > 0 ? Math.round(rate * wt) : 0;
+    source = "WEIGHT(ratePerGm*weightGm)";
+  } else {
+    const offer = toNum(listing?.offerPrice);
+    const mrp = toNum(listing?.mrp);
+
+    if (offer > 0) {
+      base = Math.round(offer);
+      source = "OFFER_PRICE";
+    } else if (mrp > 0) {
+      base = Math.round(mrp);
+      source = "MRP";
+    } else {
+      base = 0;
+      source = "NONE";
+    }
   }
 
-  const offer = toNum(data?.offerPrice);
-  const mrp = toNum(data?.mrp);
+  const publicPrice = base > 0 ? Math.round(base * (1 + marginPct / 100)) : 0;
 
-  if (offer > 0) return { base: Math.round(offer), source: "OFFER_PRICE" };
-  if (mrp > 0) return { base: Math.round(mrp), source: "MRP" };
-  return { base: 0, source: "NONE" };
+  return { marginPct, base, publicPrice, source };
 }
 
 export default function AdminGemstoneJewelleryDetail() {
@@ -89,35 +66,36 @@ export default function AdminGemstoneJewelleryDetail() {
 
   const [data, setData] = useState<GemstoneJewellerySubmission | null>(null);
   const [busy, setBusy] = useState(true);
-
+  const [saving, setSaving] = useState(false);
+  const [adminUid] = useState("admin");
   const [rejectReason, setRejectReason] = useState("");
-  const [images, setImages] = useState<MediaItem[]>([]);
-  const [videos, setVideos] = useState<MediaItem[]>([]);
-
-  // ✅ Margin always
   const [marginPct, setMarginPct] = useState<number>(DEFAULT_MARGIN);
 
   async function load() {
     if (!skuId) return;
     setBusy(true);
     try {
-      const s = await getQueuedGemstoneJewellery(skuId);
-      setData(s);
-      setRejectReason((s as any)?.rejectionReason || "");
+      // First try to get from queue (pending items)
+      let submission = await getQueuedGemstoneJewellery(skuId);
 
-      const existingMargin = toNum((s as any)?.adminMarginPct) || DEFAULT_MARGIN;
-      setMarginPct(existingMargin);
+      // If not in queue, try to get from global SKU
+      if (!submission) {
+        const { get, ref: dbRef } = await import("firebase/database");
+        const { db } = await import("@/firebaseConfig");
 
-      const all = (s?.media || []) as any[];
-      const imgs = all
-        .filter((m) => asKind(m) === "IMG")
-        .sort((a, b) => (a?.order ?? 9999) - (b?.order ?? 9999));
-      const vids = all
-        .filter((m) => asKind(m) === "VID")
-        .sort((a, b) => (a?.order ?? 9999) - (b?.order ?? 9999));
+        const globalSnap = await get(dbRef(db, `Global SKU/GemstoneJewellery/${skuId}`));
+        if (globalSnap.exists()) {
+          submission = globalSnap.val() as GemstoneJewellerySubmission;
+        }
+      }
 
-      setImages(normalizeMediaList(imgs as any, "IMG"));
-      setVideos(normalizeMediaList(vids as any, "VID"));
+      if (submission) {
+        setData(submission);
+        setRejectReason((submission as any)?.rejectionReason || "");
+        setMarginPct(toNum(submission.adminMarginPct) || DEFAULT_MARGIN);
+      }
+    } catch (e: any) {
+      console.error("Failed to load:", e);
     } finally {
       setBusy(false);
     }
@@ -128,57 +106,22 @@ export default function AdminGemstoneJewelleryDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [skuId]);
 
-  const priceMode = String((data as any)?.priceMode || "MRP");
-  const ratePerGm = toNum((data as any)?.ratePerGm);
-  const weightGm = toNum((data as any)?.weightGm);
-
-  const { base: baseAmount, source: baseSource } = useMemo(() => computeBase(data), [data]);
-  const publicAmount = useMemo(() => {
-    const m = toNum(marginPct);
-    return baseAmount > 0 ? Math.round(baseAmount * (1 + m / 100)) : 0;
-  }, [baseAmount, marginPct]);
-
-  async function saveMediaOrder() {
-    if (!data?.gstNumber || !data?.skuId) return;
-    setBusy(true);
-    try {
-      const nextImages = normalizeMediaList(images, "IMG");
-      const nextVideos = normalizeMediaList(videos, "VID");
-      await updateGemstoneJewellerySubmissionMedia({
-        gstNumber: data.gstNumber,
-        skuId: data.skuId,
-        images: nextImages,
-        videos: nextVideos,
-      });
-      alert("Media order updated.");
-      await load();
-    } catch (e: any) {
-      console.error(e);
-      alert(e?.message || "Failed to update media order.");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const { base: baseAmount, source: baseSource, publicPrice } = useMemo(
+    () => computeBaseAndPublic({ ...data, adminMarginPct: marginPct }),
+    [data, marginPct]
+  );
 
   async function approve() {
-    if (!data?.gstNumber || !data?.skuId) return;
-    const adminUid = auth.currentUser?.uid || "ADMIN";
+    if (!data) return;
     setBusy(true);
     try {
       await approveGemstoneJewellery({
         gstNumber: data.gstNumber,
         skuId: data.skuId,
         adminUid,
-        finalPatch: {
-          // ✅ minimal patch (db will compute again anyway)
-          adminMarginPct: toNum(marginPct) || 0,
-          computedBasePrice: baseAmount,
-          computedPublicPrice: publicAmount,
-          computedPriceSource: baseSource,
-        } as any,
+        finalPatch: { adminMarginPct: marginPct },
       });
-
-      alert("Approved & published.");
+      alert("Approved!");
       router.push("/admin/gemstone-jewellery");
       router.refresh();
     } catch (e: any) {
@@ -189,10 +132,31 @@ export default function AdminGemstoneJewelleryDetail() {
     }
   }
 
+  async function saveMargin() {
+    if (!data) return;
+    setSaving(true);
+    try {
+      await approveGemstoneJewellery({
+        gstNumber: data.gstNumber,
+        skuId: data.skuId,
+        adminUid,
+        finalPatch: { adminMarginPct: marginPct },
+      });
+      alert("Margin saved!");
+      await load();
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || "Failed to save margin.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function reject() {
-    if (!data?.gstNumber || !data?.skuId) return;
-    if (!rejectReason.trim()) return alert("Enter rejection reason.");
-    const adminUid = auth.currentUser?.uid || "ADMIN";
+    if (!data || !rejectReason.trim()) {
+      alert("Please enter a reason");
+      return;
+    }
     setBusy(true);
     try {
       await rejectGemstoneJewellery({
@@ -212,278 +176,147 @@ export default function AdminGemstoneJewelleryDetail() {
     }
   }
 
-  if (busy) return <div className="p-6">Loading…</div>;
-  if (!data) return <div className="p-6">Not found in queue.</div>;
+  if (busy) {
+    return (
+      <div className="p-6">
+        <Link href="/admin/gemstone-jewellery" className="text-sm underline">
+          ← Back
+        </Link>
+        <div className="mt-4 text-gray-600">Loading…</div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="p-6">
+        <Link href="/admin/gemstone-jewellery" className="text-sm underline">
+          ← Back
+        </Link>
+        <div className="mt-4 text-red-600">Listing not found</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-5">
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
+      {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <Link href="/admin/gemstone-jewellery" className="text-sm underline">
             ← Back to list
           </Link>
-          <div className="text-2xl font-bold">{data.skuId}</div>
+          <div className="text-2xl font-bold">{data.itemName || data.skuId}</div>
           <div className="text-xs text-gray-600">
-            GST: <b>{data.gstNumber}</b> • Supplier UID: <b>{data.supplierUid}</b> • Status: <b>{data.status}</b>
+            SKU: <b>{data.skuId}</b> • GST: <b>{data.gstNumber}</b> • Status: <b>{data.status}</b>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button className="rounded-lg border px-4 py-2 hover:bg-gray-50" onClick={saveMediaOrder} disabled={busy}>
-            Save Media Order
-          </button>
-          <button className="rounded-lg bg-black text-white px-4 py-2 hover:bg-zinc-900" onClick={approve} disabled={busy}>
-            Approve
-          </button>
+        <div className="flex gap-2">
+          {data.status === "PENDING" && (
+            <>
+              <button
+                onClick={approve}
+                disabled={busy}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50"
+              >
+                Approve
+              </button>
+              <button
+                onClick={reject}
+                disabled={busy}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50"
+              >
+                Reject
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Pricing */}
-      <div className="rounded-2xl border bg-white p-5 shadow-sm space-y-3">
-        <div className="text-lg font-semibold">Pricing</div>
+      {/* Admin Controls - Margin & Pricing */}
+      <div className="rounded-lg border p-6 bg-blue-50 border-blue-200 space-y-4">
+        <h3 className="text-lg font-semibold text-blue-900">Admin Controls - Margin & Pricing</h3>
 
-        <div className="grid md:grid-cols-3 gap-3 text-sm">
-          <div className="rounded-xl border p-3">
-            <div className="text-xs text-gray-500">Price Mode</div>
-            <div className="text-lg font-bold">{priceMode}</div>
-          </div>
-
-          <div className="rounded-xl border p-3">
-            <div className="text-xs text-gray-500">MRP</div>
-            <div className="text-lg font-bold">{data.mrp ? `₹${data.mrp}` : "-"}</div>
-          </div>
-
-          <div className="rounded-xl border p-3">
-            <div className="text-xs text-gray-500">Offer Price</div>
-            <div className="text-lg font-bold">{data.offerPrice ? `₹${data.offerPrice}` : "-"}</div>
-          </div>
-
-          {/* optional weight details (informational only) */}
-          <div className="rounded-xl border p-3 md:col-span-3">
-            <div className="text-xs text-gray-500">Weight inputs (if provided)</div>
-            <div className="mt-1">
-              <b>Rate/gm:</b> {ratePerGm ? `₹${ratePerGm}` : "-"} • <b>Weight:</b> {weightGm ? `${weightGm} gm` : "-"}
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Supplier Base Price</label>
+            <div className="text-2xl font-bold text-gray-900">
+              ₹{baseAmount.toLocaleString("en-IN")}
             </div>
+            <div className="text-xs text-gray-600 mt-1">({baseSource})</div>
           </div>
 
-          {/* ✅ Margin ALWAYS */}
-          <div className="rounded-xl border p-3">
-            <div className="text-xs text-gray-500">Admin Margin (%)</div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Margin %</label>
             <input
-              className="mt-1 w-full border rounded-lg px-3 py-2"
               type="number"
+              min="0"
+              max="200"
+              step="0.5"
               value={marginPct}
-              onChange={(e) => setMarginPct(Number(e.target.value))}
+              onChange={(e) => setMarginPct(toNum(e.target.value))}
+              className="w-full px-3 py-2 border rounded-lg font-semibold text-lg"
             />
-            <div className="text-xs text-gray-500 mt-1">Applied on selected base price.</div>
           </div>
 
-          <div className="rounded-xl border p-3">
-            <div className="text-xs text-gray-500">Base Price (selected)</div>
-            <div className="text-lg font-bold">{baseAmount ? `₹${baseAmount}` : "-"}</div>
-            <div className="text-[11px] text-gray-500 mt-1">Source: {baseSource}</div>
-          </div>
-
-          <div className="rounded-xl border p-3">
-            <div className="text-xs text-gray-500">Computed Public Price</div>
-            <div className="text-2xl font-bold">{publicAmount ? `₹${publicAmount}` : "-"}</div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Website Price (Public)</label>
+            <div className="text-2xl font-bold text-green-600">
+              ₹{publicPrice.toLocaleString("en-IN")}
+            </div>
+            <div className="text-xs text-gray-600 mt-1">Base + {marginPct}% margin</div>
           </div>
         </div>
-      </div>
 
-      {/* (rest of your file unchanged: media ordering + reject block + helpers) */}
-      {/* ... keep your existing Media Ordering and Reject sections as-is ... */}
-
-      {/* Media Ordering */}
-      <div className="rounded-2xl border bg-white p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="text-lg font-semibold">Media Ordering</div>
-          <div className="text-xs text-gray-500">Make cover = first image</div>
-        </div>
-
-        <div className="space-y-3">
-          <div className="font-medium">Images</div>
-          <div className="grid md:grid-cols-2 gap-3">
-            {images.map((m: any, idx) => (
-              <div key={`${m.storagePath ?? m.url ?? "media"}-${idx}`} className="rounded-2xl border p-3 flex gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={withBust(m)} alt="img" className="w-28 h-20 rounded-xl object-cover border" />
-
-                <div className="flex-1">
-                  <div className="text-xs text-gray-500">#{idx + 1}</div>
-
-                  <div className="flex gap-2 mt-2 flex-wrap">
-                    <button className="rounded-lg border px-3 py-1 text-sm" onClick={() => downloadMedia(m)}>
-                      Download
-                    </button>
-
-                    <label className="rounded-lg border px-3 py-1 text-sm cursor-pointer">
-                      Replace
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={async (e) => {
-                          const f = e.target.files?.[0];
-                          if (f) await replaceMedia("IMG", idx, f);
-                          e.currentTarget.value = "";
-                        }}
-                      />
-                    </label>
-
-                    <button
-                      className="rounded-lg border px-3 py-1 text-sm"
-                      onClick={async () => {
-                        const delStorage = confirm("Also delete from Firebase Storage?");
-                        await deleteMedia("IMG", idx, delStorage);
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-
-                  <div className="flex gap-2 mt-2 flex-wrap">
-                    <button className="rounded-lg border px-3 py-1 text-sm" disabled={idx === 0} onClick={() => setImages((prev) => move(prev, idx, idx - 1))}>↑</button>
-                    <button className="rounded-lg border px-3 py-1 text-sm" disabled={idx === images.length - 1} onClick={() => setImages((prev) => move(prev, idx, idx + 1))}>↓</button>
-                    <button className="rounded-lg border px-3 py-1 text-sm" disabled={idx === 0} onClick={() => setImages((prev) => move(prev, idx, 0))}>Make Cover</button>
-                    <button className="rounded-lg border px-3 py-1 text-sm" onClick={() => setImages((prev) => prev.filter((_, i) => i !== idx))}>Remove</button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="font-medium mt-6">Videos</div>
-          <div className="grid md:grid-cols-2 gap-3">
-            {videos.map((m: any, idx) => (
-              <div key={`${m.storagePath ?? m.url ?? "media"}-${idx}`} className="rounded-2xl border p-3 flex gap-3">
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <video src={withBust(m)} controls className="w-28 h-20 rounded-xl object-cover border" />
-
-                <div className="flex-1">
-                  <div className="text-xs text-gray-500">#{idx + 1}</div>
-
-                  <div className="flex gap-2 mt-2 flex-wrap">
-                    <button className="rounded-lg border px-3 py-1 text-sm" onClick={() => downloadMedia(m)}>Download</button>
-
-                    <label className="rounded-lg border px-3 py-1 text-sm cursor-pointer">
-                      Replace
-                      <input
-                        type="file"
-                        accept="video/*"
-                        className="hidden"
-                        onChange={async (e) => {
-                          const f = e.target.files?.[0];
-                          if (f) await replaceMedia("VID", idx, f);
-                          e.currentTarget.value = "";
-                        }}
-                      />
-                    </label>
-
-                    <button
-                      className="rounded-lg border px-3 py-1 text-sm"
-                      onClick={async () => {
-                        const delStorage = confirm("Also delete from Firebase Storage?");
-                        await deleteMedia("VID", idx, delStorage);
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-
-                  <div className="flex gap-2 mt-2 flex-wrap">
-                    <button className="rounded-lg border px-3 py-1 text-sm" disabled={idx === 0} onClick={() => setVideos((prev) => move(prev, idx, idx - 1))}>↑</button>
-                    <button className="rounded-lg border px-3 py-1 text-sm" disabled={idx === videos.length - 1} onClick={() => setVideos((prev) => move(prev, idx, idx + 1))}>↓</button>
-                    <button className="rounded-lg border px-3 py-1 text-sm" onClick={() => setVideos((prev) => prev.filter((_, i) => i !== idx))}>Remove</button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="text-xs text-gray-500 mt-2">
-            After changes, click <b>Save Media Order</b>.
-          </div>
-        </div>
-      </div>
-
-      {/* Reject */}
-      <div className="rounded-2xl border bg-white p-5 shadow-sm space-y-3">
-        <div className="text-lg font-semibold">Reject Listing</div>
-        <div className="text-sm text-gray-600">Reason is shown to supplier.</div>
-        <textarea
-          className="w-full border rounded-xl p-3 min-h-[110px]"
-          placeholder="e.g. Wrong category / unclear images / missing pricing…"
-          value={rejectReason}
-          onChange={(e) => setRejectReason(e.target.value)}
-        />
-        <div className="flex justify-end">
-          <button className="rounded-lg border px-4 py-2 hover:bg-gray-50" onClick={reject} disabled={busy}>
-            Reject
+        <div className="flex gap-2">
+          <button
+            onClick={saveMargin}
+            disabled={saving || marginPct === (data.adminMarginPct ?? DEFAULT_MARGIN)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save Margin"}
           </button>
+        </div>
+      </div>
+
+      {/* Rejection Reason (only for pending) */}
+      {data.status === "PENDING" && (
+        <div className="rounded-lg border p-6 bg-red-50 border-red-200 space-y-3">
+          <h3 className="font-semibold text-red-900">Rejection Reason</h3>
+          <textarea
+            placeholder="Explain why you're rejecting this listing (required to reject)…"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            className="w-full px-3 py-2 border rounded-lg text-sm h-24"
+          />
+        </div>
+      )}
+
+      {/* Supplier Data - Read Only */}
+      <div className="rounded-lg border p-6 bg-gray-50 border-gray-200 space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Listing Details (Supplier Data - Read-Only)</h3>
+        <p className="text-sm text-gray-600">
+          These fields are controlled by the supplier. To modify content, the supplier must edit from their dashboard.
+        </p>
+
+        {/* Display the full form in read-only mode */}
+        <div className="pointer-events-none opacity-70">
+          <GemstoneJewelleryForm
+            value={data}
+            onChange={() => {
+              /* no-op */
+            }}
+            readOnlyStatus={true}
+          />
+        </div>
+
+        <div className="text-xs text-gray-600 bg-white p-3 rounded border border-gray-200 mt-4">
+          ℹ️ <strong>Admin can only modify:</strong> Margin % and pricing. All supplier-controlled content must be
+          changed by the supplier from their dashboard.
         </div>
       </div>
     </div>
   );
-
-  async function downloadMedia(m: any) {
-    const url = m?.url;
-    if (!url) return alert("No download URL.");
-    window.open(url, "_blank");
-  }
-
-  async function replaceMedia(kind: "IMG" | "VID", idx: number, file: File) {
-    if (!data?.gstNumber || !data?.skuId) return;
-    const list = kind === "IMG" ? images : videos;
-    const target: any = list[idx];
-    if (!target?.storagePath) return alert("Missing storagePath on this media.");
-
-    setBusy(true);
-    try {
-      await uploadBytesToExistingStoragePath(target.storagePath, file);
-      const now = Date.now();
-      const next = [...list];
-      next[idx] = {
-        ...next[idx],
-        updatedAt: now,
-        contentType: file.type || target.contentType,
-      };
-
-      if (kind === "IMG") setImages(next);
-      else setVideos(next);
-      alert("Replaced successfully.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function deleteMedia(kind: "IMG" | "VID", idx: number, deleteFromStorage: boolean) {
-    if (!data?.gstNumber || !data?.skuId) return;
-
-    setBusy(true);
-    try {
-      await removeGemstoneJewellerySubmissionMediaItem({
-        gstNumber: data.gstNumber,
-        skuId: data.skuId,
-        kind,
-        index: idx,
-        deleteFromStorage,
-      });
-      alert(deleteFromStorage ? "Removed + deleted from storage." : "Removed from submission.");
-      await load();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function uploadBytesToExistingStoragePath(storagePath: string, file: File) {
-    const { storage } = await import("@/firebaseConfig");
-    const { ref: sRef, uploadBytesResumable } = await import("firebase/storage");
-    const storageRef = sRef(storage, storagePath);
-
-    await new Promise<void>((resolve, reject) => {
-      const task = uploadBytesResumable(storageRef, file, { contentType: file.type || undefined });
-      task.on("state_changed", undefined, reject, () => resolve());
-    });
-  }
 }
+

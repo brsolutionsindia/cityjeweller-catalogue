@@ -7,6 +7,7 @@ import { db } from "@/firebaseConfig";
 import { get, ref as dbRef } from "firebase/database";
 import type { GemstoneJewellerySubmission } from "@/lib/gemstoneJewellery/types";
 import { deleteGemstoneJewellerySubmission } from "@/lib/firebase/gemstoneJewelleryDb";
+import { getSupplierInboxGemstoneJewellery } from "@/lib/firebase/gemstoneJewelleryAdminDb";
 
 
 const WHATSAPP_NUMBER = "919023130944"; // your number
@@ -290,6 +291,11 @@ const session = useSupplierSession();
   const [items, setItems] = useState<GemstoneJewellerySubmission[]>([]);
   const [err, setErr] = useState<string | null>(null);
 
+  // NEW: Inbox for items sent back by admin
+  const [inbox, setInbox] = useState<any[]>([]);
+  const [inboxCount, setInboxCount] = useState(0);
+  const [inboxUnread, setInboxUnread] = useState(0);
+
   // selection
   const [selected, setSelected] = useState<Record<string, boolean>>({});
 
@@ -303,6 +309,9 @@ const session = useSupplierSession();
   const [minP, setMinP] = useState<string>("");
   const [maxP, setMaxP] = useState<string>("");
 
+  // NEW: Status filter
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+
   const [sortKey, setSortKey] = useState<(typeof SORTS)[number]["key"]>("new");
 
   const gst = session?.gst;
@@ -315,6 +324,17 @@ const session = useSupplierSession();
     setErr(null);
 
     try {
+      // NEW: Load inbox
+      try {
+        const inboxItems = await getSupplierInboxGemstoneJewellery(gst);
+        setInbox(inboxItems || []);
+        const unread = inboxItems?.filter((item: any) => !item.inboxItem?.readAt).length || 0;
+        setInboxCount(inboxItems?.length || 0);
+        setInboxUnread(unread);
+      } catch (e) {
+        console.error("Failed to load inbox:", e);
+      }
+
       // 1) read index -> skuIds
       const idxSnap = await get(dbRef(db, SUPPLIER_INDEX(gst, uid)));
       const skuIds = idxSnap.exists() ? Object.keys(idxSnap.val() || {}) : [];
@@ -407,6 +427,9 @@ const session = useSupplierSession();
       if (nature !== "ALL" && String(it.nature || "").toUpperCase() !== nature) return false;
       if (type !== "ALL" && String((it as any).type || "").toUpperCase() !== type) return false;
 
+      // NEW: Status filter
+      if (statusFilter !== "ALL" && String(it.status || "").toUpperCase() !== statusFilter) return false;
+
       if (stoneOrLook !== "ALL") {
         const v = String(
           (String(it.nature || "").toUpperCase() === "ARTIFICIAL" ? (it as any).lookName : (it as any).stoneName) || ""
@@ -437,7 +460,7 @@ const session = useSupplierSession();
     }
 
     return arr;
-  }, [items, q, nature, type, stoneOrLook, material, tag, minP, maxP, sortKey]);
+  }, [items, q, nature, type, stoneOrLook, material, tag, minP, maxP, sortKey, statusFilter]);
 
   const selectedIds = useMemo(
     () => Object.keys(selected).filter((k) => selected[k]),
@@ -462,12 +485,31 @@ const session = useSupplierSession();
     if (!gst || !uid) return;
     if (!selectedIds.length) return;
 
-    const ok = window.confirm(
-      `Delete ${selectedIds.length} listing(s)?\n\n` +
-      `• Draft/Pending/Rejected: will be deleted.\n` +
-      `• Approved: will be UNLISTED from website and moved to Review (admin re-approval required).`
+    // Separate by status
+    const drafts = selectedIds.filter(
+      (id) => items.find(it => it.skuId === id)?.status === "DRAFT"
+    );
+    const pendings = selectedIds.filter(
+      (id) => items.find(it => it.skuId === id)?.status === "PENDING"
+    );
+    const approvedOrHidden = selectedIds.filter(
+      (id) => {
+        const s = items.find(it => it.skuId === id)?.status;
+        return s === "APPROVED" || s === "HIDDEN";
+      }
+    );
+    const rejected = selectedIds.filter(
+      (id) => items.find(it => it.skuId === id)?.status === "REJECTED"
     );
 
+    let message = `Delete ${selectedIds.length} listing(s)?\n\n`;
+    if (drafts.length) message += `• Draft (${drafts.length}): will be deleted.\n`;
+    if (pendings.length) message += `• Pending (${pendings.length}): will be deleted.\n`;
+    if (rejected.length) message += `• Rejected (${rejected.length}): will be deleted.\n`;
+    if (approvedOrHidden.length)
+      message += `• Approved/Hidden (${approvedOrHidden.length}): will request removal (admin approval required).\n`;
+
+    const ok = window.confirm(message);
     if (!ok) return;
 
     setLoading(true);
@@ -482,7 +524,7 @@ const session = useSupplierSession();
       }
       setSelected({});
       await load();
-      alert("Deleted.");
+      alert("Deleted/Requested. Approved listings sent for admin review.");
     } catch (e: any) {
       console.error(e);
       alert(e?.message || "Delete failed");
@@ -745,7 +787,42 @@ const session = useSupplierSession();
         </div>
       )}
 
+      {/* NEW: Inbox notification alert */}
+      {inboxUnread > 0 && (
+        <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-between gap-3">
+          <div>
+            <strong className="block mb-1">You have {inboxUnread} item(s) to review</strong>
+            <p className="text-sm text-gray-700">
+              Admin has requested you make changes to {inboxUnread} listing(s)
+            </p>
+          </div>
+          <Link
+            href="/supplier/gemstone-jewellery/inbox"
+            className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm whitespace-nowrap"
+          >
+            View Inbox
+          </Link>
+        </div>
+      )}
 
+      {/* Status filter tabs */}
+      <div className="flex gap-2 border-b overflow-x-auto pb-2">
+        {["ALL", "DRAFT", "PENDING", "APPROVED", "REJECTED", "SUPPLIER_REVIEW", "HIDDEN"].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setStatusFilter(tab)}
+            className={`px-4 py-2 text-sm font-medium whitespace-nowrap ${
+              statusFilter === tab
+                ? "border-b-2 border-black"
+                : "text-gray-600 border-b-2 border-transparent"
+            }`}
+          >
+            {tab === "SUPPLIER_REVIEW" ? "Needs Review" : tab}
+            {tab === "PENDING" && items.filter(it => it.status === "PENDING").length > 0 &&
+              ` (${items.filter(it => it.status === "PENDING").length})`}
+          </button>
+        ))}
+      </div>
 
       {err && (
         <div className="rounded-2xl border border-red-300 bg-red-50 p-4 text-red-700">
