@@ -76,6 +76,20 @@ function pickAnyPrice(it: any): number | null {
   return n != null && n > 0 ? n : null;
 }
 
+function getRawOrigin(obj: any) {
+  if (!obj) return "";
+  return (
+    obj.origin ||
+    obj.originLegacy ||
+    (obj as any).origin_legacy ||
+    (obj as any).originCity ||
+    (obj as any).originCityLegacy ||
+    (obj as any).productOrigin ||
+    (obj as any).country ||
+    ""
+  );
+}
+
 export default function RudrakshaCard({ it }: { it: PublicRudraksha }) {
   const cover = pickCoverUrl(it.media);
   const price = pickDisplayPrice(it);
@@ -90,15 +104,7 @@ export default function RudrakshaCard({ it }: { it: PublicRudraksha }) {
 
   const title = getBestTitle(it);
   // Show origin from common fields (defensive) — prefer `origin`, fall back to other likely keys
-  const rawOrigin =
-    it.origin ||
-    it.originLegacy ||
-    it.origin_legacy ||
-    it.originCity ||
-    it.originCityLegacy ||
-    it.country ||
-    it.productOrigin ||
-    "";
+  const rawOrigin = getRawOrigin(it);
   const origin = rawOrigin ? titleCase(String(rawOrigin)) : "";
 
   const sku = it.skuId ? String(it.skuId) : "";

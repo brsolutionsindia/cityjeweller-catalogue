@@ -45,6 +45,23 @@ function safeText(s?: string | null) {
   return String(s ?? "").trim();
 }
 
+// Return the first available origin-like value from many possible legacy/new keys
+function getRawOrigin(obj: any) {
+  if (!obj) return "";
+  return (
+    obj.origin ||
+    obj.originLegacy ||
+    (obj as any).origin_legacy ||
+    (obj as any).originCity ||
+    (obj as any).originCityLegacy ||
+    (obj as any).originNew ||
+    (obj as any).originOther ||
+    (obj as any).productOrigin ||
+    (obj as any).country ||
+    ""
+  );
+}
+
 export async function generateMetadata(
   props: { params: Promise<{ skuId: string }> }
 ): Promise<Metadata> {
@@ -58,7 +75,7 @@ export async function generateMetadata(
   const cover = pickCoverUrl(Array.isArray(it.media) ? it.media : []) || FALLBACK_IMAGES[0];
   const title = titleFrom(it);
 
-  const rawOrigin = it.origin || it.originLegacy || (it as any).origin_legacy || it.originCity || it.originCityLegacy || it.productOrigin || it.country || "";
+  const rawOrigin = getRawOrigin(it);
   const origin = safeText(rawOrigin) ? `Origin: ${rawOrigin}` : "";
   const bead = it.sizeMm ? `Bead size: ${it.sizeMm} mm` : "";
   const short = safeText(it.shortDescription);
@@ -119,8 +136,7 @@ export default async function RudrakshaProductPage(
 
 
   // origin fallback for display and WA text
-  const rawOriginData =
-    data.origin || data.originLegacy || (data as any).origin_legacy || data.originCity || data.originCityLegacy || data.productOrigin || data.country || "";
+  const rawOriginData = getRawOrigin(data);
 
   // WhatsApp (fixed number)
   const WA_NUMBER = "919023130944"; // ✅ your number
@@ -187,14 +203,10 @@ export default async function RudrakshaProductPage(
 
             <div className="text-sm text-gray-600">
               SKU: <span className="font-semibold text-gray-900">{data.skuId}</span>
-              {(
-                data.origin || data.originLegacy || data.origin_legacy || data.originCity || data.originCityLegacy || data.productOrigin || data.country
-              ) ? (
+              {rawOriginData ? (
                 <>
                   {" "}
-                  • Origin: <span className="font-semibold text-gray-900">{(
-                    data.origin || data.originLegacy || data.origin_legacy || data.originCity || data.originCityLegacy || data.productOrigin || data.country
-                  )}</span>
+                  • Origin: <span className="font-semibold text-gray-900">{rawOriginData}</span>
                 </>
               ) : null}
             </div>
