@@ -111,7 +111,9 @@ export default async function RudrakshaProductPage(
 
   const price = pickDisplayPrice(data);
   const mrp = pickMrpPrice(data);
-  const cover = pickCoverUrl(Array.isArray(it.media) ? it.media : []) || FALLBACK_IMAGES[0];
+  const cover =
+    pickCoverUrl(Array.isArray(data.media) ? data.media : []) || FALLBACK_IMAGES[0];
+
 
   // WhatsApp (fixed number)
   const WA_NUMBER = "919023130944"; // ✅ your number
@@ -215,7 +217,7 @@ export default async function RudrakshaProductPage(
           {/* Tags */}
           {!!data.tags?.length && (
             <section className="flex flex-wrap gap-2">
-              {data.tags.slice(0, 14).map((t) => (
+              {data.tags.map((t) => (
                 <span
                   key={t}
                   className="text-xs rounded-full border px-3 py-1 text-gray-700 bg-white"
