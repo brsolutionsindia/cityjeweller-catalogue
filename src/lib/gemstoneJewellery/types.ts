@@ -1,3 +1,4 @@
+//src/lib/gemstoneJewellery/types.ts
 export type PriceMode = "MRP" | "WEIGHT";
 
 export type Nature = "NATURAL" | "ARTIFICIAL";
@@ -73,6 +74,12 @@ export type GemstoneJewellerySubmission = {
   mrp?: number;
   offerPrice?: number;
   currency?: "INR";
+
+adminMarginPct?: number;
+  computedBasePrice?: number;
+  computedPublicPrice?: number;
+  approvedAt?: number;
+  approvedBy?: string;
 
   // tags
   tags: string[];     // flat list: ["red","pearl","dailywear"]
