@@ -173,16 +173,18 @@ export function pickCoverUrl(media: any[] | undefined | null): string {
  * Priority: computedPublicPrice → offerPrice → mrp → suggestedMrp → price → amount
  */
 export function pickDisplayPrice(it: PublicRudraksha): number | null {
-  const cand = [
-    (it as any).computedPublicPrice,
+  // Final customer-facing price: prefer explicit offer (discounted) first,
+  // then computedPublicPrice (admin-applied margin), then MRP/suggestedMrp, then legacy price fields.
+  const candidates = [
     (it as any).offerPrice,
+    (it as any).computedPublicPrice,
     (it as any).mrp,
     (it as any).suggestedMrp,
     (it as any).price,
     (it as any).amount,
   ];
 
-  for (const x of cand) {
+  for (const x of candidates) {
     const n = toNum(x);
     if (n != null && n > 0) return n;
   }
@@ -194,6 +196,12 @@ export function pickDisplayPrice(it: PublicRudraksha): number | null {
  * Priority: suggestedMrp → mrp
  */
 export function pickMrpPrice(it: PublicRudraksha): number | null {
+  // If there is an explicit offer (discounted final price) and a computedPublicPrice (admin's base + margin),
+  // treat computedPublicPrice as the "original" price (strike-through) when it's greater than the offer.
+  const offer = toNum((it as any).offerPrice);
+  const computed = toNum((it as any).computedPublicPrice);
+  if (offer != null && computed != null && computed > offer) return computed;
+
   const cand = [(it as any).suggestedMrp, (it as any).mrp];
   for (const x of cand) {
     const n = toNum(x);

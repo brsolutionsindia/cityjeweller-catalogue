@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import type { PublicRudraksha } from "@/lib/firebase/rudrakshaPublicDb";
-import { pickCoverUrl, pickDisplayPrice } from "@/lib/firebase/rudrakshaPublicDb";
+import { pickCoverUrl, pickDisplayPrice, pickMrpPrice } from "@/lib/firebase/rudrakshaPublicDb";
 import { normalizeTag, uniqTags } from "@/lib/rudraksha/options";
 
 function titleCase(x: string) {
@@ -78,11 +78,15 @@ function pickAnyPrice(it: any): number | null {
 
 export default function RudrakshaCard({ it }: { it: PublicRudraksha }) {
   const cover = pickCoverUrl(it.media);
-  const price = pickAnyPrice(it);
-
-  const mrp = toNum((it as any).mrp ?? (it as any).suggestedMrp);
+  const price = pickDisplayPrice(it);
+  const mrp = pickMrpPrice(it);
   const hasOffer = price != null && price > 0;
   const hasMrp = mrp != null && mrp > 0;
+
+  const discountPct =
+    hasOffer && hasMrp && (mrp as number) > (price as number)
+      ? Math.round((((mrp as number) - (price as number)) / (mrp as number)) * 100)
+      : 0;
 
   const title = getBestTitle(it);
   // Show origin from common fields (defensive) — prefer `origin`, fall back to other likely keys
@@ -160,14 +164,18 @@ export default function RudrakshaCard({ it }: { it: PublicRudraksha }) {
         {/* Meta (✅ no SKU; keep origin only if present) */}
         {origin ? <div className="text-xs text-gray-500 line-clamp-1">{origin}</div> : null}
 
-        {/* Price (✅ no "Auth ready") */}
+        {/* Price (offer shown; original struck-through if available) */}
         <div className="flex items-baseline gap-2 pt-1">
-          <div className="text-sm font-bold">
-            {hasOffer ? formatINR(price as number) : "Price on request"}
-          </div>
+          <div className="text-sm font-bold">{hasOffer ? formatINR(price as number) : "Price on request"}</div>
 
-          {hasOffer && hasMrp && mrp! > (price as number) ? (
-            <div className="text-xs text-gray-400 line-through">{formatINR(mrp!)}</div>
+          {hasOffer && hasMrp && (mrp as number) > (price as number) ? (
+            <div className="text-xs text-gray-400 line-through">{formatINR(mrp as number)}</div>
+          ) : null}
+
+          {discountPct > 0 ? (
+            <div className="ml-2 text-xs font-semibold text-white bg-rose-600 px-2 py-0.5 rounded-full">
+              -{discountPct}%
+            </div>
           ) : null}
         </div>
 

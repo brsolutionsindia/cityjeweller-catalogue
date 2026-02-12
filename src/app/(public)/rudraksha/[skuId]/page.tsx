@@ -115,6 +115,8 @@ export default async function RudrakshaProductPage(
   const cover =
     pickCoverUrl(Array.isArray(data.media) ? data.media : []) || FALLBACK_IMAGES[0];
 
+  const discountPct = price && mrp && mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
+
 
   // origin fallback for display and WA text
   const rawOriginData =
@@ -207,9 +209,9 @@ export default async function RudrakshaProductPage(
                 <div className="text-sm text-gray-500 line-through pb-1">{formatINR(mrp)}</div>
               ) : null}
 
-              {mrp && price && mrp > price ? (
+              {discountPct > 0 ? (
                 <div className="text-xs font-semibold rounded-full bg-green-50 text-green-700 border border-green-200 px-2 py-1 mb-1">
-                  Save {Math.round(((mrp - price) / mrp) * 100)}%
+                  Save {discountPct}%
                 </div>
               ) : null}
             </div>
@@ -429,6 +431,9 @@ export default async function RudrakshaProductPage(
             <div className="text-sm font-bold text-gray-900 truncate">
               {price ? formatINR(price) : "Price on request"}
             </div>
+            {discountPct > 0 ? (
+              <div className="text-xs text-white bg-rose-600 rounded-full px-2 py-0.5 ml-2 inline-block">-{discountPct}%</div>
+            ) : null}
           </div>
           <a
             href={waHref}

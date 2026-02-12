@@ -32,33 +32,29 @@ function computeBaseAndPublic(listing: any) {
   const pm = String(listing?.priceMode || "MRP");
   const marginPct = toNum(listing?.adminMarginPct ?? listing?.marginPct ?? DEFAULT_MARGIN);
 
-  let base = 0;
+  // Determine supplier base price (weight mode uses ratePerGm * weight)
+  let supplierBase = 0;
   let source = "";
-
   if (isWeightMode(pm)) {
-    const rate = toNum(listing?.ratePerGm);
-    const wt = toNum(listing?.weightGm);
-    base = rate > 0 && wt > 0 ? Math.round(rate * wt) : 0;
+    const rate = toNum(listing?.ratePerGm ?? listing?.supplierRate ?? listing?.supplierPrice ?? listing?.price);
+    const wt = toNum(listing?.weightGm ?? listing?.weight);
+    supplierBase = rate > 0 && wt > 0 ? Math.round(rate * wt) : 0;
     source = "WEIGHT(ratePerGm*weightGm)";
   } else {
-    const offer = toNum(listing?.offerPrice);
-    const mrp = toNum(listing?.mrp);
-
-    if (offer > 0) {
-      base = Math.round(offer);
-      source = "OFFER_PRICE";
-    } else if (mrp > 0) {
-      base = Math.round(mrp);
-      source = "MRP";
-    } else {
-      base = 0;
-      source = "NONE";
-    }
+    supplierBase =
+      toNum(listing?.supplierPrice) ||
+      toNum(listing?.supplierRate) ||
+      toNum(listing?.price) ||
+      toNum(listing?.suggestedMrp) ||
+      toNum(listing?.mrp) ||
+      0;
+    supplierBase = Math.round(supplierBase || 0);
+    source = supplierBase > 0 ? "SUPPLIER_PRICE" : "NONE";
   }
 
-  const publicPrice = base > 0 ? Math.round(base * (1 + marginPct / 100)) : 0;
+  const publicPrice = supplierBase > 0 ? Math.round(supplierBase * (1 + marginPct / 100)) : 0;
 
-  return { marginPct, base, publicPrice, source };
+  return { marginPct, base: supplierBase, publicPrice, source };
 }
 
 
@@ -131,6 +127,7 @@ export default function AdminRudrakshaDetail() {
   const [certificates, setCertificates] = useState<MediaItem[]>([]);
 
   const [marginPct, setMarginPct] = useState<number>(DEFAULT_MARGIN);
+  const [discountPct, setDiscountPct] = useState<number>(0);
 
   async function load() {
     if (!skuId) return;
@@ -142,6 +139,8 @@ export default function AdminRudrakshaDetail() {
 
       const existingMargin = toNum((s as any)?.adminMarginPct) || DEFAULT_MARGIN;
       setMarginPct(existingMargin);
+      const existingDiscount = toNum((s as any)?.discountPct ?? (s as any)?.discountPercent ?? 0) || 0;
+      setDiscountPct(existingDiscount);
 
       const all = (s?.media || []) as any[];
 
@@ -208,6 +207,8 @@ export default function AdminRudrakshaDetail() {
     const adminUid = auth.currentUser?.uid || "ADMIN";
     setBusy(true);
     try {
+      // derive offerPrice from discountPct and computed publicAmount
+      const derivedOffer = publicAmount && discountPct ? Math.round(publicAmount * (1 - (discountPct || 0) / 100)) : (undefined as any);
       await approveRudraksha({
         gstNumber: data.gstNumber,
         skuId: data.skuId,
@@ -216,6 +217,8 @@ export default function AdminRudrakshaDetail() {
           adminMarginPct: toNum(marginPct) || 0,
           computedBasePrice: baseAmount,
           computedPublicPrice: publicAmount,
+          offerPrice: derivedOffer ?? undefined,
+          discountPct: toNum(discountPct) || 0,
           computedPriceSource: baseSource,
         } as any,
       });
@@ -294,8 +297,16 @@ export default function AdminRudrakshaDetail() {
           </div>
 
           <div className="rounded-xl border p-3">
-            <div className="text-xs text-gray-500">Offer Price</div>
-            <div className="text-lg font-bold">{data.offerPrice ? `₹${data.offerPrice}` : "-"}</div>
+            <div className="text-xs text-gray-500">Discount % (off final MRP)</div>
+            <input
+              className="mt-1 w-full border rounded-lg px-3 py-2"
+              type="number"
+              value={discountPct}
+              onChange={(e) => setDiscountPct(Number(e.target.value || 0))}
+              placeholder="Enter discount percent (0-100)"
+            />
+            <div className="text-xs text-gray-500 mt-1">Offer will be computed as: Offer = MRP * (1 - discount% / 100)</div>
+            <div className="text-sm text-gray-800 mt-2">Preview Offer: {publicAmount ? `₹${Math.round(publicAmount * (1 - (discountPct || 0) / 100))}` : "-"}</div>
           </div>
 
           <div className="rounded-xl border p-3 md:col-span-3">
@@ -318,6 +329,9 @@ export default function AdminRudrakshaDetail() {
           <div className="rounded-xl border p-3">
             <div className="text-xs text-gray-500">Computed Public Price</div>
             <div className="text-2xl font-bold">{publicAmount ? `₹${publicAmount}` : "-"}</div>
+            {publicAmount ? (
+              <div className="text-sm text-green-700 mt-2">Discount: {Math.round(((publicAmount - Math.round(publicAmount * (1 - (discountPct || 0) / 100))) / publicAmount) * 100)}%</div>
+            ) : null}
           </div>
         </div>
       </div>

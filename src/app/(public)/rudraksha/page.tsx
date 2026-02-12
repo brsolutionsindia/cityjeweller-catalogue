@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
-import { listPublicRudraksha } from "@/lib/firebase/rudrakshaPublicDb";
+import { listPublicRudraksha, pickDisplayPrice, pickMrpPrice } from "@/lib/firebase/rudrakshaPublicDb";
 import RudrakshaGrid from "@/components/public/RudrakshaGrid";
 import type { PublicRudraksha } from "@/lib/firebase/rudrakshaPublicDb";
 
@@ -119,15 +119,12 @@ function getQty(it: any) {
 }
 
 function getPrice(it: any): number | null {
-  // prefer public price if available
-  const p =
-    it.computedPublicPrice ??
-    it.offerPrice ??
-    it.mrp ??
-    it.suggestedMrp ??
-    it.price ??
-    it.amount;
-  return toNum(p);
+  // prefer pickDisplayPrice which already handles offer/computed/mrp logic
+  try {
+    return pickDisplayPrice(it as PublicRudraksha);
+  } catch {
+    return toNum(it.computedPublicPrice ?? it.offerPrice ?? it.mrp ?? it.suggestedMrp ?? it.price ?? it.amount);
+  }
 }
 
 function getCoverUrl(it: any): string | null {
@@ -934,4 +931,3 @@ export default function RudrakshaListPage() {
     </div>
   );
 }
-

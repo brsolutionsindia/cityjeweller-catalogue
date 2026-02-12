@@ -87,18 +87,35 @@ export async function getQueuedRudraksha(skuId: string) {
 
 /**
  * Rudraksha pricing:
- * base picks: suggestedMrp > 0 ? suggestedMrp : 0
- * then apply adminMarginPct always
+ * final MRP (computedPublicPrice) = supplier price * (1 + adminMarginPct/100)
+ * supplier price resolved from: weight mode -> ratePerGm*weightGm, else supplierPrice|supplierRate|price|suggestedMrp
  */
 function computeBaseAndPublic(listing: any) {
   const marginPct = toNum(listing?.adminMarginPct ?? listing?.marginPct ?? 0);
-  const mrp = toNum(listing?.suggestedMrp);
 
-  const base = mrp > 0 ? Math.round(mrp) : 0;
-  const publicPrice = base > 0 ? Math.round(base * (1 + marginPct / 100)) : 0;
-  const source = mrp > 0 ? "SUGGESTED_MRP" : "NONE";
+  // Determine supplier base price
+  let supplierBase = 0;
+  const pm = String(listing?.priceMode || "MRP").toUpperCase();
+  if (pm === "WEIGHT" || pm === "PRICE_PER_WEIGHT" || pm === "RATE_PER_WEIGHT") {
+    const rate = toNum(listing?.ratePerGm ?? listing?.supplierRate ?? listing?.supplierPrice ?? listing?.price);
+    const wt = toNum(listing?.weightGm ?? listing?.weight);
+    supplierBase = rate > 0 && wt > 0 ? Math.round(rate * wt) : 0;
+  } else {
+    // Try supplier-specific fields first, then fall back to suggestedMRP/mrp
+    supplierBase =
+      toNum(listing?.supplierPrice) ||
+      toNum(listing?.supplierRate) ||
+      toNum(listing?.price) ||
+      toNum(listing?.suggestedMrp) ||
+      toNum(listing?.mrp) ||
+      0;
+    supplierBase = Math.round(supplierBase || 0);
+  }
 
-  return { marginPct, base, publicPrice, source };
+  const computedPublicPrice = supplierBase > 0 ? Math.round(supplierBase * (1 + marginPct / 100)) : 0;
+  const source = supplierBase > 0 ? (pm.startsWith("WEIGHT") ? "WEIGHT(supplierRate*weight)" : "SUPPLIER_PRICE") : "NONE";
+
+  return { marginPct, base: supplierBase, publicPrice: computedPublicPrice, source };
 }
 
 export async function approveRudraksha(params: {
