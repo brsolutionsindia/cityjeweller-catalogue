@@ -58,7 +58,8 @@ export async function generateMetadata(
   const cover = pickCoverUrl(Array.isArray(it.media) ? it.media : []) || FALLBACK_IMAGES[0];
   const title = titleFrom(it);
 
-  const origin = safeText(it.origin) ? `Origin: ${it.origin}` : "";
+  const rawOrigin = it.origin || it.originLegacy || it.origin_legacy || it.originCity || it.originCityLegacy || it.productOrigin || it.country || "";
+  const origin = safeText(rawOrigin) ? `Origin: ${rawOrigin}` : "";
   const bead = it.sizeMm ? `Bead size: ${it.sizeMm} mm` : "";
   const short = safeText(it.shortDescription);
 
@@ -115,6 +116,10 @@ export default async function RudrakshaProductPage(
     pickCoverUrl(Array.isArray(data.media) ? data.media : []) || FALLBACK_IMAGES[0];
 
 
+  // origin fallback for display and WA text
+  const rawOriginData =
+    data.origin || data.originLegacy || data.origin_legacy || data.originCity || data.originCityLegacy || data.productOrigin || data.country || "";
+
   // WhatsApp (fixed number)
   const WA_NUMBER = "919023130944"; // ✅ your number
   const waText = encodeURIComponent(
@@ -122,7 +127,7 @@ export default async function RudrakshaProductPage(
       `• SKU: ${data.skuId}\n` +
       `${data.mukhi ? `• Mukhi: ${data.mukhi}\n` : ""}` +
       `${data.type ? `• Type: ${data.type}\n` : ""}` +
-      `${data.origin ? `• Origin: ${data.origin}\n` : ""}` +
+      `${rawOriginData ? `• Origin: ${rawOriginData}\n` : ""}` +
       `${price ? `• Price: ${formatINR(price)}\n` : ""}` +
       `Please share availability, certification details, and delivery timeline.`
   );
@@ -180,10 +185,14 @@ export default async function RudrakshaProductPage(
 
             <div className="text-sm text-gray-600">
               SKU: <span className="font-semibold text-gray-900">{data.skuId}</span>
-              {data.origin ? (
+              {(
+                data.origin || data.originLegacy || data.origin_legacy || data.originCity || data.originCityLegacy || data.productOrigin || data.country
+              ) ? (
                 <>
                   {" "}
-                  • Origin: <span className="font-semibold text-gray-900">{data.origin}</span>
+                  • Origin: <span className="font-semibold text-gray-900">{(
+                    data.origin || data.originLegacy || data.origin_legacy || data.originCity || data.originCityLegacy || data.productOrigin || data.country
+                  )}</span>
                 </>
               ) : null}
             </div>
@@ -262,11 +271,64 @@ export default async function RudrakshaProductPage(
                 <>
                   This listing provides clear media, core specifications and transparent pricing for{" "}
                   {data.mukhi ? `${data.mukhi} Mukhi ` : ""}{(data.type || "Rudraksha").toUpperCase()}.
-                  {data.origin ? ` Origin: ${data.origin}.` : ""}{" "}
+                  {rawOriginData ? ` Origin: ${rawOriginData}.` : ""} {" "}
                   Use WhatsApp enquiry for availability, certification details (if applicable), and delivery timeline.
                 </>
               )}
             </p>
+
+            {/* Full details (public) - exclude supplier-only fields like supplierRate/adminMargin */}
+            <div className="pt-4">
+              <h3 className="text-md font-semibold text-gray-900 mb-2">Full details</h3>
+              <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                {Object.keys(data)
+                  .filter(
+                    (k) =>
+                      k &&
+                      ![
+                        "supplierRate",
+                        "ratePerGm",
+                        "adminMarginPct",
+                        "marginPct",
+                        "supplierUid",
+                        "gstNumber",
+                        "approvedAt",
+                        "computedBasePrice",
+                        "computedPublicPrice",
+                        "createdAt",
+                        "media",
+                        "status",
+                        "updatedAt",
+                      ].includes(k)
+                  )
+                   .sort()
+                   .map((key) => {
+                    const val = (data as any)[key];
+                    // Skip internal empty values
+                    if (val === undefined || val === null || (Array.isArray(val) && val.length === 0)) return null;
+                    // Format some known keys
+                    let display = "";
+                    if (key === "media" || key === "images" || key === "videos") {
+                      display = Array.isArray(val) ? `${val.length} item(s)` : String(val);
+                    } else if (typeof val === "object") {
+                      try {
+                        display = JSON.stringify(val);
+                      } catch (e) {
+                        display = String(val);
+                      }
+                    } else {
+                      display = String(val);
+                    }
+
+                    return (
+                      <div key={key} className="rounded-2xl border p-3">
+                        <div className="text-xs text-gray-500">{key}</div>
+                        <div className="font-semibold text-gray-900 break-words">{display}</div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
 
             <div className="grid sm:grid-cols-3 gap-3 text-sm">
               <InfoCard

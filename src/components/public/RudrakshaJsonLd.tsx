@@ -1,14 +1,7 @@
 // src/components/public/RudrakshaJsonLd.tsx
-"use client";
 
-import Script from "next/script";
 import { pickDisplayPrice, pickCoverUrl, type PublicRudraksha } from "@/lib/firebase/rudrakshaPublicDb";
 
-/**
- * Uses Google’s structured-data patterns:
- * - BreadcrumbList :contentReference[oaicite:3]{index=3}
- * - FAQPage :contentReference[oaicite:4]{index=4}
- */
 export default function RudrakshaJsonLd({
   item,
   coverUrl,
@@ -43,8 +36,8 @@ export default function RudrakshaJsonLd({
       item.mukhi != null
         ? { "@type": "PropertyValue", name: "Mukhi", value: String(item.mukhi) }
         : null,
-      item.origin
-        ? { "@type": "PropertyValue", name: "Origin", value: String(item.origin) }
+      (item.origin || item.originLegacy || item.origin_legacy)
+        ? { "@type": "PropertyValue", name: "Origin", value: String(item.origin || item.originLegacy || item.origin_legacy) }
         : null,
       item.sizeMm
         ? { "@type": "PropertyValue", name: "Bead size (mm)", value: String(item.sizeMm) }
@@ -108,15 +101,9 @@ export default function RudrakshaJsonLd({
 
   return (
     <>
-      <Script id="ld-product" type="application/ld+json" strategy="afterInteractive">
-        {JSON.stringify(productJsonLd)}
-      </Script>
-      <Script id="ld-breadcrumb" type="application/ld+json" strategy="afterInteractive">
-        {JSON.stringify(breadcrumbJsonLd)}
-      </Script>
-      <Script id="ld-faq" type="application/ld+json" strategy="afterInteractive">
-        {JSON.stringify(faqJsonLd)}
-      </Script>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
     </>
   );
 }

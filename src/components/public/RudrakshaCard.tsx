@@ -85,7 +85,17 @@ export default function RudrakshaCard({ it }: { it: PublicRudraksha }) {
   const hasMrp = mrp != null && mrp > 0;
 
   const title = getBestTitle(it);
-  const origin = it.origin ? titleCase(String(it.origin)) : "";
+  // Show origin from common fields (defensive) — prefer `origin`, fall back to other likely keys
+  const rawOrigin =
+    it.origin ||
+    it.originLegacy ||
+    it.origin_legacy ||
+    it.originCity ||
+    it.originCityLegacy ||
+    it.country ||
+    it.productOrigin ||
+    "";
+  const origin = rawOrigin ? titleCase(String(rawOrigin)) : "";
 
   const sku = it.skuId ? String(it.skuId) : "";
   const mukhiChip = formatMukhi((it as any).mukhiType, (it as any).mukhi);
