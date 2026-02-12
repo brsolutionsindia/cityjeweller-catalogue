@@ -58,7 +58,7 @@ export async function generateMetadata(
   const cover = pickCoverUrl(Array.isArray(it.media) ? it.media : []) || FALLBACK_IMAGES[0];
   const title = titleFrom(it);
 
-  const rawOrigin = it.origin || it.originLegacy || it.origin_legacy || it.originCity || it.originCityLegacy || it.productOrigin || it.country || "";
+  const rawOrigin = it.origin || it.originLegacy || (it as any).origin_legacy || it.originCity || it.originCityLegacy || it.productOrigin || it.country || "";
   const origin = safeText(rawOrigin) ? `Origin: ${rawOrigin}` : "";
   const bead = it.sizeMm ? `Bead size: ${it.sizeMm} mm` : "";
   const short = safeText(it.shortDescription);
@@ -120,7 +120,7 @@ export default async function RudrakshaProductPage(
 
   // origin fallback for display and WA text
   const rawOriginData =
-    data.origin || data.originLegacy || data.origin_legacy || data.originCity || data.originCityLegacy || data.productOrigin || data.country || "";
+    data.origin || data.originLegacy || (data as any).origin_legacy || data.originCity || data.originCityLegacy || data.productOrigin || data.country || "";
 
   // WhatsApp (fixed number)
   const WA_NUMBER = "919023130944"; // ✅ your number
